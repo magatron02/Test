@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { Trash2, Download, ChevronRight, DollarSign } from "lucide-react";
+import { Trash2, Download, Check } from "lucide-react";
 import { useStore } from "../store";
 
 const CURRENCIES = [
-  { symbol: "฿", label: "บาทไทย (THB)" },
-  { symbol: "$", label: "ดอลลาร์ (USD)" },
-  { symbol: "€", label: "ยูโร (EUR)" },
-  { symbol: "¥", label: "เยน (JPY)" },
+  { symbol: "฿", label: "บาทไทย",   sub: "THB" },
+  { symbol: "$", label: "ดอลลาร์", sub: "USD" },
+  { symbol: "€", label: "ยูโร",     sub: "EUR" },
+  { symbol: "¥", label: "เยน",      sub: "JPY" },
 ];
 
 export default function Settings() {
@@ -20,7 +20,6 @@ export default function Settings() {
         [t.date, t.type === "income" ? "รายรับ" : "รายจ่าย", t.category, t.amount, `"${t.note}"`].join(",")
       ),
     ].join("\n");
-
     const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -32,7 +31,7 @@ export default function Settings() {
 
   const handleClearAll = () => {
     if (confirmClear) {
-      transactions.forEach((t) => deleteTransaction(t.id));
+      [...transactions].forEach((t) => deleteTransaction(t.id));
       setConfirmClear(false);
     } else {
       setConfirmClear(true);
@@ -40,30 +39,32 @@ export default function Settings() {
   };
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto scrollbar-hide pb-28">
+    <div className="flex flex-col h-full overflow-y-auto scrollbar-hide bg-bg pb-28">
       <div className="px-5 pt-12 pb-6">
-        <h1 className="text-xl font-bold">ตั้งค่า</h1>
+        <h1 className="text-xl font-bold">Settings</h1>
+        <p className="text-xs text-sub mt-0.5">ปรับแต่งแอพพลิเคชัน</p>
       </div>
 
       {/* Currency */}
       <div className="px-5 mb-6">
-        <p className="text-xs text-muted mb-3 uppercase tracking-wide">สกุลเงิน</p>
-        <div className="bg-card rounded-2xl overflow-hidden divide-y divide-white/5">
+        <p className="text-xs text-sub uppercase tracking-widest mb-3">สกุลเงิน</p>
+        <div className="bg-card border border-border rounded-2xl overflow-hidden divide-y divide-border">
           {CURRENCIES.map((c) => (
             <button
               key={c.symbol}
               onClick={() => setCurrency(c.symbol)}
-              className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-white/5 transition-colors"
+              className="w-full flex items-center gap-4 px-4 py-4 hover:bg-card2 transition-colors"
             >
-              <div className="w-9 h-9 bg-primary/20 rounded-full flex items-center justify-center text-primary font-bold">
+              <div className="w-10 h-10 rounded-full bg-green/10 border border-green/20 flex items-center justify-center text-green font-bold text-base">
                 {c.symbol}
               </div>
               <div className="flex-1 text-left">
                 <p className="text-sm font-medium">{c.label}</p>
+                <p className="text-[11px] text-sub">{c.sub}</p>
               </div>
               {currency === c.symbol && (
-                <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                  <div className="w-2 h-2 rounded-full bg-white" />
+                <div className="w-6 h-6 rounded-full bg-green flex items-center justify-center">
+                  <Check size={14} className="text-black" strokeWidth={2.5} />
                 </div>
               )}
             </button>
@@ -73,52 +74,54 @@ export default function Settings() {
 
       {/* Data */}
       <div className="px-5 mb-6">
-        <p className="text-xs text-muted mb-3 uppercase tracking-wide">ข้อมูล</p>
-        <div className="bg-card rounded-2xl overflow-hidden divide-y divide-white/5">
-          <div className="flex items-center px-4 py-3.5">
+        <p className="text-xs text-sub uppercase tracking-widest mb-3">ข้อมูล</p>
+        <div className="bg-card border border-border rounded-2xl overflow-hidden divide-y divide-border">
+          <div className="flex items-center px-4 py-4">
             <div className="flex-1">
               <p className="text-sm font-medium">รายการทั้งหมด</p>
-              <p className="text-xs text-muted">{transactions.length} รายการ</p>
+              <p className="text-[11px] text-sub">{transactions.length} รายการในระบบ</p>
             </div>
-            <ChevronRight size={16} className="text-muted" />
+            <div className="px-3 py-1 bg-green/10 border border-green/20 rounded-full">
+              <span className="text-xs text-green font-semibold">{transactions.length}</span>
+            </div>
           </div>
 
           <button
             onClick={handleExport}
-            className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-white/5 transition-colors"
+            disabled={transactions.length === 0}
+            className="w-full flex items-center gap-4 px-4 py-4 hover:bg-card2 transition-colors disabled:opacity-40"
           >
-            <div className="w-9 h-9 bg-primary/20 rounded-full flex items-center justify-center">
-              <Download size={16} className="text-primary" />
+            <div className="w-10 h-10 rounded-full bg-green/10 flex items-center justify-center">
+              <Download size={16} className="text-green" />
             </div>
             <div className="flex-1 text-left">
               <p className="text-sm font-medium">ส่งออกข้อมูล</p>
-              <p className="text-xs text-muted">บันทึกเป็นไฟล์ CSV</p>
+              <p className="text-[11px] text-sub">บันทึกเป็นไฟล์ CSV</p>
             </div>
-            <ChevronRight size={16} className="text-muted" />
           </button>
 
           <button
             onClick={handleClearAll}
-            className="w-full flex items-center gap-4 px-4 py-3.5 hover:bg-expense/10 transition-colors"
+            className="w-full flex items-center gap-4 px-4 py-4 hover:bg-expense/5 transition-colors"
           >
-            <div className="w-9 h-9 bg-expense/20 rounded-full flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-expense/10 flex items-center justify-center">
               <Trash2 size={16} className="text-expense" />
             </div>
             <div className="flex-1 text-left">
-              <p className="text-sm font-medium text-expense">
-                {confirmClear ? "กดอีกครั้งเพื่อยืนยัน" : "ลบข้อมูลทั้งหมด"}
+              <p className={`text-sm font-medium ${confirmClear ? "text-expense" : "text-white"}`}>
+                {confirmClear ? "ยืนยันลบข้อมูลทั้งหมด?" : "ลบข้อมูลทั้งหมด"}
               </p>
-              <p className="text-xs text-muted">ไม่สามารถกู้คืนได้</p>
+              <p className="text-[11px] text-sub">ไม่สามารถกู้คืนได้</p>
             </div>
           </button>
         </div>
       </div>
 
-      {/* App info */}
       <div className="px-5">
-        <div className="bg-card rounded-2xl px-4 py-4 text-center">
-          <p className="text-sm font-semibold mb-1">บัญชีรายรับรายจ่าย</p>
-          <p className="text-xs text-muted">v1.0.0</p>
+        <div className="bg-card border border-border rounded-2xl px-4 py-4 text-center">
+          <div className="text-2xl mb-1">💰</div>
+          <p className="text-sm font-semibold">Expense Tracker</p>
+          <p className="text-[11px] text-sub mt-0.5">v1.0.0 — บันทึกข้อมูลในเครื่อง</p>
         </div>
       </div>
     </div>
