@@ -14,9 +14,8 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
-import ta
 
-from app.agent.market_analyzer import compute_indicators
+from app.agent.market_analyzer import compute_indicators, _ema, _rsi, _macd, _bollinger_bands, _atr
 
 
 # ---------------------------------------------------------------------------
@@ -71,27 +70,27 @@ def _build_indicator_series(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
     # EMAs
-    df["ema9"]  = ta.trend.EMAIndicator(close, 9).ema_indicator()
-    df["ema21"] = ta.trend.EMAIndicator(close, 21).ema_indicator()
-    df["ema50"] = ta.trend.EMAIndicator(close, 50).ema_indicator()
+    df["ema9"]  = _ema(close, 9)
+    df["ema21"] = _ema(close, 21)
+    df["ema50"] = _ema(close, 50)
 
     # MACD
-    _macd = ta.trend.MACD(close)
-    df["macd"]      = _macd.macd()
-    df["macd_sig"]  = _macd.macd_signal()
-    df["macd_hist"] = _macd.macd_diff()
+    macd_line, macd_signal_line, macd_histogram = _macd(close)
+    df["macd"]      = macd_line
+    df["macd_sig"]  = macd_signal_line
+    df["macd_hist"] = macd_histogram
 
     # RSI
-    df["rsi"] = ta.momentum.RSIIndicator(close, 14).rsi()
+    df["rsi"] = _rsi(close, 14)
 
     # Bollinger Bands
-    _bb = ta.volatility.BollingerBands(close, 20, 2)
-    df["bb_upper"] = _bb.bollinger_hband()
-    df["bb_lower"] = _bb.bollinger_lband()
-    df["bb_mid"]   = _bb.bollinger_mavg()
+    bb_upper, bb_mid, bb_lower = _bollinger_bands(close, 20, 2.0)
+    df["bb_upper"] = bb_upper
+    df["bb_lower"] = bb_lower
+    df["bb_mid"]   = bb_mid
 
     # ATR
-    df["atr"] = ta.volatility.AverageTrueRange(high, low, close, 14).average_true_range()
+    df["atr"] = _atr(high, low, close, 14)
 
     return df
 

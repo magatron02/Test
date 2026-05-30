@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     # Push Notifications (Firebase Cloud Messaging)
     FCM_SERVER_KEY: str = ""
 
+    # Demo mode — uses simulated market data instead of live exchange APIs
+    USE_DEMO_MODE: bool = True
+
     class Config:
         env_file = ".env"
         extra = "ignore"

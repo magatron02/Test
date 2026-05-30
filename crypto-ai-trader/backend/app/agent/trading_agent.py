@@ -7,9 +7,15 @@ from app.agent.market_analyzer import compute_indicators, calculate_grid_params,
 from app.exchanges.binance_client import BinanceClient
 from app.exchanges.okx_client import OKXClient
 from app.exchanges.hyperliquid_client import HyperliquidClient
+from app.exchanges.demo_client import DemoClient
 
 WATCHLIST = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "AVAX/USDT"]
 HL_WATCHLIST = ["BTC", "ETH", "SOL"]
+
+
+def _make_client(real_client, exchange_name: str):
+    """Return real client if exchange is reachable, otherwise demo client."""
+    return real_client
 
 
 class TradingAgent:
@@ -18,28 +24,35 @@ class TradingAgent:
         self.binance = BinanceClient()
         self.okx = OKXClient()
         self.hyperliquid = HyperliquidClient()
+        self.demo = DemoClient("demo")
         self.is_running = False
         self.paper_balance = {"USDT": 10000.0}
         self.paper_positions = []
+        self.use_demo = settings.USE_DEMO_MODE
+
+    def _client_for(self, exchange: str):
+        if self.use_demo:
+            return self.demo
+        if exchange == "binance":
+            return self.binance
+        if exchange == "okx":
+            return self.okx
+        return self.demo
 
     async def analyze_market(self, symbol: str, exchange: str = "binance") -> dict:
         try:
-            if exchange == "binance":
-                ohlcv_1h = await self.binance.get_ohlcv(symbol, "1h", 200)
-                ohlcv_4h = await self.binance.get_ohlcv(symbol, "4h", 100)
-                ticker = await self.binance.get_ticker(symbol)
-                orderbook = await self.binance.get_orderbook(symbol)
-            elif exchange == "okx":
-                ohlcv_1h = await self.okx.get_ohlcv(symbol, "1h", 200)
-                ohlcv_4h = await self.okx.get_ohlcv(symbol, "4h", 100)
-                ticker = await self.okx.get_ticker(symbol)
-                orderbook = {"bids": [], "asks": [], "spread": 0}
-            else:
+            client = self._client_for(exchange)
+            if not self.use_demo and exchange == "hyperliquid":
                 hl_symbol = symbol.split("/")[0]
                 ohlcv_1h = await self.hyperliquid.get_ohlcv(hl_symbol, "1h", 200)
                 ohlcv_4h = await self.hyperliquid.get_ohlcv(hl_symbol, "4h", 100)
                 ticker = await self.hyperliquid.get_ticker(hl_symbol)
                 orderbook = {"bids": [], "asks": [], "spread": 0}
+            else:
+                ohlcv_1h = await client.get_ohlcv(symbol, "1h", 200)
+                ohlcv_4h = await client.get_ohlcv(symbol, "4h", 100)
+                ticker = await client.get_ticker(symbol)
+                orderbook = await client.get_orderbook(symbol) if hasattr(client, "get_orderbook") else {"bids": [], "asks": [], "spread": 0}
 
             indicators_1h = compute_indicators(ohlcv_1h)
             indicators_4h = compute_indicators(ohlcv_4h)

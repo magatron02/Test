@@ -293,19 +293,11 @@ async def run_backtest(req: BacktestRequest):
     candles_needed = req.days * _CANDLES_PER_DAY[timeframe]
     limit = min(candles_needed, _MAX_CANDLES)
 
-    # Fetch OHLCV from the requested exchange
+    # Fetch OHLCV from the requested exchange (falls back to demo in demo mode)
     try:
         symbol = req.symbol.upper()
-        if req.exchange == "binance":
-            ohlcv = await agent.binance.get_ohlcv(symbol, timeframe, limit)
-        elif req.exchange == "okx":
-            ohlcv = await agent.okx.get_ohlcv(symbol, timeframe, limit)
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Exchange '{req.exchange}' is not supported for backtesting. "
-                       "Supported: binance, okx",
-            )
+        client = agent._client_for(req.exchange)
+        ohlcv = await client.get_ohlcv(symbol, timeframe, limit)
     except HTTPException:
         raise
     except Exception as exc:
@@ -369,7 +361,7 @@ async def get_prices(symbols: str = "BTC/USDT,ETH/USDT,SOL/USDT"):
     prices = {}
     for symbol in symbol_list:
         try:
-            ticker = await agent.binance.get_ticker(symbol)
+            ticker = await agent._client_for("binance").get_ticker(symbol)
             prices[symbol] = ticker
         except Exception as e:
             prices[symbol] = {"error": str(e)}

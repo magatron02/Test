@@ -13,8 +13,12 @@ class HyperliquidClient:
     def __init__(self):
         self.base_url = TESTNET_URL if settings.HYPERLIQUID_TESTNET else MAINNET_URL
         self.account: Optional[LocalAccount] = None
-        if settings.HYPERLIQUID_PRIVATE_KEY:
-            self.account = eth_account.Account.from_key(settings.HYPERLIQUID_PRIVATE_KEY)
+        pk = settings.HYPERLIQUID_PRIVATE_KEY
+        if pk and len(pk) >= 64 and not pk.startswith("your_"):
+            try:
+                self.account = eth_account.Account.from_key(pk)
+            except Exception:
+                self.account = None
         self.session: Optional[aiohttp.ClientSession] = None
 
     async def _get_session(self) -> aiohttp.ClientSession:

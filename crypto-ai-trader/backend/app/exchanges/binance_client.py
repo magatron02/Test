@@ -4,26 +4,26 @@ import ccxt.async_support as ccxt
 from app.core.config import settings
 
 
+def _has_keys(api_key: str, secret: str) -> bool:
+    return bool(api_key and secret and not api_key.startswith("your_"))
+
+
 class BinanceClient:
     def __init__(self):
-        self.exchange = ccxt.binance({
-            "apiKey": settings.BINANCE_API_KEY,
-            "secret": settings.BINANCE_SECRET_KEY,
-            "enableRateLimit": True,
-            "options": {
-                "defaultType": "future" if not settings.BINANCE_TESTNET else "future",
-            },
-        })
+        futures_cfg: dict = {"enableRateLimit": True, "options": {"defaultType": "future"}}
+        if _has_keys(settings.BINANCE_API_KEY, settings.BINANCE_SECRET_KEY):
+            futures_cfg["apiKey"] = settings.BINANCE_API_KEY
+            futures_cfg["secret"] = settings.BINANCE_SECRET_KEY
+        self.exchange = ccxt.binance(futures_cfg)
         if settings.BINANCE_TESTNET:
             self.exchange.set_sandbox_mode(True)
 
-        self.spot = ccxt.binance({
-            "apiKey": settings.BINANCE_API_KEY,
-            "secret": settings.BINANCE_SECRET_KEY,
-            "enableRateLimit": True,
-        })
-        if settings.BINANCE_TESTNET:
-            self.spot.set_sandbox_mode(True)
+        # Spot: mainnet, public endpoints work without keys
+        spot_cfg: dict = {"enableRateLimit": True}
+        if _has_keys(settings.BINANCE_API_KEY, settings.BINANCE_SECRET_KEY):
+            spot_cfg["apiKey"] = settings.BINANCE_API_KEY
+            spot_cfg["secret"] = settings.BINANCE_SECRET_KEY
+        self.spot = ccxt.binance(spot_cfg)
 
     async def get_ticker(self, symbol: str) -> dict:
         try:
