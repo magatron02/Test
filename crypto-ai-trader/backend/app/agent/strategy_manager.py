@@ -136,3 +136,189 @@ class PerpetualStrategy:
             "stop_loss": round(stop_loss, 4),
             "rr_ratio": round(abs(take_profit - price) / abs(stop_loss - price), 2),
         }
+
+
+class DCAStrategy:
+    """Dollar-Cost Averaging strategy — buys at fixed intervals and scales in on dips"""
+
+    def __init__(self, exchange_client, symbol: str, config: dict):
+        self.client = exchange_client
+        self.symbol = symbol
+        self.total_amount = config["total_amount"]
+        self.interval_hours = config["interval_hours"]
+        self.num_orders = config["num_orders"]
+        self.min_drop_pct = config["min_drop_pct"]
+        self.base_order_size = self.total_amount / self.num_orders
+
+    async def check_and_buy(
+        self,
+        current_price: float,
+        last_buy_price: float,
+        portfolio_value: float,
+    ) -> dict:
+        """
+        Decide whether to place a DCA buy.
+
+        Returns a dict with keys:
+          action    – "buy" or "skip"
+          amount    – USDT amount to spend (0 when skipping)
+          reasoning – human-readable explanation
+        """
+        if current_price <= 0:
+            return {"action": "skip", "amount": 0, "reasoning": "Invalid price data"}
+
+        # How far has price dropped from the last purchase?
+        if last_buy_price and last_buy_price > 0:
+            drop_pct = (last_buy_price - current_price) / last_buy_price * 100
+        else:
+            drop_pct = 0.0
+
+        # Aggressive multiplier when price has dropped beyond the threshold
+        if drop_pct >= self.min_drop_pct:
+            # Scale buy size proportionally to how deep the dip is (up to 3x base)
+            dip_multiplier = min(1.0 + (drop_pct / self.min_drop_pct), 3.0)
+            amount = round(self.base_order_size * dip_multiplier, 2)
+            reasoning = (
+                f"Price dropped {drop_pct:.2f}% from last buy (${last_buy_price:.4f} → "
+                f"${current_price:.4f}), exceeding the {self.min_drop_pct}% threshold. "
+                f"Scaling in aggressively with {dip_multiplier:.2f}x the base order size."
+            )
+            return {"action": "buy", "amount": amount, "reasoning": reasoning}
+
+        # Regular interval buy — only if we still have budget headroom
+        max_deployed = self.total_amount
+        if portfolio_value >= max_deployed:
+            amount = round(self.base_order_size, 2)
+            reasoning = (
+                f"Scheduled DCA interval purchase of ${amount:.2f} at ${current_price:.4f}. "
+                f"Price is within {drop_pct:.2f}% of last buy — no dip multiplier applied."
+            )
+            return {"action": "buy", "amount": amount, "reasoning": reasoning}
+
+        return {
+            "action": "skip",
+            "amount": 0,
+            "reasoning": (
+                f"Total DCA budget of ${self.total_amount:.2f} already deployed. "
+                "Skipping this interval."
+            ),
+        }
+
+
+class TrendFollowStrategy:
+    """Multi-timeframe trend-following strategy using EMA200, RSI, and MACD"""
+
+    def __init__(self, exchange_client, symbol: str, leverage: int = 2):
+        self.client = exchange_client
+        self.symbol = symbol
+        self.leverage = leverage
+        self._MIN_CONFIDENCE = 0.6
+
+    async def analyze(self, indicators_1h: dict, indicators_4h: dict) -> dict:
+        """
+        Cross-timeframe analysis returning a trading signal.
+
+        Returns a dict with keys:
+          signal     – "long", "short", or "flat"
+          confidence – float 0-1 (signals below 0.6 are suppressed to "flat")
+          entry      – suggested entry price (current price)
+          tp         – take-profit price
+          sl         – stop-loss price
+          reasoning  – human-readable explanation
+        """
+        score = 0.0
+        max_score = 0.0
+        reasons: list[str] = []
+
+        price = indicators_1h.get("price") or indicators_4h.get("price", 0)
+        atr_1h = indicators_1h.get("atr", 0)
+        atr_4h = indicators_4h.get("atr", 0)
+        atr = atr_4h if atr_4h else atr_1h  # prefer 4 h ATR for wider targets
+
+        # --- EMA 200 bias (both timeframes) ---
+        for tf_label, ind in (("1h", indicators_1h), ("4h", indicators_4h)):
+            ema200 = ind.get("ema200")
+            if ema200 and price:
+                max_score += 1.0
+                if price > ema200:
+                    score += 1.0
+                    reasons.append(f"Price above EMA200 on {tf_label} (bullish)")
+                else:
+                    score -= 1.0
+                    reasons.append(f"Price below EMA200 on {tf_label} (bearish)")
+
+        # --- RSI divergence / level ---
+        rsi_1h = indicators_1h.get("rsi", 50)
+        rsi_4h = indicators_4h.get("rsi", 50)
+        max_score += 1.0
+        if rsi_1h < 45 and rsi_4h > 50:
+            # 1 h oversold while 4 h still bullish → bullish divergence
+            score += 1.0
+            reasons.append(f"RSI bullish divergence: 1h={rsi_1h:.1f}, 4h={rsi_4h:.1f}")
+        elif rsi_1h > 55 and rsi_4h < 50:
+            # 1 h overbought while 4 h bearish → bearish divergence
+            score -= 1.0
+            reasons.append(f"RSI bearish divergence: 1h={rsi_1h:.1f}, 4h={rsi_4h:.1f}")
+        else:
+            reasons.append(f"RSI neutral: 1h={rsi_1h:.1f}, 4h={rsi_4h:.1f}")
+
+        # --- MACD crossover (both timeframes) ---
+        for tf_label, ind in (("1h", indicators_1h), ("4h", indicators_4h)):
+            macd_hist = ind.get("macd_histogram", 0)
+            macd_prev = ind.get("macd_histogram_prev", 0)
+            if macd_hist is not None and macd_prev is not None:
+                max_score += 1.0
+                if macd_hist > 0 and macd_prev <= 0:
+                    score += 1.0
+                    reasons.append(f"MACD bullish crossover on {tf_label}")
+                elif macd_hist < 0 and macd_prev >= 0:
+                    score -= 1.0
+                    reasons.append(f"MACD bearish crossover on {tf_label}")
+                elif macd_hist > 0:
+                    score += 0.5
+                    reasons.append(f"MACD positive histogram on {tf_label}")
+                elif macd_hist < 0:
+                    score -= 0.5
+                    reasons.append(f"MACD negative histogram on {tf_label}")
+
+        # Normalise score to [-1, 1] then map to confidence in [0, 1]
+        if max_score > 0:
+            normalised = score / max_score  # range [-1, 1]
+        else:
+            normalised = 0.0
+
+        confidence = abs(normalised)
+        raw_signal = "long" if normalised > 0 else ("short" if normalised < 0 else "flat")
+
+        if confidence < self._MIN_CONFIDENCE:
+            return {
+                "signal": "flat",
+                "confidence": round(confidence, 3),
+                "entry": round(price, 4),
+                "tp": None,
+                "sl": None,
+                "reasoning": (
+                    f"Confidence {confidence:.2f} below threshold {self._MIN_CONFIDENCE}. "
+                    "No trade. " + " | ".join(reasons)
+                ),
+            }
+
+        # Calculate TP / SL from ATR; widen targets on higher timeframe
+        tp_atr = atr * 2.5 * self.leverage
+        sl_atr = atr * 1.2
+
+        if raw_signal == "long":
+            tp = round(price + tp_atr, 4) if atr else None
+            sl = round(price - sl_atr, 4) if atr else None
+        else:
+            tp = round(price - tp_atr, 4) if atr else None
+            sl = round(price + sl_atr, 4) if atr else None
+
+        return {
+            "signal": raw_signal,
+            "confidence": round(confidence, 3),
+            "entry": round(price, 4),
+            "tp": tp,
+            "sl": sl,
+            "reasoning": " | ".join(reasons),
+        }

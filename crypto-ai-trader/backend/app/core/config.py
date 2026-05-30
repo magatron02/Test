@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     DEFAULT_LEVERAGE: int = 3
     MAX_LEVERAGE: int = 10
 
+    # Push Notifications (Firebase Cloud Messaging)
+    FCM_SERVER_KEY: str = ""
+
     class Config:
         env_file = ".env"
         extra = "ignore"

@@ -57,4 +57,12 @@ export const api = {
     leverage?: number;
     strategy?: string;
   }) => getClient().post("/trade/manual", params),
+
+  runBacktest: (params: {
+    symbol: string;
+    strategy: string;
+    days: number;
+    capital: number;
+    exchange: string;
+  }) => getClient().post("/backtest", params),
 };

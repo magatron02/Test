@@ -1,9 +1,11 @@
 import asyncio
 from fastapi import APIRouter, HTTPException, BackgroundTasks
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from app.agent.trading_agent import TradingAgent
 from app.agent.market_analyzer import compute_indicators, calculate_grid_params
+from app.agent.backtester import BacktestEngine
+from app.core.notifications import notification_service
 
 router = APIRouter()
 agent = TradingAgent()
@@ -189,13 +191,176 @@ async def manual_trade(req: OrderRequest):
                 result = await agent.okx.place_spot_order(symbol, req.side, req.amount, req.price)
             else:
                 result = await agent.okx.place_perpetual_order(symbol, req.side, req.amount, req.leverage, req.price)
-        elif exchange == "paper":
+        elif req.exchange == "paper":
             result = {"status": "paper", "message": "Use agent analyze endpoint"}
         else:
             raise HTTPException(status_code=400, detail="Unknown exchange")
         return result
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ─── Notifications ────────────────────────────────────────────────────────────
+
+class RegisterTokenRequest(BaseModel):
+    token: str
+
+
+@router.post("/notifications/register")
+async def register_device(req: RegisterTokenRequest):
+    notification_service.register_token(req.token)
+    return {"status": "registered"}
+
+
+@router.delete("/notifications/unregister")
+async def unregister_device(req: RegisterTokenRequest):
+    notification_service.unregister_token(req.token)
+    return {"status": "unregistered"}
+
+
+@router.post("/notifications/test")
+async def test_notification():
+    await notification_service.send_trade_alert(
+        action="buy",
+        symbol="BTC/USDT",
+        price=67000.0,
+        confidence=0.85,
+        reasoning="Test notification from CryptoAI Trader",
+    )
+    return {"status": "sent"}
+
+
+# ─── Backtest ─────────────────────────────────────────────────────────────────
+
+# Candles per day for each supported timeframe
+_CANDLES_PER_DAY: dict = {"1h": 24, "4h": 6, "1d": 1}
+# Maximum candles a single exchange request will accept
+_MAX_CANDLES: int = 1000
+
+
+class BacktestRequest(BaseModel):
+    exchange: str = Field("binance", description="Exchange to fetch OHLCV from: binance | okx")
+    symbol: str = Field("BTC/USDT", description="Trading pair, e.g. BTC/USDT")
+    strategy: str = Field("spot", description="Strategy to backtest: spot | grid | futures")
+    timeframe: str = Field("1h", description="Candle interval: 1h | 4h | 1d")
+    days: int = Field(30, ge=1, le=365, description="Number of historical days to backtest")
+    initial_capital: float = Field(10_000.0, gt=0, description="Starting capital in USDT")
+
+
+class BacktestResponse(BaseModel):
+    symbol: str
+    exchange: str
+    strategy: str
+    timeframe: str
+    days: int
+    candles_used: int
+    initial_capital: float
+    final_capital: float
+    total_return_pct: float
+    max_drawdown_pct: float
+    sharpe_ratio: float
+    win_rate: float
+    total_trades: int
+    profit_factor: float
+    avg_trade_pct: float
+
+
+@router.post("/backtest", response_model=BacktestResponse)
+async def run_backtest(req: BacktestRequest):
+    """
+    Fetch historical OHLCV data from the given exchange and run a full
+    simulated backtest using pure technical-indicator signals (RSI, MACD,
+    EMA, Bollinger Bands, ATR).  No AI/Claude calls are made.
+
+    Returns aggregated performance metrics for the chosen strategy and period.
+    """
+    # Validate inputs
+    strategy = req.strategy.lower()
+    if strategy not in ("spot", "grid", "futures"):
+        raise HTTPException(
+            status_code=422,
+            detail="strategy must be one of: spot, grid, futures",
+        )
+
+    timeframe = req.timeframe.lower()
+    if timeframe not in _CANDLES_PER_DAY:
+        raise HTTPException(
+            status_code=422,
+            detail="timeframe must be one of: 1h, 4h, 1d",
+        )
+
+    # Determine how many candles to request
+    candles_needed = req.days * _CANDLES_PER_DAY[timeframe]
+    limit = min(candles_needed, _MAX_CANDLES)
+
+    # Fetch OHLCV from the requested exchange
+    try:
+        symbol = req.symbol.upper()
+        if req.exchange == "binance":
+            ohlcv = await agent.binance.get_ohlcv(symbol, timeframe, limit)
+        elif req.exchange == "okx":
+            ohlcv = await agent.okx.get_ohlcv(symbol, timeframe, limit)
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Exchange '{req.exchange}' is not supported for backtesting. "
+                       "Supported: binance, okx",
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Failed to fetch OHLCV data from {req.exchange}: {exc}",
+        )
+
+    if len(ohlcv) < 60:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Only {len(ohlcv)} candles returned — need at least 60 to warm up "
+                "indicators.  Try a longer timeframe or more days."
+            ),
+        )
+
+    # Determine grid parameters when strategy is "grid"
+    backtest_params: dict = {"initial_capital": req.initial_capital}
+    if strategy == "grid":
+        closes = [c["close"] for c in ohlcv]
+        first_close = closes[0]
+        # Use a rolling high/low over the full period as the grid boundary
+        highs  = [c["high"] for c in ohlcv]
+        lows   = [c["low"]  for c in ohlcv]
+        backtest_params["upper_price"] = max(highs) * 0.98   # slight inward buffer
+        backtest_params["lower_price"] = min(lows)  * 1.02
+        backtest_params["grid_count"]  = 10
+
+    # Run the backtest (no AI calls)
+    try:
+        engine = BacktestEngine()
+        result = await engine.run_backtest(ohlcv, strategy, backtest_params)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Backtest engine error: {exc}")
+
+    return BacktestResponse(
+        symbol           = req.symbol,
+        exchange         = req.exchange,
+        strategy         = strategy,
+        timeframe        = timeframe,
+        days             = req.days,
+        candles_used     = len(ohlcv),
+        initial_capital  = result.initial_capital,
+        final_capital    = result.final_capital,
+        total_return_pct = result.total_return_pct,
+        max_drawdown_pct = result.max_drawdown_pct,
+        sharpe_ratio     = result.sharpe_ratio,
+        win_rate         = result.win_rate,
+        total_trades     = result.total_trades,
+        profit_factor    = result.profit_factor,
+        avg_trade_pct    = result.avg_trade_pct,
+    )
 
 
 @router.get("/prices")
