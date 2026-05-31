@@ -304,6 +304,22 @@ async def save_thai_settings(data: Dict[str, Any]):
     return {"success": True}
 
 
+@router.get("/candles")
+async def get_candles(symbol: str = "BTC/USDT", limit: int = 80):
+    """GET /api/candles?symbol=BTC/USDT&limit=80 — OHLCV for candlestick chart."""
+    if not _trader:
+        raise HTTPException(503, "Trader not running")
+    try:
+        candles = await _trader._exchange.get_ohlcv(symbol, limit=limit)
+        return [
+            {"t": int(c.timestamp.timestamp() * 1000),
+             "o": c.open, "h": c.high, "l": c.low, "c": c.close, "v": c.volume}
+            for c in candles
+        ]
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
 # ─── Training Loop Routes ──────────────────────────────────────
 
 @router.post("/training/loop/start")

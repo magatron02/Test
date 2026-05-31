@@ -141,6 +141,24 @@ class TrainingLoop:
     def stop(self):
         self.running = False
 
+    async def _notify_complete(self, wr: float, total: int):
+        try:
+            from ..core.config import settings
+            from ..notifications.line_notify import line_notify
+            from ..notifications.telegram_notify import telegram_notify
+            notify_on = settings.get("notifications", "notify_on") or {}
+            if not notify_on.get("training_complete", False):
+                return
+            msg = f"🎯 AI Training สำเร็จ!\nWin Rate: {wr:.1%} ({total} trades)\nModel พร้อมใช้งานแล้ว"
+            cfg_line = settings.get("notifications", "line") or {}
+            cfg_tg   = settings.get("notifications", "telegram") or {}
+            if cfg_line.get("enabled") and cfg_line.get("token"):
+                await line_notify(msg)
+            if cfg_tg.get("enabled") and cfg_tg.get("bot_token"):
+                await telegram_notify(msg)
+        except Exception:
+            pass
+
     # ── internals ───────────────────────────────────────────
     def _log(self, msg: str):
         ts = datetime.utcnow().strftime("%H:%M:%S")
@@ -261,6 +279,7 @@ class TrainingLoop:
                                     "total_trades": total,
                                     "accuracy": acc,
                                 })
+                                await self._notify_complete(wr, total)
                                 break
 
                     # ── open new trade ──
