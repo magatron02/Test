@@ -91,6 +91,15 @@ strategy:
     atr_period: 14
     vwap_enabled: true
 
+thai:
+  sec_api_key: ""           # ลงทะเบียนฟรีที่ api-portal.sec.or.th
+  # watch_stocks:           # หุ้นที่ติดตาม (default = SET50 ทั้งหมด)
+  #   - "PTT.BK"
+  #   - "KBANK.BK"
+  # watch_funds:            # กองทุนที่ติดตาม
+  #   - "KFSDIV"
+  #   - "KT-PRECIOUS"
+
 notifications:
   line:
     token: ""               # LINE Notify token

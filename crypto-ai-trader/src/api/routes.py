@@ -216,3 +216,83 @@ async def reset_demo():
     _trader._exchange.reset()
     _trader._open_trades.clear()
     return {"success": True}
+
+
+# ─── Thai Market Routes ────────────────────────────────────────
+
+@router.get("/thai/stocks")
+async def get_thai_stocks(symbols: str = ""):
+    """GET /api/thai/stocks — SET stock quotes + technical signals."""
+    from ..thai.set_client import set_client, SET_STOCKS
+    from ..thai.thai_analyzer import analyze_set
+
+    target_syms = [s.strip() for s in symbols.split(",") if s.strip()] or None
+    quotes = set_client.get_all_quotes(target_syms)
+    result = []
+    for q in quotes:
+        history = set_client.get_history(q["symbol"], days=100)
+        if len(history) < 30:
+            analysis = None
+        else:
+            a = analyze_set(q, history)
+            analysis = {
+                "signal":      a.signal,
+                "confidence":  a.confidence,
+                "reasoning":   a.reasoning,
+                "rsi":         a.rsi,
+                "rsi_signal":  a.rsi_signal,
+                "macd_trend":  a.macd_trend,
+                "ema_trend":   a.ema_trend,
+                "bb_signal":   a.bb_signal,
+                "bb_position": a.bb_position,
+                "volatility":  a.volatility,
+                "support":     a.support,
+                "resistance":  a.resistance,
+            }
+        result.append({**q, "analysis": analysis})
+    return result
+
+
+@router.get("/thai/stocks/{symbol}/history")
+async def get_set_history(symbol: str, days: int = 100):
+    """GET /api/thai/stocks/{symbol}/history — daily OHLCV for chart."""
+    from ..thai.set_client import set_client
+    history = set_client.get_history(symbol, days=days)
+    return history
+
+
+@router.get("/thai/funds")
+async def get_thai_funds():
+    """GET /api/thai/funds — NAV + returns for popular Thai mutual funds."""
+    from ..thai.fund_client import fund_client
+    funds = await fund_client.get_all_funds()
+    # Remove full history from response (keep last 30 points for chart)
+    return funds
+
+
+@router.get("/thai/funds/{code}/history")
+async def get_fund_history(code: str):
+    """GET /api/thai/funds/{code}/history — NAV history for sparkline."""
+    from ..thai.fund_client import fund_client, POPULAR_FUNDS
+    fund = next((f for f in POPULAR_FUNDS if f["code"] == code), None)
+    if not fund:
+        raise HTTPException(404, f"Fund {code} not found")
+    data = await fund_client.get_fund_data(fund, days=365)
+    return data.get("history", [])
+
+
+@router.get("/thai/settings")
+async def get_thai_settings():
+    return {
+        "sec_api_key_set": bool(settings.get("thai", "sec_api_key", default="")),
+        "watch_stocks": settings.get("thai", "watch_stocks", default=[]),
+        "watch_funds":  settings.get("thai", "watch_funds",  default=[]),
+    }
+
+
+@router.post("/thai/settings")
+async def save_thai_settings(data: Dict[str, Any]):
+    for k, v in data.items():
+        settings.set(v, "thai", k)
+    settings.save()
+    return {"success": True}

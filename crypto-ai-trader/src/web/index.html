@@ -111,6 +111,7 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe 
     <li><a href="#" class="nav-link" onclick="showSection('portfolio', this)"><i class="bi bi-wallet2"></i> Portfolio</a></li>
     <li><a href="#" class="nav-link" onclick="showSection('ai-training', this)"><i class="bi bi-cpu"></i> AI Training</a></li>
     <li><a href="#" class="nav-link" onclick="showSection('trade-history', this)"><i class="bi bi-clock-history"></i> History</a></li>
+    <li><a href="#" class="nav-link" onclick="showSection('thai-market', this)"><i class="bi bi-flag"></i> ตลาดไทย</a></li>
     <li><a href="#" class="nav-link" onclick="showSection('settings', this)"><i class="bi bi-gear"></i> Settings</a></li>
   </ul>
   <div class="p-3 mt-3 border-top" style="border-color:var(--border)!important">
@@ -346,6 +347,96 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe 
   </div>
 </section>
 
+<!-- THAI MARKET -->
+<section id="sec-thai-market" class="section">
+
+  <!-- Tabs -->
+  <div class="d-flex gap-2 mb-3">
+    <button class="tab-btn active" id="tabStocks" onclick="thaiTab('stocks',this)">
+      <i class="bi bi-bar-chart me-1"></i>หุ้นไทย (SET)
+    </button>
+    <button class="tab-btn" id="tabFunds" onclick="thaiTab('funds',this)">
+      <i class="bi bi-piggy-bank me-1"></i>กองทุนรวม
+    </button>
+    <div class="ms-auto d-flex align-items-center gap-2">
+      <span class="badge" style="background:rgba(56,139,253,0.2);color:#58a6ff;border:1px solid rgba(56,139,253,0.3)" id="thaiDataSource">simulation</span>
+      <button class="btn btn-outline-secondary btn-sm" onclick="refreshThaiData()">
+        <i class="bi bi-arrow-clockwise"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- หุ้นไทย panel -->
+  <div id="panel-stocks">
+    <div class="row g-3 mb-3">
+      <div class="col-md-8">
+        <div class="card">
+          <div class="card-header d-flex justify-content-between">
+            <span><i class="bi bi-graph-up me-2"></i>SET Stock Chart (Daily)</span>
+            <select class="form-select form-select-sm" style="width:auto" id="setChartSymbol" onchange="loadSetChart(this.value)"></select>
+          </div>
+          <div class="card-body p-2">
+            <div class="chart-container"><canvas id="setChart"></canvas></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card h-100">
+          <div class="card-header"><i class="bi bi-cpu me-2"></i>Technical Analysis</div>
+          <div class="card-body" id="setAnalysisPanel">
+            <div class="text-muted small text-center py-3">เลือกหุ้น</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="row g-2" id="setStockCards">
+      <div class="col-12 text-muted text-center py-4">
+        <div class="spinner-border spinner-border-sm text-secondary me-2"></div>กำลังโหลดข้อมูล...
+      </div>
+    </div>
+  </div>
+
+  <!-- กองทุน panel -->
+  <div id="panel-funds" style="display:none">
+    <div class="row g-3 mb-3">
+      <div class="col-md-8">
+        <div class="card">
+          <div class="card-header d-flex justify-content-between">
+            <span><i class="bi bi-graph-up me-2"></i>NAV History</span>
+            <select class="form-select form-select-sm" style="width:auto" id="fundChartSelect" onchange="loadFundChart(this.value)"></select>
+          </div>
+          <div class="card-body p-2">
+            <div class="chart-container"><canvas id="fundChart"></canvas></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card h-100">
+          <div class="card-header"><i class="bi bi-info-circle me-2"></i>Fund Info</div>
+          <div class="card-body" id="fundInfoPanel">
+            <div class="text-muted small text-center py-3">เลือกกองทุน</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="row g-2" id="fundCards">
+      <div class="col-12 text-muted text-center py-4">
+        <div class="spinner-border spinner-border-sm text-secondary me-2"></div>กำลังโหลด...
+      </div>
+    </div>
+
+    <!-- SEC API key notice -->
+    <div class="alert mt-3" style="background:rgba(56,139,253,0.08);border:1px solid rgba(56,139,253,0.2);border-radius:8px">
+      <i class="bi bi-info-circle me-2" style="color:#388bfd"></i>
+      <strong style="color:#388bfd">ข้อมูล NAV จริง:</strong>
+      ต้องลงทะเบียนรับ API key ฟรีที่
+      <a href="https://api-portal.sec.or.th" target="_blank" style="color:#58a6ff">api-portal.sec.or.th</a>
+      แล้วใส่ใน Settings → Thai Market → SEC API Key
+    </div>
+  </div>
+
+</section>
+
 <!-- SETTINGS -->
 <section id="sec-settings" class="section">
   <div class="row g-3">
@@ -426,6 +517,15 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe 
         </div>
       </div>
 
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-flag me-2"></i>Thai Market</div>
+        <div class="card-body">
+          <label class="form-label">SEC Thailand API Key <small class="text-muted">(ลงทะเบียนฟรีที่ api-portal.sec.or.th)</small></label>
+          <input type="password" class="form-control form-control-sm mb-2" id="secApiKey" placeholder="xxxxxxxxxxxxxxxx">
+          <button class="btn btn-primary btn-sm" onclick="saveThaiSettings()">Save</button>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-header"><i class="bi bi-bell me-2"></i>Notifications</div>
         <div class="card-body">
@@ -495,6 +595,7 @@ function showSection(name, el) {
   if (name === 'portfolio') refreshPortfolio();
   if (name === 'trade-history') refreshHistory();
   if (name === 'ai-training') refreshTraining();
+  if (name === 'thai-market') loadThaiStocks();
 }
 
 function showExTab(name, el) {
@@ -988,6 +1089,289 @@ document.getElementById('chartSymbolSelect').addEventListener('change', (e) => s
 function setChartRange(range, el) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
+}
+
+// ============================================================
+// Thai Market
+// ============================================================
+let thaiStocksData = [];
+let thaiFundsData  = [];
+let setChartObj    = null;
+let fundChartObj   = null;
+
+function thaiTab(tab, el) {
+  document.getElementById('panel-stocks').style.display = tab === 'stocks' ? '' : 'none';
+  document.getElementById('panel-funds').style.display  = tab === 'funds'  ? '' : 'none';
+  document.querySelectorAll('#sec-thai-market .tab-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  if (tab === 'stocks' && !thaiStocksData.length) loadThaiStocks();
+  if (tab === 'funds'  && !thaiFundsData.length)  loadThaiFunds();
+}
+
+async function refreshThaiData() {
+  thaiStocksData = []; thaiFundsData = [];
+  if (document.getElementById('panel-stocks').style.display !== 'none') await loadThaiStocks();
+  else await loadThaiFunds();
+}
+
+async function loadThaiStocks() {
+  document.getElementById('setStockCards').innerHTML =
+    '<div class="col-12 text-muted text-center py-4"><div class="spinner-border spinner-border-sm text-secondary me-2"></div>กำลังวิเคราะห์...</div>';
+  try {
+    const r = await fetch('/api/thai/stocks');
+    thaiStocksData = await r.json();
+    renderSetCards(thaiStocksData);
+    // populate chart selector
+    const sel = document.getElementById('setChartSymbol');
+    sel.innerHTML = '';
+    thaiStocksData.forEach(s => {
+      const o = document.createElement('option');
+      o.value = s.symbol; o.textContent = `${s.name} (${s.symbol.replace('.BK','')})`;
+      sel.appendChild(o);
+    });
+    if (thaiStocksData.length) loadSetChart(thaiStocksData[0].symbol);
+    const src = thaiStocksData[0]?.analysis ? 'yfinance' : 'simulation';
+    document.getElementById('thaiDataSource').textContent = src;
+  } catch(e) { document.getElementById('setStockCards').innerHTML = '<div class="col-12 text-danger p-3">โหลดไม่ได้: '+e.message+'</div>'; }
+}
+
+function renderSetCards(stocks) {
+  const container = document.getElementById('setStockCards');
+  container.innerHTML = '';
+  const sectorColor = {
+    'พลังงาน':'rgba(210,153,34,0.15)', 'การเงิน':'rgba(56,139,253,0.12)',
+    'สื่อสาร':'rgba(163,113,247,0.12)', 'ขนส่ง':'rgba(46,160,67,0.12)',
+    'สุขภาพ':'rgba(248,81,73,0.1)', 'พาณิชย์':'rgba(88,166,255,0.12)',
+    'อุตสาหกรรม':'rgba(139,148,158,0.12)', 'ท่องเที่ยว':'rgba(63,185,80,0.1)',
+    'เกษตร':'rgba(46,160,67,0.15)',
+  };
+  stocks.forEach(s => {
+    const a = s.analysis || {};
+    const up = s.change_1d >= 0;
+    const sigCls = a.signal === 'BUY' ? 'signal-buy' : a.signal === 'SELL' ? 'signal-sell' : 'signal-hold';
+    const bgCol = sectorColor[s.sector] || 'rgba(48,54,61,0.3)';
+    const col = document.createElement('div');
+    col.className = 'col-6 col-md-4 col-lg-3 col-xl-2';
+    col.innerHTML = `
+      <div class="price-card" onclick="selectSetStock('${s.symbol}')" style="background:${bgCol};cursor:pointer">
+        <div class="d-flex justify-content-between align-items-start mb-1">
+          <div>
+            <strong class="small">${s.name}</strong><br>
+            <span style="font-size:0.65rem;color:var(--text-muted)">${s.sector}</span>
+          </div>
+          ${a.signal ? `<span class="badge-signal ${sigCls}">${a.signal}</span>` : ''}
+        </div>
+        <div class="fw-bold">฿${s.price?.toFixed(2)}</div>
+        <div class="small ${up?'price-up':'price-down'}">${up?'+':''}${s.change_1d?.toFixed(2)}%</div>
+        ${a.rsi ? `<div style="font-size:0.65rem;color:var(--text-muted);margin-top:3px">RSI ${a.rsi}</div>` : ''}
+      </div>`;
+    container.appendChild(col);
+  });
+}
+
+function selectSetStock(symbol) {
+  document.getElementById('setChartSymbol').value = symbol;
+  loadSetChart(symbol);
+}
+
+async function loadSetChart(symbol) {
+  if (!symbol) return;
+  const stock = thaiStocksData.find(s => s.symbol === symbol);
+  try {
+    const r = await fetch(`/api/thai/stocks/${encodeURIComponent(symbol)}/history?days=60`);
+    const history = await r.json();
+    if (!history.length) return;
+
+    const labels = history.map(h => h.date);
+    const closes = history.map(h => h.close);
+    const gridColor = 'rgba(48,54,61,0.5)';
+
+    if (!setChartObj) {
+      setChartObj = new Chart(document.getElementById('setChart'), {
+        type: 'line',
+        data: { labels, datasets: [{
+          label: symbol, data: closes,
+          borderColor: '#d29922', backgroundColor: 'rgba(210,153,34,0.08)',
+          fill: true, tension: 0.2, pointRadius: 0,
+        }]},
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color:'#8b949e', maxTicksLimit: 8, font:{size:10} }, grid:{color:gridColor} },
+            y: { ticks: { color:'#8b949e', font:{size:10} }, grid:{color:gridColor} },
+          }
+        }
+      });
+    } else {
+      setChartObj.data.labels = labels;
+      setChartObj.data.datasets[0].data = closes;
+      setChartObj.data.datasets[0].label = symbol;
+      setChartObj.update();
+    }
+
+    // Update analysis panel
+    if (stock?.analysis) {
+      const a = stock.analysis;
+      const sigColor = a.signal==='BUY'?'#3fb950':a.signal==='SELL'?'#f85149':'#8b949e';
+      document.getElementById('setAnalysisPanel').innerHTML = `
+        <div class="d-flex justify-content-between mb-2">
+          <strong style="color:${sigColor}">${a.signal}</strong>
+          <span class="text-muted small">${(a.confidence*100).toFixed(0)}%</span>
+        </div>
+        <div class="small text-muted mb-3 p-2 rounded" style="background:rgba(48,54,61,0.4)">${a.reasoning}</div>
+        <div class="indicator-row"><span>RSI(14)</span>
+          <span style="color:${a.rsi<35?'#3fb950':a.rsi>65?'#f85149':'#8b949e'}">${a.rsi} [${a.rsi_signal}]</span></div>
+        <div class="indicator-row"><span>MACD</span>
+          <span class="${a.macd_trend==='BULLISH'?'price-up':a.macd_trend==='BEARISH'?'price-down':'text-muted'}">${a.macd_trend}</span></div>
+        <div class="indicator-row"><span>EMA Trend</span>
+          <span class="${a.ema_trend==='BULLISH'?'price-up':a.ema_trend==='BEARISH'?'price-down':'text-muted'}">${a.ema_trend}</span></div>
+        <div class="indicator-row"><span>Bollinger</span>
+          <span class="${a.bb_signal==='OVERSOLD'?'price-up':a.bb_signal==='OVERBOUGHT'?'price-down':'text-muted'}">${a.bb_signal}</span></div>
+        <div class="indicator-row"><span>Volatility</span><span>${a.volatility}</span></div>
+        <div class="indicator-row"><span>Support</span><span class="price-up">฿${a.support}</span></div>
+        <div class="indicator-row"><span>Resistance</span><span class="price-down">฿${a.resistance}</span></div>`;
+    }
+  } catch(e) { console.error('loadSetChart', e); }
+}
+
+async function loadThaiFunds() {
+  document.getElementById('fundCards').innerHTML =
+    '<div class="col-12 text-muted text-center py-4"><div class="spinner-border spinner-border-sm text-secondary me-2"></div>กำลังโหลด NAV...</div>';
+  try {
+    const r = await fetch('/api/thai/funds');
+    thaiFundsData = await r.json();
+    renderFundCards(thaiFundsData);
+
+    const sel = document.getElementById('fundChartSelect');
+    sel.innerHTML = '';
+    thaiFundsData.forEach(f => {
+      const o = document.createElement('option');
+      o.value = f.code; o.textContent = f.name;
+      sel.appendChild(o);
+    });
+    if (thaiFundsData.length) loadFundChart(thaiFundsData[0].code);
+    const src = thaiFundsData[0]?.source || 'simulation';
+    document.getElementById('thaiDataSource').textContent = src;
+  } catch(e) { document.getElementById('fundCards').innerHTML = '<div class="col-12 text-danger p-3">'+e.message+'</div>'; }
+}
+
+function renderFundCards(funds) {
+  const container = document.getElementById('fundCards');
+  container.innerHTML = '';
+  const typeColor = {
+    equity:'rgba(46,160,67,0.12)', equity_esg:'rgba(46,160,67,0.08)',
+    fixed_income:'rgba(56,139,253,0.12)', money_market:'rgba(139,148,158,0.12)',
+    commodity:'rgba(210,153,34,0.12)', mixed:'rgba(163,113,247,0.12)',
+    foreign:'rgba(88,166,255,0.12)',
+  };
+  const typeLabel = {
+    equity:'หุ้นไทย', equity_esg:'หุ้น ESG', fixed_income:'ตราสารหนี้',
+    money_market:'ตลาดเงิน', commodity:'สินค้าโภคภัณฑ์', mixed:'ผสม', foreign:'ต่างประเทศ',
+  };
+  funds.forEach(f => {
+    const bg = typeColor[f.type] || 'rgba(48,54,61,0.2)';
+    const ret1d = f.ret_1d != null ? f.ret_1d : null;
+    const ret1m = f.ret_1m != null ? f.ret_1m : null;
+    const ret1y = f.ret_1y != null ? f.ret_1y : null;
+    const up = ret1d == null ? true : ret1d >= 0;
+    const col = document.createElement('div');
+    col.className = 'col-12 col-md-6 col-lg-4';
+    col.innerHTML = `
+      <div class="price-card" onclick="selectFund('${f.code}')" style="background:${bg}">
+        <div class="d-flex justify-content-between align-items-start mb-1">
+          <div>
+            <strong class="small">${f.name}</strong><br>
+            <span style="font-size:0.65rem;color:var(--text-muted)">${f.amcTH} · ${typeLabel[f.type]||f.type}</span>
+          </div>
+          ${f.source==='simulation'?'<span style="font-size:0.6rem;color:var(--text-muted);border:1px solid var(--border);border-radius:4px;padding:1px 5px">sim</span>':''}
+        </div>
+        <div class="fw-bold mt-1">฿${f.nav?.toFixed(4) || '—'}</div>
+        <div class="d-flex gap-3 mt-1" style="font-size:0.75rem">
+          <span>1D: <span class="${ret1d==null?'text-muted':ret1d>=0?'price-up':'price-down'}">${ret1d!=null?(ret1d>=0?'+':'')+ret1d.toFixed(2)+'%':'—'}</span></span>
+          <span>1M: <span class="${ret1m==null?'text-muted':ret1m>=0?'price-up':'price-down'}">${ret1m!=null?(ret1m>=0?'+':'')+ret1m.toFixed(2)+'%':'—'}</span></span>
+          <span>1Y: <span class="${ret1y==null?'text-muted':ret1y>=0?'price-up':'price-down'}">${ret1y!=null?(ret1y>=0?'+':'')+ret1y.toFixed(2)+'%':'—'}</span></span>
+        </div>
+      </div>`;
+    container.appendChild(col);
+  });
+}
+
+function selectFund(code) {
+  document.getElementById('fundChartSelect').value = code;
+  loadFundChart(code);
+}
+
+async function loadFundChart(code) {
+  const fund = thaiFundsData.find(f => f.code === code);
+  if (!fund) return;
+  try {
+    const history = fund.history || [];
+    if (!history.length) return;
+    const labels = history.map(h => h.date);
+    const navs   = history.map(h => h.nav);
+    const gridColor = 'rgba(48,54,61,0.5)';
+
+    if (!fundChartObj) {
+      fundChartObj = new Chart(document.getElementById('fundChart'), {
+        type: 'line',
+        data: { labels, datasets: [{
+          label: 'NAV (฿)', data: navs,
+          borderColor: '#a371f7', backgroundColor: 'rgba(163,113,247,0.08)',
+          fill: true, tension: 0.3, pointRadius: 0,
+        }]},
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks:{color:'#8b949e',maxTicksLimit:6,font:{size:10}},grid:{color:gridColor} },
+            y: { ticks:{color:'#8b949e',font:{size:10}},grid:{color:gridColor} },
+          }
+        }
+      });
+    } else {
+      fundChartObj.data.labels = labels;
+      fundChartObj.data.datasets[0].data = navs;
+      fundChartObj.data.datasets[0].label = `${fund.name} NAV`;
+      fundChartObj.update();
+    }
+
+    const typeLabel = {
+      equity:'หุ้นไทย',equity_esg:'หุ้น ESG',fixed_income:'ตราสารหนี้',
+      money_market:'ตลาดเงิน',commodity:'สินค้าโภคภัณฑ์',mixed:'ผสม',foreign:'ต่างประเทศ'
+    };
+    document.getElementById('fundInfoPanel').innerHTML = `
+      <div class="fw-bold mb-2">${fund.name}</div>
+      <div class="indicator-row"><span>บลจ.</span><span>${fund.amcTH}</span></div>
+      <div class="indicator-row"><span>ประเภท</span><span>${typeLabel[fund.type]||fund.type}</span></div>
+      <div class="indicator-row"><span>NAV/หน่วย</span><span>฿${fund.nav?.toFixed(4)||'—'}</span></div>
+      <div class="indicator-row"><span>1 วัน</span>
+        <span class="${!fund.ret_1d?'text-muted':fund.ret_1d>=0?'price-up':'price-down'}">${fund.ret_1d!=null?(fund.ret_1d>=0?'+':'')+fund.ret_1d.toFixed(2)+'%':'—'}</span></div>
+      <div class="indicator-row"><span>1 เดือน</span>
+        <span class="${!fund.ret_1m?'text-muted':fund.ret_1m>=0?'price-up':'price-down'}">${fund.ret_1m!=null?(fund.ret_1m>=0?'+':'')+fund.ret_1m.toFixed(2)+'%':'—'}</span></div>
+      <div class="indicator-row"><span>3 เดือน</span>
+        <span class="${!fund.ret_3m?'text-muted':fund.ret_3m>=0?'price-up':'price-down'}">${fund.ret_3m!=null?(fund.ret_3m>=0?'+':'')+fund.ret_3m.toFixed(2)+'%':'—'}</span></div>
+      <div class="indicator-row"><span>6 เดือน</span>
+        <span class="${!fund.ret_6m?'text-muted':fund.ret_6m>=0?'price-up':'price-down'}">${fund.ret_6m!=null?(fund.ret_6m>=0?'+':'')+fund.ret_6m.toFixed(2)+'%':'—'}</span></div>
+      <div class="indicator-row"><span>1 ปี</span>
+        <span class="${!fund.ret_1y?'text-muted':fund.ret_1y>=0?'price-up':'price-down'}">${fund.ret_1y!=null?(fund.ret_1y>=0?'+':'')+fund.ret_1y.toFixed(2)+'%':'—'}</span></div>
+      <div class="indicator-row"><span>YTD</span>
+        <span class="${!fund.ret_ytd?'text-muted':fund.ret_ytd>=0?'price-up':'price-down'}">${fund.ret_ytd!=null?(fund.ret_ytd>=0?'+':'')+fund.ret_ytd.toFixed(2)+'%':'—'}</span></div>
+      <div class="mt-2">
+        <span style="font-size:0.65rem;color:var(--text-muted)">แหล่งข้อมูล: ${fund.source==='sec_api'?'SEC Thailand':'Simulation'}</span>
+      </div>`;
+  } catch(e) { console.error('loadFundChart', e); }
+}
+
+async function saveThaiSettings() {
+  const key = document.getElementById('secApiKey').value;
+  if (key) {
+    await fetch('/api/thai/settings', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({sec_api_key: key}),
+    });
+    showToast('Saved', 'SEC API key saved — NAV จะดึงจาก SEC Thailand', 'success');
+  }
 }
 
 // ============================================================
