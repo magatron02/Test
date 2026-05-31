@@ -1,112 +1,261 @@
-# CryptoAI Trader
+# AI Auto Trader — คู่มือผู้ใช้ภาษาไทย
 
-AI-powered crypto trading agent with mobile app. Supports Spot, Grid, Futures, and Perpetual trading on Binance, OKX, and Hyperliquid.
+---
 
-## Architecture
+## 1. ภาพรวม
+
+**AI Auto Trader** คือระบบซื้อขายสกุลเงินดิจิทัลอัตโนมัติที่ขับเคลื่อนด้วย AI โดยมีความสามารถดังนี้:
+
+- วิเคราะห์ตลาดด้วย AI ในแบบเรียลไทม์ (Rule-based / ML / Claude AI / Hybrid)
+- รองรับโหมด **Demo** (เงินสมมติ ไม่มีความเสี่ยง) และโหมด **Live** (เงินจริง)
+- รองรับ exchange หลายแห่ง: Binance, OKX, Bitkub
+- วิเคราะห์หลาย Timeframe พร้อมกัน (15m + 1h + 4h)
+- มีระบบ AI Training Loop เพื่อปรับปรุงความแม่นยำ
+- รองรับ **ตลาดไทย**: หุ้น SET และกองทุนรวม
+- แจ้งเตือนผ่าน LINE Notify และ Telegram
+
+---
+
+## 2. ความต้องการของระบบ
+
+| รายการ | ข้อกำหนด |
+|--------|----------|
+| ระบบปฏิบัติการ | Windows 10 / Windows 11 (64-bit) |
+| Python | 3.10 ขึ้นไป |
+| RAM | 4 GB ขึ้นไป |
+| พื้นที่ดิสก์ | 2 GB ขึ้นไป |
+| อินเทอร์เน็ต | จำเป็น (ใช้ตลอดเวลา) |
+| เบราว์เซอร์ | Chrome / Edge / Firefox รุ่นล่าสุด |
+
+---
+
+## 3. การติดตั้ง (ครั้งแรก)
+
+1. แตกไฟล์โปรแกรมไปยังโฟลเดอร์ที่ต้องการ เช่น `C:\AITrader\`
+2. ดับเบิลคลิกที่ไฟล์ **`SETUP.bat`**
+3. รอให้ระบบติดตั้ง dependencies โดยอัตโนมัติ (ใช้เวลาประมาณ 3-5 นาทีในครั้งแรก)
+4. เมื่อขึ้นข้อความ `Setup complete!` แสดงว่าติดตั้งเสร็จแล้ว
+
+> **หมายเหตุ:** ไม่จำเป็นต้องติดตั้ง Python แยกต่างหาก — SETUP.bat จัดการให้ทั้งหมด
+
+---
+
+## 4. การเปิดใช้งาน
+
+1. ดับเบิลคลิกที่ไฟล์ **`START.bat`**
+2. หน้าต่าง Command Prompt จะเปิดขึ้นและแสดงสถานะการทำงาน
+3. เบราว์เซอร์จะเปิด **http://localhost:8888** โดยอัตโนมัติภายใน 2-3 วินาที
+4. หากเบราว์เซอร์ไม่เปิดอัตโนมัติ ให้เปิดเองและพิมพ์ `http://localhost:8888`
+
+> **อย่าปิดหน้าต่าง Command Prompt** ขณะใช้งาน — หากปิดโปรแกรมจะหยุดทำงาน
+
+---
+
+## 5. เมนูหลัก
+
+| เมนู | คำอธิบาย |
+|------|----------|
+| **Dashboard** | ภาพรวมพอร์ตโฟลิโอ, กราฟ equity curve, สถิติ Sharpe/Drawdown |
+| **Trading** | ดูสัญญาณซื้อขาย, เปิด/ปิด trade ด้วยตนเอง, เลือกกลยุทธ์ |
+| **Portfolio** | ยอดเงิน, ตำแหน่งที่ถือครอง, PnL แยกตามเหรียญ |
+| **AI Training** | Fast Training Loop, ดู win rate, ตั้งค่า Auto-trade |
+| **History** | ประวัติการซื้อขายทั้งหมด, Export CSV |
+| **ตลาดไทย** | ราคาหุ้น SET, กองทุนรวม, การวิเคราะห์ทางเทคนิค |
+| **Backtest** | ทดสอบกลยุทธ์กับข้อมูลในอดีต |
+| **Settings** | ตั้งค่า API Keys, การแจ้งเตือน, Risk Management |
+
+---
+
+## 6. การตั้งค่า API Keys
+
+### 6.1 Exchange API Keys (Binance / OKX / Bitkub)
+
+1. ไปที่ **Settings** → **Exchange API Keys**
+2. กรอก **API Key** และ **API Secret** ของ exchange ที่ต้องการ
+3. คลิกปุ่ม **"Test Connections"** เพื่อทดสอบการเชื่อมต่อ
+4. คลิก **Save** เพื่อบันทึก
+
+### 6.2 การสร้าง API Key บน Binance
+
+1. เข้าสู่ระบบที่ [binance.com](https://binance.com)
+2. ไปที่ **Account** → **API Management**
+3. คลิก **Create API** → ตั้งชื่อ → ยืนยัน 2FA
+4. ตั้ง Permission: เปิด **Enable Spot & Margin Trading** (ปิด Withdraw)
+5. Whitelist IP address ของคุณเพื่อความปลอดภัย
+
+### 6.3 แนะนำใช้ Testnet ก่อน
 
 ```
-crypto-ai-trader/
-├── backend/          # FastAPI + Python AI Agent
-│   ├── app/
-│   │   ├── agent/   # AI Trading Agent (Claude-powered)
-│   │   ├── exchanges/  # Binance, OKX, Hyperliquid clients
-│   │   └── api/     # REST + WebSocket endpoints
-│   └── Dockerfile
-├── mobile/           # React Native App
-│   └── src/
-│       ├── screens/ # Dashboard, Trading, Portfolio, Wallet, Settings
-│       ├── components/
-│       └── services/ # API + WebSocket client
-└── docker-compose.yml
+Binance Testnet: https://testnet.binance.vision/
+OKX Demo:        เปิดในแอป OKX → Demo Trading
 ```
 
-## Quick Start
+> ใช้ Testnet/Demo เพื่อทดสอบกลยุทธ์โดยไม่เสี่ยงกับเงินจริง
 
-### Backend
+### 6.4 Claude AI API Key (ตัวเลือก)
 
-```bash
-cd backend
-cp .env.example .env
-# Edit .env with your API keys
+- ไปที่ [console.anthropic.com](https://console.anthropic.com) เพื่อสร้าง API Key
+- กรอกใน **Settings** → **AI** → **Claude API Key**
+- ใช้โหมด AI Model = `claude` เพื่อเปิดใช้งาน
 
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
-```
+---
 
-Or with Docker:
-```bash
-cp backend/.env.example .env
-docker-compose up -d
-```
+## 7. AI Training — การฝึก AI
 
-### Mobile App
+### Fast Training Loop
 
-```bash
-cd mobile
-npm install
-npx react-native run-ios    # iOS
-npx react-native run-android  # Android
-```
+1. ไปที่เมนู **AI Training**
+2. ตั้ง **Target Win Rate** (แนะนำ 80%)
+3. เปิด/ปิด **Auto-trade** — เมื่อเปิด AI จะซื้อขายอัตโนมัติเมื่อถึง target
+4. คลิก **Start Training Loop**
+5. ดูสถานะ: จำนวน trades, win rate ปัจจุบัน, สถานะ
 
-## Configuration
+### ความหมายของตัวเลข
 
-Set these in `backend/.env`:
+| ตัวเลข | ความหมาย |
+|--------|----------|
+| Win Rate ≥ 80% | AI พร้อมสำหรับ Auto-trade |
+| Sharpe Ratio > 1.0 | ผลตอบแทนดีเมื่อเทียบกับความเสี่ยง |
+| Max Drawdown < 10% | ความเสี่ยงขาดทุนสูงสุดยังอยู่ในระดับที่ยอมรับได้ |
 
-| Variable | Description |
-|----------|-------------|
-| `ANTHROPIC_API_KEY` | Claude AI API key (required) |
-| `BINANCE_API_KEY` | Binance API key |
-| `BINANCE_SECRET_KEY` | Binance secret |
-| `BINANCE_TESTNET` | Use testnet (true/false) |
-| `OKX_API_KEY` | OKX API key |
-| `OKX_SECRET_KEY` | OKX secret |
-| `OKX_PASSPHRASE` | OKX passphrase |
-| `HYPERLIQUID_PRIVATE_KEY` | ETH wallet private key |
+---
 
-## Trading Strategies
+## 8. Backtesting — ทดสอบกลยุทธ์
 
-### Spot Trading
-Buy/sell assets directly. AI analyzes RSI, MACD, EMA crossovers across 1H and 4H timeframes.
+1. ไปที่เมนู **Backtest**
+2. เลือก **Symbol** (เช่น BTC/USDT)
+3. ตั้ง **ระยะเวลา** (7-365 วัน)
+4. ตั้ง **Take Profit %** และ **Stop Loss %**
+5. คลิก **Run Backtest**
+6. ดูผลลัพธ์: Win Rate, Total PnL, Max Drawdown, Equity Curve
 
-### Grid Trading
-Automatically places buy/sell orders at fixed price intervals. Profits from price oscillation.
-- AI calculates optimal upper/lower bounds based on ATR volatility
-- Rebalances automatically when orders fill
+> Backtest ใช้ข้อมูลราคาจำลองย้อนหลัง — ผลลัพธ์อาจต่างจากการเทรดจริง
 
-### Futures / Perpetual
-Leveraged positions with configurable leverage (default 3x, max 10x).
-- Full long/short capability
-- Automatic TP/SL placement
-- Risk-managed position sizing
+---
 
-## Risk Management
+## 9. Multi-Timeframe Analysis (MTF)
 
-- Maximum position size: 5% of portfolio per trade
-- Maximum drawdown: 15% triggers agent pause
-- Stop-loss required on every trade
-- Paper trading mode for testing (default: ON)
+ระบบวิเคราะห์พร้อมกัน 3 Timeframe โดยมีน้ำหนักดังนี้:
 
-## API Endpoints
+| Timeframe | น้ำหนัก | จุดประสงค์ |
+|-----------|---------|-----------|
+| 15 นาที | 30% | สัญญาณระยะสั้น |
+| 1 ชั่วโมง | 40% | เทรนด์กลาง (หลัก) |
+| 4 ชั่วโมง | 30% | เทรนด์ใหญ่ |
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /api/v1/health` | Health check |
-| `GET /api/v1/prices` | Live prices |
-| `GET /api/v1/market/{exchange}/{symbol}` | Full market analysis |
-| `POST /api/v1/agent/analyze` | AI analysis + decision |
-| `POST /api/v1/agent/start` | Start auto-trading |
-| `POST /api/v1/agent/stop` | Stop agent |
-| `GET /api/v1/portfolio/{exchange}` | Portfolio balances |
-| `POST /api/v1/grid/setup` | Calculate grid parameters |
-| `WS /ws` | Real-time prices + agent status |
+**Combined Signal** = ผลรวมถ่วงน้ำหนักของทั้ง 3 Timeframe
 
-## Security
+- `BUY` — เมื่อ buy score ≥ 0.25 และมากกว่า sell score
+- `SELL` — เมื่อ sell score ≥ 0.25 และมากกว่า buy score
+- `HOLD` — เมื่อสัญญาณไม่ชัดเจน
 
-- API keys stored encrypted on device
-- WalletConnect for on-chain signing (no private key exposure)
-- Testnet mode enabled by default
-- Read-only portfolio viewing supported (no trade keys required)
+ดูได้ที่ **Trading** → คลิกเหรียญ → **MTF Analysis**
 
-## Disclaimer
+---
 
-This software is for educational purposes. Crypto trading involves significant risk of loss. Always test with paper trading before using real funds. Past AI performance does not guarantee future results.
+## 10. การแจ้งเตือน
+
+### LINE Notify
+
+1. เข้า [notify-bot.line.me](https://notify-bot.line.me) → Login → **Generate token**
+2. เลือก Chat/Group ที่ต้องการรับแจ้งเตือน
+3. Copy token ไปกรอกใน **Settings** → **Notifications** → **LINE Token**
+
+### Telegram
+
+1. สร้าง Bot ผ่าน [@BotFather](https://t.me/BotFather) → `/newbot`
+2. คัดลอก **Bot Token**
+3. หา **Chat ID** ของคุณผ่าน [@userinfobot](https://t.me/userinfobot)
+4. กรอกทั้งคู่ใน **Settings** → **Notifications** → **Telegram**
+
+---
+
+## 11. ตลาดไทย
+
+### หุ้น SET
+
+- ดูราคาหุ้นไทยแบบ Real-time (delayed 15 นาที)
+- มีการวิเคราะห์ทางเทคนิค: RSI, MACD, EMA, Bollinger Bands
+- สัญญาณ BUY/SELL/HOLD พร้อม confidence score
+- ดูกราฟย้อนหลังได้ถึง 100 วัน
+
+### กองทุนรวม
+
+- ติดตาม NAV (มูลค่าสินทรัพย์สุทธิต่อหน่วย)
+- ดูผลตอบแทน YTD, 1Y, 3Y
+- รองรับกองทุนยอดนิยมในไทย
+
+### การตั้งค่า
+
+1. ไปที่ **Settings** → **ตลาดไทย**
+2. กรอก SEC API Key (ถ้ามี) เพื่อข้อมูลละเอียดขึ้น
+3. เพิ่มหุ้น/กองทุนที่ต้องการติดตามในรายการ Watchlist
+
+---
+
+## 12. Risk Management
+
+| การตั้งค่า | ความหมาย | แนะนำ |
+|-----------|----------|-------|
+| **Max Daily Loss** | ขาดทุนสูงสุดต่อวัน (%) | 5% |
+| **Risk per Trade** | เงินที่เสี่ยงต่อ 1 trade (%) | 1-2% |
+| **Max Open Trades** | จำนวน positions สูงสุดพร้อมกัน | 3-5 |
+| **Take Profit** | เป้าหมายกำไร (%) | 3-5% |
+| **Stop Loss** | จุดตัดขาดทุน (%) | 1-2% |
+
+ตั้งค่าได้ที่ **Settings** → **Risk Management**
+
+---
+
+## 13. คำสั่ง .bat
+
+| ไฟล์ | คำสั่ง | คำอธิบาย |
+|------|--------|----------|
+| `SETUP.bat` | ติดตั้ง | ติดตั้งครั้งแรก (รันครั้งเดียว) |
+| `START.bat` | เริ่มต้น | เปิดโปรแกรม |
+| `STOP.bat` | หยุด | ปิดโปรแกรม |
+| `RESTART.bat` | รีสตาร์ท | รีสตาร์ทโปรแกรม |
+| `CHECK.bat` | ตรวจสอบ | ดูสถานะว่าโปรแกรมทำงานอยู่ไหม |
+| `BUILD.bat` | Build | สร้างไฟล์ .exe (สำหรับ developer) |
+
+---
+
+## 14. คำถามที่พบบ่อย (FAQ)
+
+**Q: เงินในพอร์ตหายไปไหน?**
+A: ตรวจสอบว่าคุณอยู่ในโหมดไหน — ถ้าเป็น **Demo mode** เงินที่เห็นคือเงินสมมติ ไม่ใช่เงินจริง กลับไปดูที่ Settings → Trading Mode
+
+**Q: โปรแกรมเปิดไม่ได้ / หน้าเว็บไม่ขึ้น**
+A: ตรวจสอบว่า port 8888 ไม่ถูกโปรแกรมอื่นใช้อยู่ หรือ Firewall/Antivirus อาจบล็อก ลองรัน `CHECK.bat` เพื่อดูสถานะ
+
+**Q: เปลี่ยน port ได้ไหม?**
+A: ได้ — แก้ไขไฟล์ `settings.yml` บรรทัด `port: 8888` เป็น port ที่ต้องการ แล้ว restart โปรแกรม
+
+**Q: AI ซื้อขายผิดพลาดบ่อย ทำไงดี?**
+A: ลองรัน AI Training Loop จนถึง Win Rate ≥ 80% ก่อนเปิด Auto-trade หรือปรับค่า Risk per Trade ให้ต่ำลง
+
+**Q: ข้อมูลราคาไม่อัปเดต?**
+A: ตรวจสอบการเชื่อมต่ออินเทอร์เน็ต และ API Key ที่ Settings → Test Connections
+
+**Q: จะดู log การทำงานได้จากไหน?**
+A: ดูได้จากหน้าต่าง Command Prompt ที่เปิดโดย START.bat หรือดูไฟล์ใน `data/logs/`
+
+**Q: Backtest ผลดีมาก แต่เทรดจริงขาดทุน ทำไม?**
+A: Backtest ใช้ข้อมูลย้อนหลัง ซึ่งอาจเกิด **overfitting** ให้ทดสอบด้วย Testnet ก่อนเสมอ และใช้ข้อมูลย้อนหลังอย่างน้อย 90 วัน
+
+---
+
+## 15. ข้อควรระวัง
+
+> **คำเตือนสำคัญ — กรุณาอ่านก่อนใช้งาน**
+
+1. **Live Mode ใช้เงินจริง** — การซื้อขายในโหมด Live จะใช้เงินจริงจาก exchange ของคุณ ความผิดพลาดอาจทำให้สูญเสียเงินได้
+2. **ทดสอบด้วย Demo ก่อนเสมอ** — ใช้ Demo mode จนมั่นใจในกลยุทธ์ก่อนสลับเป็น Live mode
+3. **ไม่รับผิดชอบความเสียหาย** — ผู้พัฒนาไม่รับผิดชอบต่อความเสียหายทางการเงินใดๆ ที่เกิดจากการใช้งานโปรแกรมนี้
+4. **ตลาดคริปโตมีความผันผวนสูง** — ราคาอาจเปลี่ยนแปลงอย่างรวดเร็วและรุนแรง ลงทุนเฉพาะจำนวนที่คุณยอมรับการสูญเสียได้
+5. **ปกป้อง API Key ของคุณ** — อย่าแชร์ API Key กับผู้อื่น และตั้ง IP Whitelist เสมอ
+6. **อัปเดตโปรแกรมสม่ำเสมอ** — ตรวจสอบการอัปเดตเวอร์ชันใหม่เพื่อความปลอดภัยและความเสถียร
+
+---
+
+*เวอร์ชัน 1.0.0 | พัฒนาด้วย FastAPI + Python + AI*
