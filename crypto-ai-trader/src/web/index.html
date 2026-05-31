@@ -8,70 +8,153 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.49.0/dist/apexcharts.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg-dark: #0d1117;
-  --bg-card: #161b22;
-  --bg-card2: #1c2128;
-  --border: #30363d;
-  --text-main: #e6edf3;
-  --text-muted: #8b949e;
-  --accent: #2ea043;
-  --accent-red: #f85149;
-  --accent-blue: #388bfd;
-  --accent-yellow: #d29922;
-  --accent-purple: #a371f7;
+  --bg-dark:   #000000;
+  --bg-card:   #111111;
+  --bg-card2:  #0d0d0d;
+  --border:    #222222;
+  --border2:   #2a2a2a;
+  --text-main: #ffffff;
+  --text-muted:#666666;
+  --accent:        #F5C518;   /* yellow — primary */
+  --accent-buy:    #39d98a;   /* green  — BUY  */
+  --accent-red:    #ff6b35;   /* orange — SELL */
+  --accent-blue:   #F5C518;   /* repurposed → yellow */
+  --accent-yellow: #F5C518;
+  --accent-purple: #F5C518;
+  --font-mono: 'Space Mono', 'Courier New', monospace;
 }
 * { box-sizing: border-box; }
-body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe UI', sans-serif; margin: 0; }
-.navbar { background: var(--bg-card) !important; border-bottom: 1px solid var(--border); padding: 8px 20px; }
-.navbar-brand { font-weight: 700; font-size: 1.1rem; color: var(--accent) !important; }
-.sidebar { width: 220px; min-height: calc(100vh - 56px); background: var(--bg-card); border-right: 1px solid var(--border); position: fixed; top: 56px; left: 0; overflow-y: auto; z-index: 100; }
-.sidebar .nav-link { color: var(--text-muted); padding: 10px 16px; display: flex; align-items: center; gap: 10px; font-size: 0.9rem; transition: all 0.2s; border-left: 3px solid transparent; }
-.sidebar .nav-link:hover, .sidebar .nav-link.active { color: var(--text-main); background: var(--bg-card2); border-left-color: var(--accent); }
-.main-content { margin-left: 220px; padding: 20px; min-height: calc(100vh - 56px); }
-.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; }
-.card-header { background: var(--bg-card2); border-bottom: 1px solid var(--border); padding: 12px 16px; font-weight: 600; font-size: 0.85rem; }
-.stat-card { border-radius: 8px; padding: 16px; }
-.stat-value { font-size: 1.6rem; font-weight: 700; line-height: 1.2; }
-.stat-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-.badge-signal { font-size: 0.7rem; padding: 3px 8px; border-radius: 12px; font-weight: 600; }
-.signal-buy { background: rgba(46,160,67,0.2); color: #3fb950; border: 1px solid rgba(46,160,67,0.3); }
-.signal-sell { background: rgba(248,81,73,0.2); color: #f85149; border: 1px solid rgba(248,81,73,0.3); }
-.signal-hold { background: rgba(139,148,158,0.2); color: #8b949e; border: 1px solid rgba(139,148,158,0.3); }
-.signal-buy-text { color: #3fb950; }
-.signal-sell-text { color: #f85149; }
+body { background: var(--bg-dark); color: var(--text-main); font-family: var(--font-mono); margin: 0; font-size: 13px; }
+
+/* ── Navbar ── */
+.navbar { background: #000 !important; border-bottom: 1px solid var(--border); padding: 10px 24px; }
+.navbar-brand { font-weight: 700; font-size: 1.05rem; color: var(--text-main) !important; letter-spacing: 0.5px; }
+.navbar-brand small { color: var(--text-muted) !important; }
+
+/* ── Sidebar ── */
+.sidebar { width: 200px; min-height: calc(100vh - 50px); background: #000; border-right: 1px solid var(--border); position: fixed; top: 50px; left: 0; overflow-y: auto; z-index: 100; }
+.sidebar .nav-link { color: var(--text-muted); padding: 9px 16px; display: flex; align-items: center; gap: 10px; font-size: 0.78rem; transition: all 0.15s; border-left: 2px solid transparent; text-decoration: none; }
+.sidebar .nav-link:hover { color: var(--text-main); background: var(--bg-card); }
+.sidebar .nav-link.active { color: var(--accent); background: rgba(245,197,24,0.06); border-left-color: var(--accent); }
+.sidebar .nav-link i { font-size: 0.85rem; }
+
+/* ── Layout ── */
+.main-content { margin-left: 200px; padding: 24px; min-height: calc(100vh - 50px); }
+
+/* ── Cards ── */
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 2px; }
+.card-header { background: var(--bg-card2); border-bottom: 1px solid var(--border); padding: 10px 14px; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text-muted); }
+.card-body { padding: 14px; }
+
+/* ── Stat cards ── */
+.stat-card { border-radius: 2px; padding: 14px; background: var(--bg-card); border: 1px solid var(--border); }
+.stat-value { font-size: 1.5rem; font-weight: 700; line-height: 1.2; color: var(--text-main); }
+.stat-label { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+
+/* ── Signal badges ── */
+.badge-signal { font-size: 0.65rem; padding: 2px 7px; border-radius: 2px; font-weight: 700; letter-spacing: 0.5px; }
+.signal-buy  { background: rgba(57,217,138,0.12); color: var(--accent-buy);  border: 1px solid rgba(57,217,138,0.25); }
+.signal-sell { background: rgba(255,107,53,0.12);  color: var(--accent-red);  border: 1px solid rgba(255,107,53,0.25); }
+.signal-hold { background: rgba(102,102,102,0.12); color: var(--text-muted); border: 1px solid rgba(102,102,102,0.25); }
+.signal-buy-text  { color: var(--accent-buy); font-weight: 700; }
+.signal-sell-text { color: var(--accent-red); font-weight: 700; }
+
+/* ── Table ── */
 .table { color: var(--text-main); }
-.table td, .table th { border-color: var(--border); font-size: 0.82rem; vertical-align: middle; }
-.table thead th { color: var(--text-muted); font-weight: 600; background: var(--bg-card2); }
-.price-card { border-radius: 8px; padding: 12px 16px; background: var(--bg-card); border: 1px solid var(--border); cursor: pointer; transition: border-color 0.2s; }
-.price-card:hover, .price-card.active { border-color: var(--accent-blue); }
-.price-up { color: var(--accent); }
-.price-down { color: var(--accent-red); }
-.indicator-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(48,54,61,0.5); font-size: 0.82rem; }
+.table td, .table th { border-color: var(--border); font-size: 0.78rem; vertical-align: middle; padding: 7px 10px; }
+.table thead th { color: var(--text-muted); font-weight: 700; background: var(--bg-card2); text-transform: uppercase; font-size: 0.68rem; letter-spacing: 0.8px; }
+.table-hover tbody tr:hover td { background: rgba(245,197,24,0.04); }
+
+/* ── Price cards ── */
+.price-card { border-radius: 2px; padding: 12px 14px; background: var(--bg-card); border: 1px solid var(--border); cursor: pointer; transition: border-color 0.15s; }
+.price-card:hover, .price-card.active { border-color: var(--accent); }
+.price-up   { color: var(--accent-buy); font-weight: 700; }
+.price-down { color: var(--accent-red); font-weight: 700; }
+
+/* ── Indicators ── */
+.indicator-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid rgba(34,34,34,0.8); font-size: 0.78rem; }
 .indicator-row:last-child { border-bottom: none; }
-.indicator-bar { width: 60px; height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 6px; }
-.indicator-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
-.activity-item { padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 0.82rem; }
+.indicator-bar { width: 60px; height: 4px; border-radius: 0; background: var(--border); overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 6px; }
+.indicator-fill { height: 100%; transition: width 0.5s; }
+
+/* ── Activity feed ── */
+.activity-item { padding: 7px 12px; border-bottom: 1px solid var(--border); font-size: 0.78rem; }
 .activity-item:last-child { border-bottom: none; }
-.mode-badge { padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
-.mode-demo { background: rgba(163,113,247,0.2); color: var(--accent-purple); border: 1px solid rgba(163,113,247,0.3); }
-.mode-live { background: rgba(46,160,67,0.2); color: #3fb950; border: 1px solid rgba(46,160,67,0.3); }
-.form-control, .form-select { background: var(--bg-card2); border: 1px solid var(--border); color: var(--text-main); }
-.form-control:focus, .form-select:focus { background: var(--bg-card2); border-color: var(--accent-blue); color: var(--text-main); box-shadow: 0 0 0 0.2rem rgba(56,139,253,0.15); }
-.form-label { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 4px; }
-.progress { background: var(--border); height: 8px; border-radius: 4px; }
-.ws-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-.ws-connected { background: var(--accent); animation: pulse 2s infinite; }
+
+/* ── Mode badge ── */
+.mode-badge { padding: 2px 10px; border-radius: 2px; font-size: 0.68rem; font-weight: 700; letter-spacing: 1px; }
+.mode-demo { background: rgba(245,197,24,0.1); color: var(--accent); border: 1px solid rgba(245,197,24,0.3); }
+.mode-live { background: rgba(57,217,138,0.1); color: var(--accent-buy); border: 1px solid rgba(57,217,138,0.3); }
+
+/* ── Forms ── */
+.form-control, .form-select {
+  background: var(--bg-card2); border: 1px solid var(--border2);
+  color: var(--text-main); border-radius: 2px; font-family: var(--font-mono); font-size: 0.8rem;
+}
+.form-control:focus, .form-select:focus {
+  background: var(--bg-card2); border-color: var(--accent);
+  color: var(--text-main); box-shadow: 0 0 0 2px rgba(245,197,24,0.12);
+}
+.form-control::placeholder { color: var(--text-muted); }
+.form-label { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* ── Buttons ── */
+.btn-primary {
+  background: var(--accent); border-color: var(--accent); color: #000;
+  font-family: var(--font-mono); font-weight: 700; letter-spacing: 0.5px; border-radius: 2px;
+}
+.btn-primary:hover { background: #ffd740; border-color: #ffd740; color: #000; }
+.btn-outline-secondary {
+  border-color: var(--border2); color: var(--text-muted); font-family: var(--font-mono); border-radius: 2px;
+}
+.btn-outline-secondary:hover { border-color: var(--accent); color: var(--accent); background: rgba(245,197,24,0.06); }
+.btn-success { background: var(--accent-buy); border-color: var(--accent-buy); color: #000; font-family: var(--font-mono); font-weight: 700; border-radius: 2px; }
+.btn-danger  { background: var(--accent-red);  border-color: var(--accent-red);  color: #000; font-family: var(--font-mono); font-weight: 700; border-radius: 2px; }
+.btn-sm { font-size: 0.72rem; padding: 3px 9px; }
+.btn-warning { background: var(--accent); border-color: var(--accent); color: #000; font-family: var(--font-mono); font-weight: 700; border-radius: 2px; }
+
+/* ── Tab buttons ── */
+.tab-btn { background: none; border: 1px solid var(--border2); color: var(--text-muted); padding: 4px 12px; border-radius: 2px; cursor: pointer; font-size: 0.72rem; font-family: var(--font-mono); transition: all 0.15s; }
+.tab-btn.active { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 700; }
+.tab-btn:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+
+/* ── Progress ── */
+.progress { background: var(--border); height: 6px; border-radius: 0; }
+.progress-bar { background: var(--accent); }
+
+/* ── WebSocket dot ── */
+.ws-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.ws-connected    { background: var(--accent-buy); animation: pulse 2s infinite; }
 .ws-disconnected { background: var(--accent-red); }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+/* ── Misc ── */
 .section { display: none; }
 .section.active { display: block; }
 .chart-container { position: relative; height: 300px; }
-.notification { position: fixed; top: 70px; right: 20px; z-index: 9999; min-width: 280px; }
-.btn-sm { font-size: 0.78rem; padding: 4px 10px; }
-.tab-btn { background: none; border: 1px solid var(--border); color: var(--text-muted); padding: 5px 14px; border-radius: 20px; cursor: pointer; font-size: 0.8rem; }
-.tab-btn.active { background: var(--accent-blue); border-color: var(--accent-blue); color: #fff; }
+.notification { position: fixed; top: 65px; right: 20px; z-index: 9999; min-width: 280px; }
+.text-success { color: var(--accent-buy) !important; }
+.text-danger  { color: var(--accent-red) !important; }
+.text-warning { color: var(--accent) !important; }
+.text-primary { color: var(--accent) !important; }
+.text-info    { color: var(--accent) !important; }
+.bg-success   { background: var(--accent-buy) !important; color: #000 !important; }
+.bg-danger    { background: var(--accent-red) !important; color: #000 !important; }
+.bg-warning   { background: var(--accent)     !important; color: #000 !important; }
+.border-top   { border-color: var(--border) !important; }
+.border-bottom{ border-color: var(--border) !important; }
+hr { border-color: var(--border); }
+code { color: var(--accent); background: rgba(245,197,24,0.08); padding: 1px 5px; border-radius: 2px; font-family: var(--font-mono); }
+a { color: var(--accent); }
+a:hover { color: #ffd740; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #000; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 </style>
 </head>
 <body>
@@ -130,30 +213,30 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe 
 <section id="sec-dashboard" class="section active">
   <div class="row g-3 mb-4">
     <div class="col-6 col-md-3">
-      <div class="stat-card" style="background:rgba(46,160,67,0.1);border:1px solid rgba(46,160,67,0.2);">
+      <div class="stat-card" style="background:rgba(57,217,138,0.06);border:1px solid rgba(57,217,138,0.18);">
         <div class="stat-label">Total Value</div>
         <div class="stat-value text-success" id="totalValue">$0.00</div>
         <div class="small text-muted mt-1" id="totalPnl">+0.00 USDT</div>
       </div>
     </div>
     <div class="col-6 col-md-3">
-      <div class="stat-card" style="background:rgba(56,139,253,0.1);border:1px solid rgba(56,139,253,0.2);">
+      <div class="stat-card" style="background:rgba(245,197,24,0.06);border:1px solid rgba(245,197,24,0.18);">
         <div class="stat-label">Cash (USDT)</div>
-        <div class="stat-value" style="color:var(--accent-blue)" id="cashValue">$0.00</div>
+        <div class="stat-value" style="color:var(--accent)" id="cashValue">$0.00</div>
         <div class="small text-muted mt-1" id="positionCount">0 positions</div>
       </div>
     </div>
     <div class="col-6 col-md-3">
-      <div class="stat-card" style="background:rgba(210,153,34,0.1);border:1px solid rgba(210,153,34,0.2);">
+      <div class="stat-card" style="background:rgba(245,197,24,0.06);border:1px solid rgba(245,197,24,0.18);">
         <div class="stat-label">Win Rate</div>
-        <div class="stat-value" style="color:var(--accent-yellow)" id="winRate">0%</div>
+        <div class="stat-value" style="color:var(--accent)" id="winRate">0%</div>
         <div class="small text-muted mt-1" id="totalTrades">0 trades</div>
       </div>
     </div>
     <div class="col-6 col-md-3">
-      <div class="stat-card" style="background:rgba(163,113,247,0.1);border:1px solid rgba(163,113,247,0.2);">
+      <div class="stat-card" style="background:rgba(255,107,53,0.06);border:1px solid rgba(255,107,53,0.18);">
         <div class="stat-label">Avg PnL/Trade</div>
-        <div class="stat-value" style="color:var(--accent-purple)" id="avgPnl">0.00%</div>
+        <div class="stat-value" style="color:var(--accent-red)" id="avgPnl">0.00%</div>
         <div class="small text-muted mt-1" id="bestTrade">Best: 0%</div>
       </div>
     </div>
@@ -242,30 +325,30 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe 
   <!-- Performance metrics row -->
   <div class="row g-3 mb-3">
     <div class="col-6 col-md-3">
-      <div class="stat-card" style="background:rgba(46,160,67,0.1);border:1px solid rgba(46,160,67,0.2)">
+      <div class="stat-card" style="background:rgba(57,217,138,0.06);border:1px solid rgba(57,217,138,0.18)">
         <div class="stat-label">Max Drawdown</div>
         <div class="stat-value text-danger" id="maxDrawdown">—</div>
         <div class="small text-muted">Peak → Trough</div>
       </div>
     </div>
     <div class="col-6 col-md-3">
-      <div class="stat-card" style="background:rgba(56,139,253,0.1);border:1px solid rgba(56,139,253,0.2)">
+      <div class="stat-card" style="background:rgba(245,197,24,0.06);border:1px solid rgba(245,197,24,0.18)">
         <div class="stat-label">Sharpe Ratio</div>
-        <div class="stat-value" style="color:var(--accent-blue)" id="sharpeRatio">—</div>
+        <div class="stat-value" style="color:var(--accent)" id="sharpeRatio">—</div>
         <div class="small text-muted">Risk-adjusted return</div>
       </div>
     </div>
     <div class="col-6 col-md-3">
-      <div class="stat-card" style="background:rgba(210,153,34,0.1);border:1px solid rgba(210,153,34,0.2)">
+      <div class="stat-card" style="background:rgba(245,197,24,0.06);border:1px solid rgba(245,197,24,0.18)">
         <div class="stat-label">Total Trades</div>
         <div class="stat-value" style="color:var(--accent-yellow)" id="pfTotalTrades">—</div>
         <div class="small text-muted" id="pfWinRate">Win rate —</div>
       </div>
     </div>
     <div class="col-6 col-md-3">
-      <div class="stat-card" style="background:rgba(163,113,247,0.1);border:1px solid rgba(163,113,247,0.2)">
+      <div class="stat-card" style="background:rgba(255,107,53,0.06);border:1px solid rgba(255,107,53,0.18)">
         <div class="stat-label">Total PnL</div>
-        <div class="stat-value" style="color:var(--accent-purple)" id="pfTotalPnl">—</div>
+        <div class="stat-value" style="color:var(--accent-red)" id="pfTotalPnl">—</div>
         <div class="small text-muted">Closed trades</div>
       </div>
     </div>
@@ -306,7 +389,7 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe 
 <section id="sec-ai-training" class="section">
 
   <!-- Fast Training Loop Banner -->
-  <div class="card mb-3" id="loopBanner" style="background:linear-gradient(135deg,rgba(46,160,67,0.15),rgba(56,139,253,0.1));border:1px solid rgba(46,160,67,0.3)">
+  <div class="card mb-3" id="loopBanner" style="background:rgba(245,197,24,0.04);border:1px solid rgba(57,217,138,0.25)">
     <div class="card-body py-2 d-flex align-items-center gap-3 flex-wrap">
       <div class="flex-grow-1">
         <div class="d-flex align-items-center gap-2 mb-1">
@@ -316,7 +399,7 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe 
         <div class="d-flex align-items-center gap-2" style="min-width:260px">
           <div class="flex-grow-1 position-relative" style="height:18px">
             <div class="progress" style="height:18px;background:rgba(255,255,255,0.06)">
-              <div class="progress-bar" id="loopWrBar" role="progressbar" style="width:0%;background:linear-gradient(90deg,#2ea043,#388bfd);transition:width 0.4s ease"></div>
+              <div class="progress-bar" id="loopWrBar" role="progressbar" style="width:0%;background:var(--accent);transition:width 0.4s ease"></div>
             </div>
             <!-- 80% target marker -->
             <div style="position:absolute;top:0;left:80%;height:100%;width:2px;background:#f0883e;pointer-events:none" title="80% target"></div>
@@ -344,28 +427,28 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe 
   <!-- Stat row -->
   <div class="row g-3 mb-3">
     <div class="col-md-3">
-      <div class="stat-card" style="background:rgba(46,160,67,0.1);border:1px solid rgba(46,160,67,0.2)">
+      <div class="stat-card" style="background:rgba(57,217,138,0.06);border:1px solid rgba(57,217,138,0.18)">
         <div class="stat-label">Win Rate</div>
         <div class="stat-value" id="loopWrBig" style="color:var(--accent-green)">—</div>
         <div class="small text-muted">Fast loop trades</div>
       </div>
     </div>
     <div class="col-md-3">
-      <div class="stat-card" style="background:rgba(56,139,253,0.1);border:1px solid rgba(56,139,253,0.2)">
+      <div class="stat-card" style="background:rgba(245,197,24,0.06);border:1px solid rgba(245,197,24,0.18)">
         <div class="stat-label">Closed Trades</div>
-        <div class="stat-value" style="color:var(--accent-blue)" id="loopTotalBig">0</div>
+        <div class="stat-value" style="color:var(--accent)" id="loopTotalBig">0</div>
         <div class="small text-muted">ต้องการ ≥ 40</div>
       </div>
     </div>
     <div class="col-md-3">
-      <div class="stat-card" style="background:rgba(163,113,247,0.1);border:1px solid rgba(163,113,247,0.2)">
+      <div class="stat-card" style="background:rgba(255,107,53,0.06);border:1px solid rgba(255,107,53,0.18)">
         <div class="stat-label">Model Accuracy</div>
-        <div class="stat-value" style="color:var(--accent-purple)" id="loopAccuracy">—</div>
+        <div class="stat-value" style="color:var(--accent-red)" id="loopAccuracy">—</div>
         <div class="small text-muted" id="trainAccuracy">Cross-validation</div>
       </div>
     </div>
     <div class="col-md-3">
-      <div class="stat-card" style="background:rgba(210,153,34,0.1);border:1px solid rgba(210,153,34,0.2)">
+      <div class="stat-card" style="background:rgba(245,197,24,0.06);border:1px solid rgba(245,197,24,0.18)">
         <div class="stat-label">Loop Status</div>
         <div class="stat-value" style="color:var(--accent-yellow);font-size:1rem" id="trainStatus">Idle</div>
         <div class="small text-muted" id="trainLastTime">ยังไม่ได้ run</div>
@@ -502,7 +585,7 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe 
       <i class="bi bi-piggy-bank me-1"></i>กองทุนรวม
     </button>
     <div class="ms-auto d-flex align-items-center gap-2">
-      <span class="badge" style="background:rgba(56,139,253,0.2);color:#58a6ff;border:1px solid rgba(56,139,253,0.3)" id="thaiDataSource">simulation</span>
+      <span class="badge" style="background:rgba(245,197,24,0.18);color:#F5C518;border:1px solid rgba(245,197,24,0.25)" id="thaiDataSource">simulation</span>
       <button class="btn btn-outline-secondary btn-sm" onclick="refreshThaiData()">
         <i class="bi bi-arrow-clockwise"></i>
       </button>
@@ -569,11 +652,11 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe 
     </div>
 
     <!-- SEC API key notice -->
-    <div class="alert mt-3" style="background:rgba(56,139,253,0.08);border:1px solid rgba(56,139,253,0.2);border-radius:8px">
-      <i class="bi bi-info-circle me-2" style="color:#388bfd"></i>
-      <strong style="color:#388bfd">ข้อมูล NAV จริง:</strong>
+    <div class="alert mt-3" style="background:rgba(245,197,24,0.06);border:1px solid rgba(245,197,24,0.18);border-radius:8px">
+      <i class="bi bi-info-circle me-2" style="color:#F5C518"></i>
+      <strong style="color:#F5C518">ข้อมูล NAV จริง:</strong>
       ต้องลงทะเบียนรับ API key ฟรีที่
-      <a href="https://api-portal.sec.or.th" target="_blank" style="color:#58a6ff">api-portal.sec.or.th</a>
+      <a href="https://api-portal.sec.or.th" target="_blank" style="color:#F5C518">api-portal.sec.or.th</a>
       แล้วใส่ใน Settings → Thai Market → SEC API Key
     </div>
   </div>
@@ -632,21 +715,21 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe 
     <div class="col-md-8">
       <div class="row g-3 mb-3" id="btMetrics" style="display:none">
         <div class="col-6 col-md-3">
-          <div class="stat-card" style="background:rgba(46,160,67,0.1);border:1px solid rgba(46,160,67,0.2)">
+          <div class="stat-card" style="background:rgba(57,217,138,0.06);border:1px solid rgba(57,217,138,0.18)">
             <div class="stat-label">Total Return</div>
             <div class="stat-value" id="btReturn">—</div>
           </div>
         </div>
         <div class="col-6 col-md-3">
-          <div class="stat-card" style="background:rgba(210,153,34,0.1);border:1px solid rgba(210,153,34,0.2)">
+          <div class="stat-card" style="background:rgba(245,197,24,0.06);border:1px solid rgba(245,197,24,0.18)">
             <div class="stat-label">Win Rate</div>
             <div class="stat-value" style="color:var(--accent-yellow)" id="btWinRate">—</div>
           </div>
         </div>
         <div class="col-6 col-md-3">
-          <div class="stat-card" style="background:rgba(56,139,253,0.1);border:1px solid rgba(56,139,253,0.2)">
+          <div class="stat-card" style="background:rgba(245,197,24,0.06);border:1px solid rgba(245,197,24,0.18)">
             <div class="stat-label">Sharpe Ratio</div>
-            <div class="stat-value" style="color:var(--accent-blue)" id="btSharpe">—</div>
+            <div class="stat-value" style="color:var(--accent)" id="btSharpe">—</div>
           </div>
         </div>
         <div class="col-6 col-md-3">
@@ -996,7 +1079,7 @@ function initCharts() {
 
   charts.portfolio = new Chart(document.getElementById('portfolioChart'), {
     type: 'line',
-    data: { labels: [], datasets: [{ label: 'Portfolio Value (USDT)', data: [], borderColor: '#2ea043', backgroundColor: 'rgba(46,160,67,0.1)', fill: true, tension: 0.4, pointRadius: 2 }] },
+    data: { labels: [], datasets: [{ label: 'Portfolio Value (USDT)', data: [], borderColor: '#39d98a', backgroundColor: 'rgba(57,217,138,0.06)', fill: true, tension: 0.4, pointRadius: 2 }] },
     options: { ...defaultOpts, plugins: { ...defaultOpts.plugins, legend: { display: false } } }
   });
 
@@ -1032,7 +1115,7 @@ function initCharts() {
 
   charts.allocation = new Chart(document.getElementById('allocationChart'), {
     type: 'doughnut',
-    data: { labels: ['USDT'], datasets: [{ data: [100], backgroundColor: ['#388bfd'], borderColor: ['#0d1117'], borderWidth: 2 }] },
+    data: { labels: ['USDT'], datasets: [{ data: [100], backgroundColor: ['#F5C518'], borderColor: ['#000000'], borderWidth: 2 }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#8b949e', font:{size:10} } } } }
   });
 
@@ -1049,7 +1132,7 @@ function initCharts() {
     type: 'bar',
     data: {
       labels: ['RSI', 'MACD', 'BB', 'ATR', 'Volume', 'VWAP', '24h chg', 'EMA'],
-      datasets: [{ label: 'Importance', data: [0,0,0,0,0,0,0,0], backgroundColor: 'rgba(163,113,247,0.7)', borderRadius: 4 }]
+      datasets: [{ label: 'Importance', data: [0,0,0,0,0,0,0,0], backgroundColor: 'rgba(245,197,24,0.7)', borderRadius: 4 }]
     },
     options: {
       ...defaultOpts, indexAxis: 'y',
@@ -1200,7 +1283,7 @@ function updateIndicatorPanel(sym) {
       <span class="badge-signal ${d.signal==='BUY'?'signal-buy':d.signal==='SELL'?'signal-sell':'signal-hold'}">${d.signal}</span></div>
     <div class="indicator-row"><span>Confidence</span>
       <span>${((d.signal_strength||0)*100).toFixed(0)}%
-        <span class="indicator-bar"><span class="indicator-fill" style="width:${(d.signal_strength||0)*100}%;background:#388bfd"></span></span>
+        <span class="indicator-bar"><span class="indicator-fill" style="width:${(d.signal_strength||0)*100}%;background:#F5C518"></span></span>
       </span></div>
     <div class="indicator-row"><span>24h Change</span>
       <span class="${d.change_24h>=0?'price-up':'price-down'}">${d.change_24h>=0?'+':''}${d.change_24h.toFixed(2)}%</span></div>
@@ -1221,7 +1304,7 @@ function updateAIPanel(sym) {
     <div class="indicator-row"><span>Volatility</span><span>${a.volatility||'—'}</span></div>
     <div class="indicator-row"><span>BB Position</span>
       <span>${((a.bb_position||0.5)*100).toFixed(0)}%
-        <span class="indicator-bar"><span class="indicator-fill" style="width:${(a.bb_position||0.5)*100}%;background:#a371f7"></span></span>
+        <span class="indicator-bar"><span class="indicator-fill" style="width:${(a.bb_position||0.5)*100}%;background:#F5C518"></span></span>
       </span></div>
   `;
 }
@@ -1262,8 +1345,8 @@ function updateHoldings(positions, cash, total) {
 function updateAllocationChart(positions, cash) {
   const labels = ['USDT'];
   const data = [cash];
-  const colors = ['#388bfd'];
-  const palette = ['#2ea043','#f85149','#d29922','#a371f7','#58a6ff','#3fb950'];
+  const colors = ['#F5C518'];
+  const palette = ['#39d98a','#f85149','#d29922','#F5C518','#F5C518','#3fb950'];
   positions.forEach((p, i) => {
     labels.push(p.symbol.split('/')[0]);
     data.push(p.value);
@@ -1450,7 +1533,7 @@ function updateLoopButtons(running) {
   const badge = document.getElementById('loopBadge');
   if (running) {
     badge.textContent = '● Running';
-    badge.style.background = 'rgba(46,160,67,0.3)';
+    badge.style.background = 'rgba(57,217,138,0.25)';
     badge.style.color = '#3fb950';
   } else {
     badge.textContent = 'Idle';
@@ -1478,7 +1561,7 @@ function updateLoopStats(d) {
   document.getElementById('loopWrText').textContent = (wr * 100).toFixed(1) + '%';
   document.getElementById('loopWrBar').style.width = Math.min(wr / target * 100, 100) + '%';
   document.getElementById('loopWrBar').style.background =
-    wr >= target ? 'linear-gradient(90deg,#2ea043,#1a7f37)' : 'linear-gradient(90deg,#2ea043,#388bfd)';
+    wr >= target ? 'linear-gradient(90deg,#39d98a,#1a7f37)' : 'var(--accent)';
   document.getElementById('loopWrBig').textContent = (wr * 100).toFixed(1) + '%';
   document.getElementById('loopWrBig').style.color = wr >= target ? '#3fb950' : 'var(--accent-green)';
   document.getElementById('loopTotalBig').textContent = total;
@@ -1490,7 +1573,7 @@ function updateLoopStats(d) {
     document.getElementById('trainStatus').textContent = d.completed ? '🎯 Done!' : d.running ? '⚡ Running' : 'Idle';
   }
   if (d.last_regime && Object.keys(d.last_regime).length) {
-    const colors = {BULL:'#3fb950', BEAR:'#f85149', RANGE:'#388bfd', VOLATILE:'#f0883e'};
+    const colors = {BULL:'#3fb950', BEAR:'#f85149', RANGE:'#F5C518', VOLATILE:'#f0883e'};
     document.getElementById('regimesBadges').innerHTML = Object.entries(d.last_regime)
       .map(([sym, r]) => `<span class="badge" style="background:${colors[r]||'#888'}22;color:${colors[r]||'#888'};border:1px solid ${colors[r]||'#888'}44;font-size:10px">${sym.split('/')[0]}:${r}</span>`)
       .join('');
@@ -1512,7 +1595,7 @@ function handleLoopTradeClosed(d) {
 }
 
 function handleLoopModelUpdated(d) {
-  appendLoopLog(`<span style="color:#a371f7">🧠 Model retrained — accuracy: ${d.accuracy ? (d.accuracy*100).toFixed(1)+'%' : 'N/A'} | trades: ${d.total}</span>`);
+  appendLoopLog(`<span style="color:#F5C518">🧠 Model retrained — accuracy: ${d.accuracy ? (d.accuracy*100).toFixed(1)+'%' : 'N/A'} | trades: ${d.total}</span>`);
   if (d.accuracy) document.getElementById('loopAccuracy').textContent = (d.accuracy * 100).toFixed(1) + '%';
 }
 
@@ -1521,7 +1604,7 @@ function handleLoopProgress(d) {
   if (d.log && d.log.length) {
     const log = document.getElementById('loopLog');
     log.innerHTML = d.log.map(l => {
-      const col = l.includes('✅') ? '#3fb950' : l.includes('❌') ? '#f85149' : l.includes('🧠') ? '#a371f7' : l.includes('🎯') ? '#f0883e' : '#8b949e';
+      const col = l.includes('✅') ? '#3fb950' : l.includes('❌') ? '#f85149' : l.includes('🧠') ? '#F5C518' : l.includes('🎯') ? '#f0883e' : '#8b949e';
       return `<div style="color:${col}">${l}</div>`;
     }).join('');
   }
@@ -1761,7 +1844,7 @@ function renderSetCards(stocks) {
     'สื่อสาร':'rgba(163,113,247,0.12)', 'ขนส่ง':'rgba(46,160,67,0.12)',
     'สุขภาพ':'rgba(248,81,73,0.1)', 'พาณิชย์':'rgba(88,166,255,0.12)',
     'อุตสาหกรรม':'rgba(139,148,158,0.12)', 'ท่องเที่ยว':'rgba(63,185,80,0.1)',
-    'เกษตร':'rgba(46,160,67,0.15)',
+    'เกษตร':'rgba(57,217,138,0.08)',
   };
   stocks.forEach(s => {
     const a = s.analysis || {};
@@ -1935,7 +2018,7 @@ async function loadFundChart(code) {
         type: 'line',
         data: { labels, datasets: [{
           label: 'NAV (฿)', data: navs,
-          borderColor: '#a371f7', backgroundColor: 'rgba(163,113,247,0.08)',
+          borderColor: '#F5C518', backgroundColor: 'rgba(163,113,247,0.08)',
           fill: true, tension: 0.3, pointRadius: 0,
         }]},
         options: {
