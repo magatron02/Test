@@ -1,14 +1,25 @@
 import os
 import shutil
+import sys as _sys
 import yaml
 from pathlib import Path
 from typing import Any, Dict
 
-BASE_DIR = Path(__file__).parent.parent.parent
-CONFIG_PATH = BASE_DIR / "config" / "settings.yml"
-EXAMPLE_PATH = BASE_DIR / "config" / "settings.example.yml"
-DATA_DIR = BASE_DIR / "data"
-MODELS_DIR = BASE_DIR / "models"
+
+def _resolve_base() -> Path:
+    if getattr(_sys, 'frozen', False):
+        return Path(_sys.executable).parent
+    env = os.environ.get('TRADER_BASE_DIR')
+    if env:
+        return Path(env)
+    return Path(__file__).parent.parent.parent
+
+
+BASE_DIR     = _resolve_base()
+CONFIG_PATH  = BASE_DIR / "config" / "settings.yml"
+EXAMPLE_PATH = (Path(_sys._MEIPASS) if getattr(_sys, 'frozen', False) else BASE_DIR) / "config" / "settings.example.yml"
+DATA_DIR     = BASE_DIR / "data"
+MODELS_DIR   = BASE_DIR / "models"
 
 
 def load_config() -> Dict[str, Any]:

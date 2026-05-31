@@ -5,6 +5,7 @@ import threading
 import webbrowser
 from pathlib import Path
 
+import sys as _sys
 import uvicorn
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,7 +26,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-WEB_DIR = Path(__file__).parent / "web"
+WEB_DIR = (Path(_sys._MEIPASS) / "src" / "web") if getattr(_sys, 'frozen', False) else (Path(__file__).parent / "web")
 
 app = FastAPI(title=settings.app_name, version="1.0.0")
 
@@ -101,7 +102,7 @@ def main():
 ╚══════════════════════════════════════════╝
 """)
     uvicorn.run(
-        "src.main:app",
+        app,
         host="0.0.0.0",
         port=settings.app_port,
         reload=False,
