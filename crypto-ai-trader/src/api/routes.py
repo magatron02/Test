@@ -340,7 +340,7 @@ async def get_advanced_stats(db: Session = Depends(get_db)):
     """GET /api/stats/advanced — Sharpe ratio, Max Drawdown, daily PnL."""
     closed = db.query(Trade).filter(Trade.status == "closed").order_by(Trade.closed_at).all()
     if len(closed) < 2:
-        return {"sharpe": 0, "max_drawdown_pct": 0, "daily_pnl": []}
+        return {"sharpe": 0, "max_drawdown_pct": 0, "daily_pnl": [], "equity_curve": []}
 
     # Cumulative equity from trades (start at 10000 for display)
     capital = 10000.0
@@ -472,7 +472,7 @@ async def run_backtest(data: Dict[str, Any]):
     if days < 7 or days > 365:
         raise HTTPException(400, "days must be 7-365")
     try:
-        result = run_backtest(symbol, days=days, tp_pct=tp_pct, sl_pct=sl_pct)
+        result = _run(symbol, days=days, tp_pct=tp_pct, sl_pct=sl_pct)
         return result
     except Exception as e:
         raise HTTPException(500, str(e))
@@ -521,9 +521,9 @@ async def test_exchanges():
 
     # Test each configured live exchange
     exchange_map = {
-        "binance": ("..exchanges.binance_client", "BinanceClient"),
-        "okx":     ("..exchanges.okx_client",     "OKXClient"),
-        "bitkub":  ("..exchanges.bitkub_client",   "BitkubClient"),
+        "binance": ("..exchanges.binance_client", "BinanceExchange"),
+        "okx":     ("..exchanges.okx_client",     "OKXExchange"),
+        "bitkub":  ("..exchanges.bitkub_client",   "BitkubExchange"),
     }
     for name, (module_path, class_name) in exchange_map.items():
         cfg = settings.get("exchanges", name) or {}

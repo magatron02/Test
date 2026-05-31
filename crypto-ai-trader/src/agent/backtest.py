@@ -148,7 +148,8 @@ def run_backtest(symbol: str, days: int = 30,
 
     eq = np.array(equity, dtype=float)
     rets = np.diff(eq) / np.where(eq[:-1] != 0, eq[:-1], 1)
-    sharpe = float((rets.mean() / rets.std()) * math.sqrt(8760 / (days * 24))) if rets.std() > 0 else 0.0
+    # Equity has one point per hourly candle → annualize hourly Sharpe by sqrt(24*365)
+    sharpe = float((rets.mean() / rets.std()) * math.sqrt(24 * 365)) if rets.std() > 0 else 0.0
 
     run_max  = np.maximum.accumulate(eq)
     max_dd   = float(((eq - run_max) / np.where(run_max != 0, run_max, 1)).min() * 100)
