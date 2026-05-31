@@ -13,11 +13,42 @@ from ..core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Binance TH uses /api/v1/ (not v3 like global Binance)
 BINANCE_TH_BASE = "https://api.binance.th"
+API_V1 = f"{BINANCE_TH_BASE}/api/v1"
+
+# Symbol mapping: our internal format → Binance TH format
+# Binance TH trades against THB (e.g. BTCTHB, ETHTHB)
+SYMBOL_MAP = {
+    "BTC/THB":  "BTCTHB",
+    "ETH/THB":  "ETHTHB",
+    "BNB/THB":  "BNBTHB",
+    "XRP/THB":  "XRPTHB",
+    "SOL/THB":  "SOLTHB",
+    "USDT/THB": "USDTTHB",
+    "ADA/THB":  "ADATHB",
+    "DOGE/THB": "DOGETHB",
+    "MATIC/THB":"MATICTHB",
+    "DOT/THB":  "DOTTHB",
+}
+
+TIMEFRAME_MAP = {
+    "1m": "1m", "3m": "3m", "5m": "5m", "15m": "15m",
+    "30m": "30m", "1h": "1h", "2h": "2h", "4h": "4h",
+    "6h": "6h", "12h": "12h", "1d": "1d", "1w": "1w",
+}
+
+
+def _to_th_symbol(symbol: str) -> str:
+    """Convert 'BTC/THB' → 'BTCTHB'."""
+    if symbol in SYMBOL_MAP:
+        return SYMBOL_MAP[symbol]
+    # Fallback: strip slash
+    return symbol.replace("/", "")
 
 
 class BinanceTHExchange(BaseExchange):
-    """Binance TH (Thailand) exchange client."""
+    """Binance TH (Thailand) exchange — trades THB pairs via /api/v1/ endpoints."""
 
     name = "binance_th"
 
@@ -37,20 +68,27 @@ class BinanceTHExchange(BaseExchange):
 
     def _sign(self, params: dict) -> str:
         query = urlencode(params)
-        return hmac.new(self._api_secret.encode(), query.encode(), hashlib.sha256).hexdigest()
+        return hmac.new(
+            self._api_secret.encode(),
+            query.encode(),
+            hashlib.sha256,
+        ).hexdigest()
 
     async def close(self):
         if self._session and not self._session.closed:
             await self._session.close()
 
     async def get_ticker(self, symbol: str) -> Ticker:
-        ccxt_sym = symbol.replace("/", "")
+        th_sym = _to_th_symbol(symbol)
         session = await self._get_session()
         async with session.get(
-            f"{BINANCE_TH_BASE}/api/v3/ticker/24hr",
-            params={"symbol": ccxt_sym}
+            f"{API_V1}/ticker/24hr",
+            params={"symbol": th_sym},
         ) as r:
             data = await r.json()
+
+        if isinstance(data, dict) and "code" in data:
+            raise ValueError(f"Binance TH ticker error: {data}")
 
         return Ticker(
             symbol=symbol,
@@ -62,17 +100,27 @@ class BinanceTHExchange(BaseExchange):
         )
 
     async def get_ohlcv(self, symbol: str, timeframe: str = "5m", limit: int = 100) -> List[OHLCV]:
-        ccxt_sym = symbol.replace("/", "")
+        th_sym = _to_th_symbol(symbol)
+        tf = TIMEFRAME_MAP.get(timeframe, "5m")
         session = await self._get_session()
         async with session.get(
-            f"{BINANCE_TH_BASE}/api/v3/klines",
-            params={"symbol": ccxt_sym, "interval": timeframe, "limit": limit}
+            f"{API_V1}/klines",
+            params={"symbol": th_sym, "interval": tf, "limit": limit},
         ) as r:
             data = await r.json()
 
+        if isinstance(data, dict) and "code" in data:
+            raise ValueError(f"Binance TH klines error: {data}")
+
         return [
-            OHLCV(datetime.fromtimestamp(row[0] / 1000), float(row[1]), float(row[2]),
-                  float(row[3]), float(row[4]), float(row[5]))
+            OHLCV(
+                timestamp=datetime.fromtimestamp(row[0] / 1000),
+                open=float(row[1]),
+                high=float(row[2]),
+                low=float(row[3]),
+                close=float(row[4]),
+                volume=float(row[5]),
+            )
             for row in data
         ]
 
@@ -80,19 +128,29 @@ class BinanceTHExchange(BaseExchange):
         params = {"timestamp": int(time.time() * 1000)}
         params["signature"] = self._sign(params)
         session = await self._get_session()
-        async with session.get(f"{BINANCE_TH_BASE}/api/v3/account", params=params) as r:
+        async with session.get(f"{API_V1}/account", params=params) as r:
             data = await r.json()
 
+        if "code" in data:
+            raise ValueError(f"Binance TH account error: {data.get('msg', data)}")
+
         return {
-            b["asset"]: Balance(b["asset"], float(b["free"]), float(b["locked"]),
-                                float(b["free"]) + float(b["locked"]))
+            b["asset"]: Balance(
+                b["asset"],
+                float(b["free"]),
+                float(b["locked"]),
+                float(b["free"]) + float(b["locked"]),
+            )
             for b in data.get("balances", [])
             if float(b["free"]) + float(b["locked"]) > 0
         }
 
-    async def create_order(self, symbol: str, side: str, amount: float, price: Optional[float] = None) -> Order:
+    async def create_order(
+        self, symbol: str, side: str, amount: float, price: Optional[float] = None
+    ) -> Order:
+        th_sym = _to_th_symbol(symbol)
         params = {
-            "symbol": symbol.replace("/", ""),
+            "symbol": th_sym,
             "side": side.upper(),
             "type": "MARKET",
             "quantity": amount,
@@ -100,13 +158,14 @@ class BinanceTHExchange(BaseExchange):
         }
         params["signature"] = self._sign(params)
         session = await self._get_session()
-        async with session.post(f"{BINANCE_TH_BASE}/api/v3/order", params=params) as r:
+        async with session.post(f"{API_V1}/order", params=params) as r:
             data = await r.json()
 
-        if "code" in data and data["code"] < 0:
-            raise ValueError(f"Binance TH order error: {data['msg']}")
+        if "code" in data and int(data["code"]) < 0:
+            raise ValueError(f"Binance TH order error: {data.get('msg', data)}")
 
-        exec_price = float(data.get("fills", [{}])[0].get("price", 0)) if data.get("fills") else 0
+        fills = data.get("fills", [])
+        exec_price = float(fills[0]["price"]) if fills else 0.0
         return Order(
             id=str(data["orderId"]),
             symbol=symbol,
@@ -117,3 +176,7 @@ class BinanceTHExchange(BaseExchange):
             cost=float(data.get("cummulativeQuoteQty", 0)),
             status="closed" if data["status"] == "FILLED" else data["status"].lower(),
         )
+
+    @staticmethod
+    def supported_symbols() -> List[str]:
+        return list(SYMBOL_MAP.keys())

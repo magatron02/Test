@@ -27,6 +27,8 @@ exchanges:
     api_key: ""
     api_secret: ""
     enabled: false
+    # Binance TH trades THB pairs: BTC/THB, ETH/THB, BNB/THB, XRP/THB, SOL/THB
+    # API uses /api/v1/ endpoints (different from global Binance /api/v3/)
   bitkub:
     api_key: ""
     api_secret: ""
@@ -51,6 +53,12 @@ trading:
     - "BNB/USDT"
     - "SOL/USDT"
     - "XRP/USDT"
+  # Binance TH symbols (ใช้เมื่อเปิด binance_th):
+  # - "BTC/THB"
+  # - "ETH/THB"
+  # - "BNB/THB"
+  # - "XRP/THB"
+  # - "SOL/THB"
   base_currency: "USDT"
   max_position_pct: 0.15    # สูงสุด 15% ของพอร์ตต่อ trade
   stop_loss_pct: 0.03       # Stop loss 3%
