@@ -4,7 +4,6 @@ from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
-import ta
 
 from ..exchanges.base import OHLCV
 
@@ -18,50 +17,101 @@ class MarketAnalysis:
     change_24h: float
 
     rsi: float = 0.0
-    rsi_signal: str = "NEUTRAL"   # OVERSOLD | NEUTRAL | OVERBOUGHT
+    rsi_signal: str = "NEUTRAL"
 
     macd: float = 0.0
     macd_signal: float = 0.0
     macd_hist: float = 0.0
-    macd_trend: str = "NEUTRAL"   # BULLISH | BEARISH | NEUTRAL
+    macd_trend: str = "NEUTRAL"
 
     ema_9: float = 0.0
     ema_21: float = 0.0
     ema_50: float = 0.0
-    ema_trend: str = "NEUTRAL"    # BULLISH | BEARISH | NEUTRAL
+    ema_trend: str = "NEUTRAL"
 
     bb_upper: float = 0.0
     bb_middle: float = 0.0
     bb_lower: float = 0.0
-    bb_position: float = 0.5      # 0=lower band, 1=upper band
-    bb_signal: str = "NEUTRAL"    # OVERSOLD | NEUTRAL | OVERBOUGHT
+    bb_position: float = 0.5
+    bb_signal: str = "NEUTRAL"
 
     atr: float = 0.0
-    atr_pct: float = 0.0          # ATR as % of price (volatility)
-    volatility: str = "MEDIUM"    # LOW | MEDIUM | HIGH
+    atr_pct: float = 0.0
+    volatility: str = "MEDIUM"
 
     vwap: float = 0.0
-    price_vs_vwap: str = "ABOVE"  # ABOVE | BELOW
+    price_vs_vwap: str = "ABOVE"
 
-    volume_ratio: float = 1.0     # current vs 20-period average
-    volume_signal: str = "NORMAL" # LOW | NORMAL | HIGH
+    volume_ratio: float = 1.0
+    volume_signal: str = "NORMAL"
 
-    overall_signal: str = "HOLD"  # BUY | SELL | HOLD
-    signal_strength: float = 0.0  # 0-1
+    overall_signal: str = "HOLD"
+    signal_strength: float = 0.0
     features: Dict = field(default_factory=dict)
 
 
-def _ohlcv_to_df(candles: List[OHLCV]) -> pd.DataFrame:
-    df = pd.DataFrame([{
-        "timestamp": c.timestamp,
-        "open": c.open,
-        "high": c.high,
-        "low": c.low,
-        "close": c.close,
-        "volume": c.volume,
-    } for c in candles])
-    df.set_index("timestamp", inplace=True)
-    return df
+def _ema(series: np.ndarray, period: int) -> np.ndarray:
+    k = 2 / (period + 1)
+    result = np.zeros_like(series, dtype=float)
+    result[0] = series[0]
+    for i in range(1, len(series)):
+        result[i] = series[i] * k + result[i - 1] * (1 - k)
+    return result
+
+
+def _rsi(closes: np.ndarray, period: int = 14) -> float:
+    if len(closes) < period + 1:
+        return 50.0
+    deltas = np.diff(closes[-(period + 1):])
+    gains = np.where(deltas > 0, deltas, 0.0)
+    losses = np.where(deltas < 0, -deltas, 0.0)
+    avg_gain = gains.mean()
+    avg_loss = losses.mean()
+    if avg_loss == 0:
+        return 100.0
+    rs = avg_gain / avg_loss
+    return 100 - (100 / (1 + rs))
+
+
+def _macd(closes: np.ndarray, fast=12, slow=26, signal=9):
+    if len(closes) < slow + signal:
+        return 0.0, 0.0, 0.0
+    ema_fast = _ema(closes, fast)
+    ema_slow = _ema(closes, slow)
+    macd_line = ema_fast - ema_slow
+    signal_line = _ema(macd_line, signal)
+    hist = macd_line - signal_line
+    return float(macd_line[-1]), float(signal_line[-1]), float(hist[-1])
+
+
+def _bollinger(closes: np.ndarray, period=20, std_dev=2.0):
+    if len(closes) < period:
+        mid = float(closes.mean())
+        return mid * 1.02, mid, mid * 0.98
+    window = closes[-period:]
+    mid = float(window.mean())
+    std = float(window.std())
+    return mid + std_dev * std, mid, mid - std_dev * std
+
+
+def _atr(highs, lows, closes, period=14) -> float:
+    if len(closes) < 2:
+        return 0.0
+    trs = []
+    for i in range(1, len(closes)):
+        tr = max(highs[i] - lows[i], abs(highs[i] - closes[i-1]), abs(lows[i] - closes[i-1]))
+        trs.append(tr)
+    trs = np.array(trs[-period:])
+    return float(trs.mean())
+
+
+def _ohlcv_to_arrays(candles: List[OHLCV]):
+    opens  = np.array([c.open   for c in candles], dtype=float)
+    highs  = np.array([c.high   for c in candles], dtype=float)
+    lows   = np.array([c.low    for c in candles], dtype=float)
+    closes = np.array([c.close  for c in candles], dtype=float)
+    vols   = np.array([c.volume for c in candles], dtype=float)
+    return opens, highs, lows, closes, vols
 
 
 def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
@@ -69,25 +119,19 @@ def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
     if len(candles) < 30:
         return MarketAnalysis(symbol=symbol, price=price, change_24h=change_24h)
 
-    df = _ohlcv_to_df(candles)
+    opens, highs, lows, closes, vols = _ohlcv_to_arrays(candles)
     result = MarketAnalysis(symbol=symbol, price=price, change_24h=change_24h)
 
     # RSI
-    rsi_ind = ta.momentum.RSIIndicator(df["close"], window=rsi_period)
-    result.rsi = float(rsi_ind.rsi().iloc[-1])
+    result.rsi = _rsi(closes, rsi_period)
     if result.rsi < 30:
         result.rsi_signal = "OVERSOLD"
     elif result.rsi > 70:
         result.rsi_signal = "OVERBOUGHT"
-    else:
-        result.rsi_signal = "NEUTRAL"
 
     # MACD
-    macd_ind = ta.trend.MACD(df["close"], window_slow=26, window_fast=12, window_sign=9)
-    result.macd = float(macd_ind.macd().iloc[-1])
-    result.macd_signal = float(macd_ind.macd_signal().iloc[-1])
-    result.macd_hist = float(macd_ind.macd_diff().iloc[-1])
-    prev_hist = float(macd_ind.macd_diff().iloc[-2]) if len(df) > 1 else 0
+    result.macd, result.macd_signal, result.macd_hist = _macd(closes)
+    _, _, prev_hist = _macd(closes[:-1])
     if result.macd_hist > 0 and prev_hist <= 0:
         result.macd_trend = "BULLISH"
     elif result.macd_hist < 0 and prev_hist >= 0:
@@ -98,20 +142,16 @@ def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
         result.macd_trend = "BEARISH"
 
     # EMA
-    result.ema_9 = float(ta.trend.EMAIndicator(df["close"], window=9).ema_indicator().iloc[-1])
-    result.ema_21 = float(ta.trend.EMAIndicator(df["close"], window=21).ema_indicator().iloc[-1])
-    ema50_ind = ta.trend.EMAIndicator(df["close"], window=min(50, len(df) - 1))
-    result.ema_50 = float(ema50_ind.ema_indicator().iloc[-1])
+    result.ema_9  = float(_ema(closes, 9)[-1])
+    result.ema_21 = float(_ema(closes, 21)[-1])
+    result.ema_50 = float(_ema(closes, min(50, len(closes) - 1))[-1])
     if result.ema_9 > result.ema_21 > result.ema_50:
         result.ema_trend = "BULLISH"
     elif result.ema_9 < result.ema_21 < result.ema_50:
         result.ema_trend = "BEARISH"
 
     # Bollinger Bands
-    bb_ind = ta.volatility.BollingerBands(df["close"], window=bb_period, window_dev=2)
-    result.bb_upper = float(bb_ind.bollinger_hband().iloc[-1])
-    result.bb_middle = float(bb_ind.bollinger_mavg().iloc[-1])
-    result.bb_lower = float(bb_ind.bollinger_lband().iloc[-1])
+    result.bb_upper, result.bb_middle, result.bb_lower = _bollinger(closes, bb_period)
     band_range = result.bb_upper - result.bb_lower
     if band_range > 0:
         result.bb_position = (price - result.bb_lower) / band_range
@@ -121,23 +161,22 @@ def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
         result.bb_signal = "OVERBOUGHT"
 
     # ATR
-    atr_ind = ta.volatility.AverageTrueRange(df["high"], df["low"], df["close"], window=atr_period)
-    result.atr = float(atr_ind.average_true_range().iloc[-1])
+    result.atr = _atr(highs, lows, closes, atr_period)
     result.atr_pct = result.atr / price * 100 if price > 0 else 0
     if result.atr_pct < 1.0:
         result.volatility = "LOW"
     elif result.atr_pct > 3.0:
         result.volatility = "HIGH"
 
-    # VWAP (rolling daily approximation)
-    typical = (df["high"] + df["low"] + df["close"]) / 3
-    vwap_series = (typical * df["volume"]).cumsum() / df["volume"].cumsum()
-    result.vwap = float(vwap_series.iloc[-1])
+    # VWAP (cumulative)
+    typical = (highs + lows + closes) / 3
+    vwap_series = np.cumsum(typical * vols) / np.cumsum(vols)
+    result.vwap = float(vwap_series[-1])
     result.price_vs_vwap = "ABOVE" if price > result.vwap else "BELOW"
 
     # Volume
-    vol_avg = df["volume"].rolling(20).mean().iloc[-1]
-    curr_vol = df["volume"].iloc[-1]
+    vol_avg = float(vols[-20:].mean()) if len(vols) >= 20 else float(vols.mean())
+    curr_vol = float(vols[-1])
     result.volume_ratio = curr_vol / vol_avg if vol_avg > 0 else 1.0
     if result.volume_ratio < 0.5:
         result.volume_signal = "LOW"
@@ -148,28 +187,20 @@ def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
     buy_score = 0.0
     sell_score = 0.0
 
-    if result.rsi_signal == "OVERSOLD":
-        buy_score += 0.25
-    elif result.rsi_signal == "OVERBOUGHT":
-        sell_score += 0.25
+    if result.rsi_signal == "OVERSOLD":     buy_score  += 0.25
+    elif result.rsi_signal == "OVERBOUGHT": sell_score += 0.25
 
-    if result.macd_trend == "BULLISH":
-        buy_score += 0.25
-    elif result.macd_trend == "BEARISH":
-        sell_score += 0.25
+    if result.macd_trend == "BULLISH":  buy_score  += 0.25
+    elif result.macd_trend == "BEARISH": sell_score += 0.25
 
-    if result.ema_trend == "BULLISH":
-        buy_score += 0.20
-    elif result.ema_trend == "BEARISH":
-        sell_score += 0.20
+    if result.ema_trend == "BULLISH":  buy_score  += 0.20
+    elif result.ema_trend == "BEARISH": sell_score += 0.20
 
-    if result.bb_signal == "OVERSOLD":
-        buy_score += 0.20
-    elif result.bb_signal == "OVERBOUGHT":
-        sell_score += 0.20
+    if result.bb_signal == "OVERSOLD":     buy_score  += 0.20
+    elif result.bb_signal == "OVERBOUGHT": sell_score += 0.20
 
     if result.price_vs_vwap == "ABOVE" and result.volume_signal == "HIGH":
-        buy_score += 0.10
+        buy_score  += 0.10
     elif result.price_vs_vwap == "BELOW" and result.volume_signal == "HIGH":
         sell_score += 0.10
 
