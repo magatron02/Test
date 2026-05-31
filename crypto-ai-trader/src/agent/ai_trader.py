@@ -10,8 +10,22 @@ from .trainer import AITrainer
 from ..core.config import settings
 from ..core.database import SessionLocal, Trade, Portfolio
 from ..exchanges.base import BaseExchange
+from ..notifications import line_notify, telegram_notify
 
 logger = logging.getLogger(__name__)
+
+
+async def _notify_trade(action: str, symbol: str, price: float, pnl_pct: float = None):
+    notify_on = settings.get("notifications", "notify_on", default={})
+    if action == "BUY" and not notify_on.get("trade_open", True):
+        return
+    if action in ("SELL", "CLOSE") and not notify_on.get("trade_close", True):
+        return
+    try:
+        await line_notify.send(f"{action} {symbol} @ {price:.4f}" + (f" | PnL: {pnl_pct:+.2f}%" if pnl_pct is not None else ""))
+        await telegram_notify.send_trade(action, symbol, price, pnl_pct)
+    except Exception:
+        pass
 
 
 class AITrader:
@@ -213,6 +227,7 @@ class AITrader:
                 "mode": settings.trading_mode,
             })
             logger.info(f"Trade executed: {signal.action} {symbol} @ {order.price:.4f} (conf={signal.confidence:.2f})")
+            await _notify_trade(signal.action, symbol, order.price)
 
         except Exception as e:
             logger.error(f"Trade execution failed for {symbol}: {e}")
@@ -276,6 +291,7 @@ class AITrader:
                         "pnl_pct": pnl_pct,
                     })
                     logger.info(f"Closed {symbol}: {close_reason} | PnL: {pnl_pct:+.2f}%")
+                    await _notify_trade("SELL", symbol, order.price, pnl_pct)
             except Exception as e:
                 logger.error(f"Exit failed for {symbol}: {e}")
 

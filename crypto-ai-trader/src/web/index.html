@@ -199,6 +199,31 @@ a:hover { color: #C6FF80; }
 ::-webkit-scrollbar-track { background: #000; }
 ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+/* ── Light mode ── */
+[data-theme="light"] {
+  --bg-dark:   #f0f2f5;
+  --bg-card:   #ffffff;
+  --bg-card2:  #f7f8fa;
+  --border:    #e2e5ea;
+  --border2:   #d0d4db;
+  --text-main: #0d0d0d;
+  --text-muted:#7a8694;
+}
+[data-theme="light"] body { background: var(--bg-dark); color: var(--text-main); }
+[data-theme="light"] .topnav { background: rgba(240,242,245,0.92) !important; border-bottom-color: var(--border); }
+[data-theme="light"] .topnav-pills { background: rgba(0,0,0,0.05) !important; border-color: var(--border) !important; }
+[data-theme="light"] .pill-link.active { background: #0d0d0d; color: #fff; }
+[data-theme="light"] .card { background: rgba(255,255,255,0.8) !important; border-color: var(--border) !important; }
+[data-theme="light"] .card::before { background: linear-gradient(90deg,transparent,rgba(168,255,83,0.18),transparent); }
+[data-theme="light"] .stat-card { background: rgba(255,255,255,0.85) !important; border-color: var(--border) !important; }
+[data-theme="light"] .card-header { background: var(--bg-card2); border-bottom-color: var(--border); }
+[data-theme="light"] .table { color: var(--text-main); }
+[data-theme="light"] .table td, [data-theme="light"] .table th { border-color: var(--border); }
+[data-theme="light"] .table thead th { background: var(--bg-card2); color: var(--text-muted); }
+[data-theme="light"] .table-hover tbody tr:hover td { background: rgba(168,255,83,0.08); }
+[data-theme="light"] .form-control, [data-theme="light"] .form-select { background: #fff; color: #0d0d0d; border-color: var(--border); }
+[data-theme="light"] #themeIcon::before { content: "\f496"; } /* moon */
+
 /* ── Glassmorphism ── */
 .card {
   background: rgba(12,12,12,0.6) !important;
@@ -311,6 +336,7 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
   <div class="topnav-right">
     <span class="text-muted" style="font-size:0.72rem" id="lastUpdate">--</span>
     <span class="ws-dot ws-disconnected" id="wsDot" title="WebSocket"></span>
+    <button class="btn btn-link p-0" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark" style="color:var(--text-muted);font-size:1rem;line-height:1;text-decoration:none"><i class="bi bi-sun-fill" id="themeIcon"></i></button>
     <span class="mode-badge mode-demo" id="modeTag">DEMO</span>
     <select class="form-select form-select-sm" style="width:auto;font-size:0.72rem" id="aiModelSelect">
       <option value="hybrid">Hybrid AI</option>
@@ -1176,6 +1202,25 @@ let currentSymbol = null;
 let allPrices = {};
 let allAnalyses = {};
 let charts = {};
+// Theme toggle
+function toggleTheme() {
+  const html = document.documentElement;
+  const isLight = html.getAttribute('data-theme') === 'light';
+  html.setAttribute('data-theme', isLight ? 'dark' : 'light');
+  document.getElementById('themeIcon').className = isLight ? 'bi bi-sun-fill' : 'bi bi-moon-fill';
+  localStorage.setItem('theme', isLight ? 'dark' : 'light');
+}
+(function() {
+  const saved = localStorage.getItem('theme');
+  if (saved === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+    document.addEventListener('DOMContentLoaded', () => {
+      const icon = document.getElementById('themeIcon');
+      if (icon) icon.className = 'bi bi-moon-fill';
+    });
+  }
+})();
+
 // CountUp helper
 function animateNum(elId, value, prefix='', suffix='', decimals=2) {
   const el = document.getElementById(elId);
