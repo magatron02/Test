@@ -15,11 +15,17 @@ router = APIRouter(prefix="/api")
 
 # Reference to trader injected at startup
 _trader = None
+_training_loop = None
 
 
 def set_trader(trader):
     global _trader
     _trader = trader
+
+
+def set_training_loop(loop):
+    global _training_loop
+    _training_loop = loop
 
 
 @router.get("/status")
@@ -296,3 +302,29 @@ async def save_thai_settings(data: Dict[str, Any]):
         settings.set(v, "thai", k)
     settings.save()
     return {"success": True}
+
+
+# ─── Training Loop Routes ──────────────────────────────────────
+
+@router.post("/training/loop/start")
+async def start_training_loop(data: Dict[str, Any] = None):
+    if not _training_loop:
+        raise HTTPException(503, "Training loop not available")
+    target = (data or {}).get("target", 0.80)
+    await _training_loop.start(target=float(target))
+    return {"started": True, "target": target}
+
+
+@router.get("/training/loop/status")
+async def get_training_loop_status():
+    if not _training_loop:
+        return {"running": False, "completed": False, "total_trades": 0, "win_rate": 0.0}
+    return _training_loop.status
+
+
+@router.post("/training/loop/stop")
+async def stop_training_loop():
+    if not _training_loop:
+        raise HTTPException(503, "Training loop not available")
+    _training_loop.stop()
+    return {"stopped": True}

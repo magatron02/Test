@@ -251,42 +251,106 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe 
 
 <!-- AI TRAINING -->
 <section id="sec-ai-training" class="section">
-  <div class="row g-3 mb-3">
-    <div class="col-md-3">
-      <div class="stat-card" style="background:rgba(163,113,247,0.1);border:1px solid rgba(163,113,247,0.2)">
-        <div class="stat-label">Training Records</div>
-        <div class="stat-value" style="color:var(--accent-purple)" id="trainTotal">0</div>
-        <div class="small text-muted">ข้อมูลทั้งหมด</div>
+
+  <!-- Fast Training Loop Banner -->
+  <div class="card mb-3" id="loopBanner" style="background:linear-gradient(135deg,rgba(46,160,67,0.15),rgba(56,139,253,0.1));border:1px solid rgba(46,160,67,0.3)">
+    <div class="card-body py-2 d-flex align-items-center gap-3 flex-wrap">
+      <div class="flex-grow-1">
+        <div class="d-flex align-items-center gap-2 mb-1">
+          <span class="fw-bold" style="color:var(--accent-green)"><i class="bi bi-lightning-charge-fill me-1"></i>Fast Training Loop</span>
+          <span class="badge" id="loopBadge" style="background:rgba(100,100,100,0.3);color:#8b949e">Idle</span>
+        </div>
+        <div class="d-flex align-items-center gap-2" style="min-width:260px">
+          <div class="flex-grow-1 position-relative" style="height:18px">
+            <div class="progress" style="height:18px;background:rgba(255,255,255,0.06)">
+              <div class="progress-bar" id="loopWrBar" role="progressbar" style="width:0%;background:linear-gradient(90deg,#2ea043,#388bfd);transition:width 0.4s ease"></div>
+            </div>
+            <!-- 80% target marker -->
+            <div style="position:absolute;top:0;left:80%;height:100%;width:2px;background:#f0883e;pointer-events:none" title="80% target"></div>
+          </div>
+          <span class="small fw-bold" id="loopWrText" style="min-width:48px;color:var(--accent-green)">0%</span>
+          <span class="small text-muted" style="white-space:nowrap">/ <span id="loopWrTarget">80</span>% target</span>
+        </div>
       </div>
-    </div>
-    <div class="col-md-3">
-      <div class="stat-card" style="background:rgba(46,160,67,0.1);border:1px solid rgba(46,160,67,0.2)">
-        <div class="stat-label">Labelled</div>
-        <div class="stat-value text-success" id="trainLabelled">0</div>
-        <div class="small text-muted">มีผลลัพธ์แล้ว</div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="stat-card" style="background:rgba(56,139,253,0.1);border:1px solid rgba(56,139,253,0.2)">
-        <div class="stat-label">Accuracy</div>
-        <div class="stat-value" style="color:var(--accent-blue)" id="trainAccuracy">-</div>
-        <div class="small text-muted">Cross-validation</div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="stat-card" style="background:rgba(210,153,34,0.1);border:1px solid rgba(210,153,34,0.2)">
-        <div class="stat-label">Model Status</div>
-        <div class="stat-value" style="color:var(--accent-yellow);font-size:1rem" id="trainStatus">Not ready</div>
-        <div class="small text-muted" id="trainLastTime">ยังไม่ได้ train</div>
+      <div class="d-flex gap-2 align-items-center">
+        <span class="small text-muted">Trades: <b id="loopTradeCount">0</b> &nbsp; Wins: <b id="loopWinCount" class="text-success">0</b></span>
+        <button class="btn btn-success btn-sm px-3" id="loopStartBtn" onclick="startTrainingLoop()">
+          <i class="bi bi-play-fill me-1"></i>Start
+        </button>
+        <button class="btn btn-outline-danger btn-sm px-3 d-none" id="loopStopBtn" onclick="stopTrainingLoop()">
+          <i class="bi bi-stop-fill me-1"></i>Stop
+        </button>
       </div>
     </div>
   </div>
 
+  <!-- Stat row -->
+  <div class="row g-3 mb-3">
+    <div class="col-md-3">
+      <div class="stat-card" style="background:rgba(46,160,67,0.1);border:1px solid rgba(46,160,67,0.2)">
+        <div class="stat-label">Win Rate</div>
+        <div class="stat-value" id="loopWrBig" style="color:var(--accent-green)">—</div>
+        <div class="small text-muted">Fast loop trades</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-card" style="background:rgba(56,139,253,0.1);border:1px solid rgba(56,139,253,0.2)">
+        <div class="stat-label">Closed Trades</div>
+        <div class="stat-value" style="color:var(--accent-blue)" id="loopTotalBig">0</div>
+        <div class="small text-muted">ต้องการ ≥ 40</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-card" style="background:rgba(163,113,247,0.1);border:1px solid rgba(163,113,247,0.2)">
+        <div class="stat-label">Model Accuracy</div>
+        <div class="stat-value" style="color:var(--accent-purple)" id="loopAccuracy">—</div>
+        <div class="small text-muted" id="trainAccuracy">Cross-validation</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-card" style="background:rgba(210,153,34,0.1);border:1px solid rgba(210,153,34,0.2)">
+        <div class="stat-label">Loop Status</div>
+        <div class="stat-value" style="color:var(--accent-yellow);font-size:1rem" id="trainStatus">Idle</div>
+        <div class="small text-muted" id="trainLastTime">ยังไม่ได้ run</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <!-- Live trade log -->
+    <div class="col-md-7">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-activity me-2"></i>Live Trade Log</span>
+          <div class="d-flex gap-2">
+            <span class="small text-muted">Market Regime:</span>
+            <span id="regimesBadges" class="d-flex gap-1 flex-wrap"></span>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <div id="loopLog" style="height:280px;overflow-y:auto;font-family:monospace;font-size:12px;padding:10px;background:var(--bg-card2)">
+            <span class="text-muted">Waiting for training loop to start...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Feature importance -->
+    <div class="col-md-5">
+      <div class="card h-100">
+        <div class="card-header"><i class="bi bi-bar-chart-fill me-2"></i>Feature Importance</div>
+        <div class="card-body p-2">
+          <div style="max-height:280px"><canvas id="featureChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manual training card (existing) -->
   <div class="row g-3">
     <div class="col-md-7">
       <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-cpu me-2"></i>AI Model Training</span>
+          <span><i class="bi bi-cpu me-2"></i>Manual Training (Demo trades)</span>
           <div class="d-flex gap-2 align-items-center">
             <button class="btn btn-outline-warning btn-sm" onclick="resetDemo()">
               <i class="bi bi-arrow-counterclockwise me-1"></i>Reset Demo
@@ -305,13 +369,13 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe 
             <div class="progress"><div class="progress-bar bg-success" id="trainProgressBar" style="width:0%"></div></div>
           </div>
           <div class="p-3 rounded" style="background:var(--bg-card2)">
-            <h6 class="text-muted small mb-2">วิธีทำงานของ AI Training:</h6>
+            <h6 class="text-muted small mb-2">วิธีทำงาน Fast Training Loop:</h6>
             <ol class="small text-muted ps-3 mb-0">
-              <li>ระบบเทรด Demo ด้วยข้อมูลตลาดจริง</li>
-              <li>บันทึกทุก trade พร้อม indicators ที่ใช้ตัดสินใจ</li>
-              <li>เมื่อ trade ปิด บันทึกผลกำไร/ขาดทุน</li>
-              <li>เมื่อครบ 50 trades → train RandomForest model</li>
-              <li>Model เรียนรู้ pattern ที่ทำกำไร → ใช้ใน signal ต่อไป</li>
+              <li>จำลองตลาด BULL/BEAR/RANGE/VOLATILE พร้อม drift ที่สมจริง</li>
+              <li>เทรด paper trade ด้วย TP=4% / SL=2% ให้ได้ 40+ trades</li>
+              <li>ทุก 25 trades → retrain RandomForest model อัตโนมัติ</li>
+              <li>Loop หยุดอัตโนมัติเมื่อ Win Rate ≥ 80%</li>
+              <li>Model ที่ผ่านการ train แล้วจะถูกใช้ใน live trading ทันที</li>
             </ol>
           </div>
           <div class="mt-3" id="trainResultBox" style="display:none">
@@ -322,9 +386,26 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe 
     </div>
     <div class="col-md-5">
       <div class="card">
-        <div class="card-header"><i class="bi bi-graph-up me-2"></i>Feature Importance</div>
-        <div class="card-body p-2">
-          <div style="max-height:280px"><canvas id="featureChart"></canvas></div>
+        <div class="card-header"><i class="bi bi-database me-2"></i>DB Training Stats</div>
+        <div class="card-body">
+          <div class="row g-2">
+            <div class="col-6">
+              <div class="p-2 rounded text-center" style="background:var(--bg-card2)">
+                <div class="small text-muted">Records</div>
+                <div class="fw-bold" id="trainTotal">0</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="p-2 rounded text-center" style="background:var(--bg-card2)">
+                <div class="small text-muted">Labelled</div>
+                <div class="fw-bold text-success" id="trainLabelled">0</div>
+              </div>
+            </div>
+          </div>
+          <div class="mt-2 p-2 rounded text-center" style="background:var(--bg-card2)">
+            <div class="small text-muted">Model Status</div>
+            <div class="fw-bold" id="trainStatusSmall">Not ready</div>
+          </div>
         </div>
       </div>
     </div>
@@ -580,6 +661,11 @@ function connectWS() {
     if (msg.event === 'analysis_update') handleAnalysisUpdate(msg.data);
     else if (msg.event === 'trade_executed') handleTradeExecuted(msg.data);
     else if (msg.event === 'trade_closed') handleTradeClosed(msg.data);
+    else if (msg.event === 'training_trade_opened') handleLoopTradeOpened(msg.data);
+    else if (msg.event === 'training_trade_closed') handleLoopTradeClosed(msg.data);
+    else if (msg.event === 'training_model_updated') handleLoopModelUpdated(msg.data);
+    else if (msg.event === 'training_progress') handleLoopProgress(msg.data);
+    else if (msg.event === 'training_completed') handleLoopCompleted(msg.data);
   };
   setInterval(() => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({type:'ping'})); }, 25000);
 }
@@ -594,7 +680,7 @@ function showSection(name, el) {
   if (el) el.classList.add('active');
   if (name === 'portfolio') refreshPortfolio();
   if (name === 'trade-history') refreshHistory();
-  if (name === 'ai-training') refreshTraining();
+  if (name === 'ai-training') { refreshTraining(); refreshLoopStatus(); }
   if (name === 'thai-market') loadThaiStocks();
 }
 
@@ -1007,6 +1093,140 @@ async function resetDemo() {
   } catch(e) { showToast('Error', e.message, 'danger'); }
 }
 
+// ============================================================
+// Fast Training Loop
+// ============================================================
+let loopRunning = false;
+
+async function startTrainingLoop() {
+  try {
+    const r = await fetch('/api/training/loop/start', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({target: 0.80})
+    });
+    const d = await r.json();
+    if (d.started) {
+      loopRunning = true;
+      updateLoopButtons(true);
+      document.getElementById('loopLog').innerHTML = '<span class="text-muted">Training started…</span>';
+      showToast('Training Loop', 'Started — aiming for 80% win rate', 'success');
+    }
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+}
+
+async function stopTrainingLoop() {
+  try {
+    await fetch('/api/training/loop/stop', {method: 'POST'});
+    loopRunning = false;
+    updateLoopButtons(false);
+    showToast('Training Loop', 'Stopped', 'warning');
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+}
+
+function updateLoopButtons(running) {
+  document.getElementById('loopStartBtn').classList.toggle('d-none', running);
+  document.getElementById('loopStopBtn').classList.toggle('d-none', !running);
+  const badge = document.getElementById('loopBadge');
+  if (running) {
+    badge.textContent = '● Running';
+    badge.style.background = 'rgba(46,160,67,0.3)';
+    badge.style.color = '#3fb950';
+  } else {
+    badge.textContent = 'Idle';
+    badge.style.background = 'rgba(100,100,100,0.3)';
+    badge.style.color = '#8b949e';
+  }
+}
+
+function appendLoopLog(html) {
+  const log = document.getElementById('loopLog');
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  log.insertBefore(div, log.firstChild);
+  while (log.children.length > 80) log.removeChild(log.lastChild);
+}
+
+function updateLoopStats(d) {
+  const wr = d.win_rate || 0;
+  const total = d.total_trades || 0;
+  const wins = d.win_trades || 0;
+  const target = d.target || 0.80;
+
+  document.getElementById('loopTradeCount').textContent = total;
+  document.getElementById('loopWinCount').textContent = wins;
+  document.getElementById('loopWrText').textContent = (wr * 100).toFixed(1) + '%';
+  document.getElementById('loopWrBar').style.width = Math.min(wr / target * 100, 100) + '%';
+  document.getElementById('loopWrBar').style.background =
+    wr >= target ? 'linear-gradient(90deg,#2ea043,#1a7f37)' : 'linear-gradient(90deg,#2ea043,#388bfd)';
+  document.getElementById('loopWrBig').textContent = (wr * 100).toFixed(1) + '%';
+  document.getElementById('loopWrBig').style.color = wr >= target ? '#3fb950' : 'var(--accent-green)';
+  document.getElementById('loopTotalBig').textContent = total;
+  document.getElementById('loopWrTarget').textContent = Math.round(target * 100);
+  if (d.accuracy) document.getElementById('loopAccuracy').textContent = (d.accuracy * 100).toFixed(1) + '%';
+  if (d.running !== undefined) {
+    loopRunning = d.running;
+    updateLoopButtons(d.running);
+    document.getElementById('trainStatus').textContent = d.completed ? '🎯 Done!' : d.running ? '⚡ Running' : 'Idle';
+  }
+  if (d.last_regime && Object.keys(d.last_regime).length) {
+    const colors = {BULL:'#3fb950', BEAR:'#f85149', RANGE:'#388bfd', VOLATILE:'#f0883e'};
+    document.getElementById('regimesBadges').innerHTML = Object.entries(d.last_regime)
+      .map(([sym, r]) => `<span class="badge" style="background:${colors[r]||'#888'}22;color:${colors[r]||'#888'};border:1px solid ${colors[r]||'#888'}44;font-size:10px">${sym.split('/')[0]}:${r}</span>`)
+      .join('');
+  }
+}
+
+function handleLoopTradeOpened(d) {
+  const icon = d.side === 'BUY' ? '🟢' : '🔴';
+  const col = d.side === 'BUY' ? '#3fb950' : '#f85149';
+  appendLoopLog(`<span style="color:${col}">${icon} OPEN ${d.side} ${d.symbol} @ ${d.price} | conf:${(d.confidence*100).toFixed(0)}% | <span style="color:#888">${d.regime}</span></span>`);
+}
+
+function handleLoopTradeClosed(d) {
+  const icon = d.win ? '✅' : '❌';
+  const col = d.win ? '#3fb950' : '#f85149';
+  const wr = (d.win_rate * 100).toFixed(1);
+  appendLoopLog(`<span style="color:${col}">${icon} CLOSE ${d.symbol} ${d.pnl_pct >= 0 ? '+' : ''}${d.pnl_pct.toFixed(2)}% | WR=${wr}% (${d.wins}/${d.total}) | <span style="color:#888">${d.regime}</span></span>`);
+  updateLoopStats(d);
+}
+
+function handleLoopModelUpdated(d) {
+  appendLoopLog(`<span style="color:#a371f7">🧠 Model retrained — accuracy: ${d.accuracy ? (d.accuracy*100).toFixed(1)+'%' : 'N/A'} | trades: ${d.total}</span>`);
+  if (d.accuracy) document.getElementById('loopAccuracy').textContent = (d.accuracy * 100).toFixed(1) + '%';
+}
+
+function handleLoopProgress(d) {
+  updateLoopStats(d);
+  if (d.log && d.log.length) {
+    const log = document.getElementById('loopLog');
+    log.innerHTML = d.log.map(l => {
+      const col = l.includes('✅') ? '#3fb950' : l.includes('❌') ? '#f85149' : l.includes('🧠') ? '#a371f7' : l.includes('🎯') ? '#f0883e' : '#8b949e';
+      return `<div style="color:${col}">${l}</div>`;
+    }).join('');
+  }
+}
+
+function handleLoopCompleted(d) {
+  loopRunning = false;
+  updateLoopButtons(false);
+  document.getElementById('trainStatus').textContent = '🎯 Done!';
+  updateLoopStats({...d, running: false, completed: true});
+  showToast('🎯 Training Complete!', `Win Rate: ${(d.win_rate*100).toFixed(1)}% on ${d.total_trades} trades`, 'success');
+  appendLoopLog(`<span style="color:#f0883e;font-weight:bold">🎯 TARGET REACHED! WR=${(d.win_rate*100).toFixed(1)}% — ${d.total_trades} trades</span>`);
+}
+
+async function refreshLoopStatus() {
+  try {
+    const r = await fetch('/api/training/loop/status');
+    const d = await r.json();
+    updateLoopStats(d);
+    if (d.log && d.log.length && d.running) {
+      handleLoopProgress(d);
+    }
+  } catch {}
+}
+
 async function refreshPortfolio() {
   await fetchPortfolioStats();
 }
@@ -1388,6 +1608,7 @@ async function init() {
   setInterval(fetchPortfolioStats, 10000);
   setInterval(fetchStats, 30000);
   setInterval(fetchStatus, 60000);
+  setInterval(refreshLoopStatus, 3000);
 }
 
 init();
