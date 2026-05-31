@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Auto Trader</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg-dark: #0d1117;
+  --bg-card: #161b22;
+  --bg-card2: #1c2128;
+  --border: #30363d;
+  --text-main: #e6edf3;
+  --text-muted: #8b949e;
+  --accent: #2ea043;
+  --accent-red: #f85149;
+  --accent-blue: #388bfd;
+  --accent-yellow: #d29922;
+  --accent-purple: #a371f7;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe UI', sans-serif; margin: 0; }
+.navbar { background: var(--bg-card) !important; border-bottom: 1px solid var(--border); padding: 8px 20px; }
+.navbar-brand { font-weight: 700; font-size: 1.1rem; color: var(--accent) !important; }
+.sidebar { width: 220px; min-height: calc(100vh - 56px); background: var(--bg-card); border-right: 1px solid var(--border); position: fixed; top: 56px; left: 0; overflow-y: auto; z-index: 100; }
+.sidebar .nav-link { color: var(--text-muted); padding: 10px 16px; display: flex; align-items: center; gap: 10px; font-size: 0.9rem; transition: all 0.2s; border-left: 3px solid transparent; }
+.sidebar .nav-link:hover, .sidebar .nav-link.active { color: var(--text-main); background: var(--bg-card2); border-left-color: var(--accent); }
+.main-content { margin-left: 220px; padding: 20px; min-height: calc(100vh - 56px); }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; }
+.card-header { background: var(--bg-card2); border-bottom: 1px solid var(--border); padding: 12px 16px; font-weight: 600; font-size: 0.85rem; }
+.stat-card { border-radius: 8px; padding: 16px; }
+.stat-value { font-size: 1.6rem; font-weight: 700; line-height: 1.2; }
+.stat-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.badge-signal { font-size: 0.7rem; padding: 3px 8px; border-radius: 12px; font-weight: 600; }
+.signal-buy { background: rgba(46,160,67,0.2); color: #3fb950; border: 1px solid rgba(46,160,67,0.3); }
+.signal-sell { background: rgba(248,81,73,0.2); color: #f85149; border: 1px solid rgba(248,81,73,0.3); }
+.signal-hold { background: rgba(139,148,158,0.2); color: #8b949e; border: 1px solid rgba(139,148,158,0.3); }
+.signal-buy-text { color: #3fb950; }
+.signal-sell-text { color: #f85149; }
+.table { color: var(--text-main); }
+.table td, .table th { border-color: var(--border); font-size: 0.82rem; vertical-align: middle; }
+.table thead th { color: var(--text-muted); font-weight: 600; background: var(--bg-card2); }
+.price-card { border-radius: 8px; padding: 12px 16px; background: var(--bg-card); border: 1px solid var(--border); cursor: pointer; transition: border-color 0.2s; }
+.price-card:hover, .price-card.active { border-color: var(--accent-blue); }
+.price-up { color: var(--accent); }
+.price-down { color: var(--accent-red); }
+.indicator-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(48,54,61,0.5); font-size: 0.82rem; }
+.indicator-row:last-child { border-bottom: none; }
+.indicator-bar { width: 60px; height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 6px; }
+.indicator-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
+.activity-item { padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 0.82rem; }
+.activity-item:last-child { border-bottom: none; }
+.mode-badge { padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+.mode-demo { background: rgba(163,113,247,0.2); color: var(--accent-purple); border: 1px solid rgba(163,113,247,0.3); }
+.mode-live { background: rgba(46,160,67,0.2); color: #3fb950; border: 1px solid rgba(46,160,67,0.3); }
+.form-control, .form-select { background: var(--bg-card2); border: 1px solid var(--border); color: var(--text-main); }
+.form-control:focus, .form-select:focus { background: var(--bg-card2); border-color: var(--accent-blue); color: var(--text-main); box-shadow: 0 0 0 0.2rem rgba(56,139,253,0.15); }
+.form-label { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 4px; }
+.progress { background: var(--border); height: 8px; border-radius: 4px; }
+.ws-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.ws-connected { background: var(--accent); animation: pulse 2s infinite; }
+.ws-disconnected { background: var(--accent-red); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+.section { display: none; }
+.section.active { display: block; }
+.chart-container { position: relative; height: 300px; }
+.notification { position: fixed; top: 70px; right: 20px; z-index: 9999; min-width: 280px; }
+.btn-sm { font-size: 0.78rem; padding: 4px 10px; }
+.tab-btn { background: none; border: 1px solid var(--border); color: var(--text-muted); padding: 5px 14px; border-radius: 20px; cursor: pointer; font-size: 0.8rem; }
+.tab-btn.active { background: var(--accent-blue); border-color: var(--accent-blue); color: #fff; }
+</style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+  <div class="d-flex align-items-center gap-3 w-100">
+    <span class="navbar-brand"><i class="bi bi-robot me-2"></i>AI Auto Trader</span>
+    <span class="mode-badge mode-demo" id="modeTag">DEMO</span>
+    <div class="ms-auto d-flex align-items-center gap-3">
+      <span class="text-muted small" id="lastUpdate">--</span>
+      <span class="ws-dot ws-disconnected" id="wsDot" title="WebSocket"></span>
+      <select class="form-select form-select-sm" style="width:auto" id="aiModelSelect">
+        <option value="hybrid">Hybrid AI</option>
+        <option value="rule_based">Rule-based</option>
+        <option value="ml">ML Model</option>
+        <option value="claude">Claude API</option>
+      </select>
+      <select class="form-select form-select-sm" style="width:auto" id="strategySelect">
+        <option value="hybrid">Strategy: Hybrid</option>
+        <option value="dca">DCA</option>
+        <option value="trend">Trend</option>
+        <option value="mean_reversion">Mean Reversion</option>
+      </select>
+    </div>
+  </div>
+</nav>
+
+<div class="d-flex">
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="p-3 pb-1">
+    <small class="text-muted text-uppercase" style="font-size:0.7rem;letter-spacing:1px">เมนู</small>
+  </div>
+  <ul class="nav flex-column">
+    <li><a href="#" class="nav-link active" onclick="showSection('dashboard', this)"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+    <li><a href="#" class="nav-link" onclick="showSection('trading', this)"><i class="bi bi-graph-up-arrow"></i> Trading</a></li>
+    <li><a href="#" class="nav-link" onclick="showSection('portfolio', this)"><i class="bi bi-wallet2"></i> Portfolio</a></li>
+    <li><a href="#" class="nav-link" onclick="showSection('ai-training', this)"><i class="bi bi-cpu"></i> AI Training</a></li>
+    <li><a href="#" class="nav-link" onclick="showSection('trade-history', this)"><i class="bi bi-clock-history"></i> History</a></li>
+    <li><a href="#" class="nav-link" onclick="showSection('settings', this)"><i class="bi bi-gear"></i> Settings</a></li>
+  </ul>
+  <div class="p-3 mt-3 border-top" style="border-color:var(--border)!important">
+    <div class="small text-muted mb-2">Demo Portfolio</div>
+    <div class="fw-bold text-success" id="sidebarTotal">$0.00</div>
+    <div class="small mt-1"><span id="sidebarPnl" class="text-muted">+0.00%</span></div>
+  </div>
+</nav>
+
+<!-- Main -->
+<main class="main-content">
+
+<!-- DASHBOARD -->
+<section id="sec-dashboard" class="section active">
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="stat-card" style="background:rgba(46,160,67,0.1);border:1px solid rgba(46,160,67,0.2);">
+        <div class="stat-label">Total Value</div>
+        <div class="stat-value text-success" id="totalValue">$0.00</div>
+        <div class="small text-muted mt-1" id="totalPnl">+0.00 USDT</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card" style="background:rgba(56,139,253,0.1);border:1px solid rgba(56,139,253,0.2);">
+        <div class="stat-label">Cash (USDT)</div>
+        <div class="stat-value" style="color:var(--accent-blue)" id="cashValue">$0.00</div>
+        <div class="small text-muted mt-1" id="positionCount">0 positions</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card" style="background:rgba(210,153,34,0.1);border:1px solid rgba(210,153,34,0.2);">
+        <div class="stat-label">Win Rate</div>
+        <div class="stat-value" style="color:var(--accent-yellow)" id="winRate">0%</div>
+        <div class="small text-muted mt-1" id="totalTrades">0 trades</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card" style="background:rgba(163,113,247,0.1);border:1px solid rgba(163,113,247,0.2);">
+        <div class="stat-label">Avg PnL/Trade</div>
+        <div class="stat-value" style="color:var(--accent-purple)" id="avgPnl">0.00%</div>
+        <div class="small text-muted mt-1" id="bestTrade">Best: 0%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Price Cards -->
+  <div class="row g-2 mb-4" id="priceCardsRow"></div>
+
+  <div class="row g-3">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-bar-chart-line me-2"></i>Portfolio Value</span>
+          <div class="d-flex gap-2">
+            <button class="tab-btn active" onclick="setChartRange('1h', this)">1H</button>
+            <button class="tab-btn" onclick="setChartRange('24h', this)">24H</button>
+          </div>
+        </div>
+        <div class="card-body p-2">
+          <div class="chart-container"><canvas id="portfolioChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header"><i class="bi bi-activity me-2"></i>AI Activity</div>
+        <div class="card-body p-0" style="max-height:320px;overflow-y:auto" id="activityFeed">
+          <div class="p-3 text-muted text-center small">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRADING -->
+<section id="sec-trading" class="section">
+  <div class="row g-3">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-graph-up me-2"></i>Chart & Indicators</span>
+          <select class="form-select form-select-sm" style="width:auto" id="chartSymbolSelect"></select>
+        </div>
+        <div class="card-body p-2">
+          <div class="chart-container"><canvas id="tradingChart"></canvas></div>
+        </div>
+      </div>
+      <!-- Indicators -->
+      <div class="card mt-3">
+        <div class="card-header"><i class="bi bi-sliders me-2"></i>Technical Indicators</div>
+        <div class="card-body" id="indicatorPanel">
+          <div class="text-muted text-center small py-2">เลือก symbol เพื่อดู indicators</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-cpu me-2"></i>AI Analysis</div>
+        <div class="card-body" id="aiAnalysisPanel">
+          <div class="text-muted text-center small py-2">รอการวิเคราะห์...</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><i class="bi bi-list-ul me-2"></i>Open Positions</div>
+        <div class="card-body p-0">
+          <div id="openPositionsTable" class="p-2 small text-muted text-center">ไม่มี position เปิดอยู่</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PORTFOLIO -->
+<section id="sec-portfolio" class="section">
+  <div class="row g-3 mb-3">
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header"><i class="bi bi-pie-chart me-2"></i>Asset Allocation</div>
+        <div class="card-body">
+          <div style="max-height:220px"><canvas id="allocationChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header"><i class="bi bi-wallet2 me-2"></i>Holdings</div>
+        <div class="card-body p-0">
+          <table class="table table-dark mb-0" id="holdingsTable">
+            <thead><tr><th>Asset</th><th>Amount</th><th>Price</th><th>Value</th><th>Entry</th><th>PnL</th></tr></thead>
+            <tbody id="holdingsBody"><tr><td colspan="6" class="text-center text-muted">ไม่มีข้อมูล</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- AI TRAINING -->
+<section id="sec-ai-training" class="section">
+  <div class="row g-3 mb-3">
+    <div class="col-md-3">
+      <div class="stat-card" style="background:rgba(163,113,247,0.1);border:1px solid rgba(163,113,247,0.2)">
+        <div class="stat-label">Training Records</div>
+        <div class="stat-value" style="color:var(--accent-purple)" id="trainTotal">0</div>
+        <div class="small text-muted">ข้อมูลทั้งหมด</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-card" style="background:rgba(46,160,67,0.1);border:1px solid rgba(46,160,67,0.2)">
+        <div class="stat-label">Labelled</div>
+        <div class="stat-value text-success" id="trainLabelled">0</div>
+        <div class="small text-muted">มีผลลัพธ์แล้ว</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-card" style="background:rgba(56,139,253,0.1);border:1px solid rgba(56,139,253,0.2)">
+        <div class="stat-label">Accuracy</div>
+        <div class="stat-value" style="color:var(--accent-blue)" id="trainAccuracy">-</div>
+        <div class="small text-muted">Cross-validation</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-card" style="background:rgba(210,153,34,0.1);border:1px solid rgba(210,153,34,0.2)">
+        <div class="stat-label">Model Status</div>
+        <div class="stat-value" style="color:var(--accent-yellow);font-size:1rem" id="trainStatus">Not ready</div>
+        <div class="small text-muted" id="trainLastTime">ยังไม่ได้ train</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-md-7">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-cpu me-2"></i>AI Model Training</span>
+          <div class="d-flex gap-2 align-items-center">
+            <button class="btn btn-outline-warning btn-sm" onclick="resetDemo()">
+              <i class="bi bi-arrow-counterclockwise me-1"></i>Reset Demo
+            </button>
+            <button class="btn btn-success btn-sm" onclick="triggerTraining()">
+              <i class="bi bi-lightning me-1"></i>Train Now
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="mb-3">
+            <div class="d-flex justify-content-between mb-1">
+              <small class="text-muted">Progress to next training</small>
+              <small id="trainProgress">0 / 50</small>
+            </div>
+            <div class="progress"><div class="progress-bar bg-success" id="trainProgressBar" style="width:0%"></div></div>
+          </div>
+          <div class="p-3 rounded" style="background:var(--bg-card2)">
+            <h6 class="text-muted small mb-2">วิธีทำงานของ AI Training:</h6>
+            <ol class="small text-muted ps-3 mb-0">
+              <li>ระบบเทรด Demo ด้วยข้อมูลตลาดจริง</li>
+              <li>บันทึกทุก trade พร้อม indicators ที่ใช้ตัดสินใจ</li>
+              <li>เมื่อ trade ปิด บันทึกผลกำไร/ขาดทุน</li>
+              <li>เมื่อครบ 50 trades → train RandomForest model</li>
+              <li>Model เรียนรู้ pattern ที่ทำกำไร → ใช้ใน signal ต่อไป</li>
+            </ol>
+          </div>
+          <div class="mt-3" id="trainResultBox" style="display:none">
+            <div class="alert alert-success mb-0 small" id="trainResult"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-5">
+      <div class="card">
+        <div class="card-header"><i class="bi bi-graph-up me-2"></i>Feature Importance</div>
+        <div class="card-body p-2">
+          <div style="max-height:280px"><canvas id="featureChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRADE HISTORY -->
+<section id="sec-trade-history" class="section">
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-clock-history me-2"></i>Trade History</span>
+      <span class="text-muted small" id="historyCount">0 trades</span>
+    </div>
+    <div class="card-body p-0" style="overflow-x:auto">
+      <table class="table table-dark mb-0">
+        <thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th>Price</th><th>Amount</th><th>Strategy</th><th>Model</th><th>Conf</th><th>Status</th><th>PnL</th></tr></thead>
+        <tbody id="historyBody"><tr><td colspan="10" class="text-center text-muted p-3">ยังไม่มีประวัติ</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- SETTINGS -->
+<section id="sec-settings" class="section">
+  <div class="row g-3">
+    <div class="col-md-6">
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-toggles me-2"></i>Trading Mode</div>
+        <div class="card-body">
+          <div class="d-flex gap-2 mb-3">
+            <button class="btn btn-success btn-sm" id="btnDemo" onclick="setMode('demo')">
+              <i class="bi bi-play-circle me-1"></i>Demo Mode
+            </button>
+            <button class="btn btn-outline-danger btn-sm" id="btnLive" onclick="setMode('live')">
+              <i class="bi bi-exclamation-triangle me-1"></i>Live Mode
+            </button>
+          </div>
+          <small class="text-muted">Demo Mode: เทรดด้วย virtual money ใช้ข้อมูลตลาดจริง</small>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-cpu me-2"></i>AI Model</div>
+        <div class="card-body">
+          <label class="form-label">Claude API Key</label>
+          <input type="password" class="form-control form-control-sm mb-2" id="claudeApiKey" placeholder="sk-ant-...">
+          <label class="form-label">Claude Model</label>
+          <select class="form-select form-select-sm mb-3" id="claudeModel">
+            <option value="claude-sonnet-4-6">claude-sonnet-4-6 (Recommended)</option>
+            <option value="claude-opus-4-8">claude-opus-4-8 (Most capable)</option>
+            <option value="claude-haiku-4-5-20251001">claude-haiku-4-5 (Fastest)</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="saveAISettings()">
+            <i class="bi bi-save me-1"></i>Save AI Settings
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-currency-bitcoin me-2"></i>Exchange API Keys</div>
+        <div class="card-body">
+          <ul class="nav nav-tabs nav-fill mb-3" style="border-color:var(--border)">
+            <li class="nav-item"><a href="#" class="nav-link text-muted active" onclick="showExTab('binance',this)">Binance</a></li>
+            <li class="nav-item"><a href="#" class="nav-link text-muted" onclick="showExTab('binance_th',this)">BinanceTH</a></li>
+            <li class="nav-item"><a href="#" class="nav-link text-muted" onclick="showExTab('bitkub',this)">Bitkub</a></li>
+            <li class="nav-item"><a href="#" class="nav-link text-muted" onclick="showExTab('okx',this)">OKX</a></li>
+          </ul>
+          <div id="ex-binance" class="ex-tab">
+            <label class="form-label">API Key</label>
+            <input type="password" class="form-control form-control-sm mb-2" id="binance_api_key">
+            <label class="form-label">API Secret</label>
+            <input type="password" class="form-control form-control-sm mb-2" id="binance_api_secret">
+            <button class="btn btn-primary btn-sm" onclick="saveExchangeKey('binance')">Save</button>
+          </div>
+          <div id="ex-binance_th" class="ex-tab" style="display:none">
+            <label class="form-label">API Key</label>
+            <input type="password" class="form-control form-control-sm mb-2" id="binance_th_api_key">
+            <label class="form-label">API Secret</label>
+            <input type="password" class="form-control form-control-sm mb-2" id="binance_th_api_secret">
+            <button class="btn btn-primary btn-sm" onclick="saveExchangeKey('binance_th')">Save</button>
+          </div>
+          <div id="ex-bitkub" class="ex-tab" style="display:none">
+            <label class="form-label">API Key</label>
+            <input type="password" class="form-control form-control-sm mb-2" id="bitkub_api_key">
+            <label class="form-label">API Secret</label>
+            <input type="password" class="form-control form-control-sm mb-2" id="bitkub_api_secret">
+            <button class="btn btn-primary btn-sm" onclick="saveExchangeKey('bitkub')">Save</button>
+          </div>
+          <div id="ex-okx" class="ex-tab" style="display:none">
+            <label class="form-label">API Key</label>
+            <input type="password" class="form-control form-control-sm mb-2" id="okx_api_key">
+            <label class="form-label">API Secret</label>
+            <input type="password" class="form-control form-control-sm mb-2" id="okx_api_secret">
+            <label class="form-label">Passphrase</label>
+            <input type="password" class="form-control form-control-sm mb-2" id="okx_passphrase">
+            <button class="btn btn-primary btn-sm" onclick="saveExchangeKey('okx')">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><i class="bi bi-bell me-2"></i>Notifications</div>
+        <div class="card-body">
+          <label class="form-label">LINE Notify Token</label>
+          <input type="password" class="form-control form-control-sm mb-2" id="lineToken">
+          <label class="form-label">Telegram Bot Token</label>
+          <input type="password" class="form-control form-control-sm mb-2" id="telegramToken">
+          <label class="form-label">Telegram Chat ID</label>
+          <input type="text" class="form-control form-control-sm mb-2" id="telegramChatId">
+          <button class="btn btn-primary btn-sm" onclick="saveNotifications()">Save Notifications</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+</div>
+
+<!-- Notification Toast Container -->
+<div id="toastContainer" class="notification"></div>
+
+<script>
+// ============================================================
+// State
+// ============================================================
+let ws = null;
+let reconnectTimer = null;
+let portfolioData = { labels: [], values: [] };
+let currentSymbol = null;
+let allPrices = {};
+let allAnalyses = {};
+let charts = {};
+
+// ============================================================
+// WebSocket
+// ============================================================
+function connectWS() {
+  const url = `ws://${location.host}/ws`;
+  ws = new WebSocket(url);
+  ws.onopen = () => {
+    document.getElementById('wsDot').className = 'ws-dot ws-connected';
+    if (reconnectTimer) { clearInterval(reconnectTimer); reconnectTimer = null; }
+  };
+  ws.onclose = () => {
+    document.getElementById('wsDot').className = 'ws-dot ws-disconnected';
+    if (!reconnectTimer) reconnectTimer = setTimeout(connectWS, 3000);
+  };
+  ws.onerror = () => ws.close();
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.event === 'analysis_update') handleAnalysisUpdate(msg.data);
+    else if (msg.event === 'trade_executed') handleTradeExecuted(msg.data);
+    else if (msg.event === 'trade_closed') handleTradeClosed(msg.data);
+  };
+  setInterval(() => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({type:'ping'})); }, 25000);
+}
+
+// ============================================================
+// Navigation
+// ============================================================
+function showSection(name, el) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  document.getElementById('sec-' + name).classList.add('active');
+  if (el) el.classList.add('active');
+  if (name === 'portfolio') refreshPortfolio();
+  if (name === 'trade-history') refreshHistory();
+  if (name === 'ai-training') refreshTraining();
+}
+
+function showExTab(name, el) {
+  document.querySelectorAll('.ex-tab').forEach(t => t.style.display = 'none');
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  document.getElementById('ex-' + name).style.display = '';
+  if (el) el.classList.add('active');
+}
+
+// ============================================================
+// Charts init
+// ============================================================
+function initCharts() {
+  const gridColor = 'rgba(48,54,61,0.5)';
+  const defaultOpts = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#8b949e', font: {size:11} } } },
+    scales: {
+      x: { ticks: { color: '#8b949e', font:{size:10} }, grid: { color: gridColor } },
+      y: { ticks: { color: '#8b949e', font:{size:10} }, grid: { color: gridColor } },
+    }
+  };
+
+  charts.portfolio = new Chart(document.getElementById('portfolioChart'), {
+    type: 'line',
+    data: { labels: [], datasets: [{ label: 'Portfolio Value (USDT)', data: [], borderColor: '#2ea043', backgroundColor: 'rgba(46,160,67,0.1)', fill: true, tension: 0.4, pointRadius: 2 }] },
+    options: { ...defaultOpts, plugins: { ...defaultOpts.plugins, legend: { display: false } } }
+  });
+
+  charts.trading = new Chart(document.getElementById('tradingChart'), {
+    type: 'line',
+    data: { labels: [], datasets: [{ label: 'Price', data: [], borderColor: '#388bfd', backgroundColor: 'rgba(56,139,253,0.07)', fill: true, tension: 0.2, pointRadius: 0 }] },
+    options: { ...defaultOpts, plugins: { ...defaultOpts.plugins, legend: { display: false } } }
+  });
+
+  charts.allocation = new Chart(document.getElementById('allocationChart'), {
+    type: 'doughnut',
+    data: { labels: ['USDT'], datasets: [{ data: [100], backgroundColor: ['#388bfd'], borderColor: ['#0d1117'], borderWidth: 2 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#8b949e', font:{size:10} } } } }
+  });
+
+  charts.features = new Chart(document.getElementById('featureChart'), {
+    type: 'bar',
+    data: {
+      labels: ['RSI', 'MACD', 'BB', 'ATR', 'Volume', 'VWAP', '24h chg', 'EMA'],
+      datasets: [{ label: 'Importance', data: [0,0,0,0,0,0,0,0], backgroundColor: 'rgba(163,113,247,0.7)', borderRadius: 4 }]
+    },
+    options: {
+      ...defaultOpts, indexAxis: 'y',
+      plugins: { ...defaultOpts.plugins, legend: { display: false } },
+      scales: { x: { ...defaultOpts.scales.x, max: 1 }, y: { ...defaultOpts.scales.y } }
+    }
+  });
+}
+
+// ============================================================
+// Data fetchers
+// ============================================================
+async function fetchStatus() {
+  try {
+    const r = await fetch('/api/status');
+    const d = await r.json();
+    document.getElementById('modeTag').textContent = d.mode.toUpperCase();
+    document.getElementById('modeTag').className = 'mode-badge mode-' + d.mode;
+    document.getElementById('aiModelSelect').value = d.ai_model;
+    document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('th');
+  } catch {}
+}
+
+async function fetchPrices() {
+  try {
+    const r = await fetch('/api/prices');
+    allPrices = await r.json();
+    renderPriceCards();
+    updateTradingChart();
+  } catch {}
+}
+
+async function fetchPortfolioStats() {
+  try {
+    const r = await fetch('/api/portfolio');
+    const d = await r.json();
+    const initial = 10000;
+    document.getElementById('totalValue').textContent = '$' + d.total_value.toFixed(2);
+    document.getElementById('cashValue').textContent = '$' + d.cash_usdt.toFixed(2);
+    document.getElementById('positionCount').textContent = d.positions.length + ' positions';
+    const pnl = d.total_value - initial;
+    document.getElementById('totalPnl').textContent = (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + ' USDT';
+    document.getElementById('totalPnl').className = 'small mt-1 ' + (pnl >= 0 ? 'text-success' : 'text-danger');
+    document.getElementById('sidebarTotal').textContent = '$' + d.total_value.toFixed(2);
+    const pnlPct = (d.total_value - initial) / initial * 100;
+    document.getElementById('sidebarPnl').textContent = (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '%';
+    document.getElementById('sidebarPnl').className = 'small ' + (pnlPct >= 0 ? 'text-success' : 'text-danger');
+
+    // Update portfolio chart
+    const now = new Date().toLocaleTimeString('th', {hour:'2-digit', minute:'2-digit'});
+    if (portfolioData.labels.length > 60) { portfolioData.labels.shift(); portfolioData.values.shift(); }
+    portfolioData.labels.push(now);
+    portfolioData.values.push(d.total_value);
+    charts.portfolio.data.labels = portfolioData.labels;
+    charts.portfolio.data.datasets[0].data = portfolioData.values;
+    charts.portfolio.update('none');
+
+    updateOpenPositions(d.positions);
+    updateHoldings(d.positions, d.cash_usdt, d.total_value);
+    updateAllocationChart(d.positions, d.cash_usdt);
+  } catch {}
+}
+
+async function fetchStats() {
+  try {
+    const r = await fetch('/api/stats');
+    const d = await r.json();
+    document.getElementById('winRate').textContent = d.win_rate.toFixed(1) + '%';
+    document.getElementById('totalTrades').textContent = d.total_trades + ' trades';
+    document.getElementById('avgPnl').textContent = (d.avg_pnl_pct >= 0 ? '+' : '') + d.avg_pnl_pct.toFixed(2) + '%';
+    document.getElementById('bestTrade').textContent = 'Best: ' + (d.best_trade >= 0 ? '+' : '') + (d.best_trade || 0).toFixed(2) + '%';
+  } catch {}
+}
+
+// ============================================================
+// Rendering
+// ============================================================
+function renderPriceCards() {
+  const container = document.getElementById('priceCardsRow');
+  const symbolSelect = document.getElementById('chartSymbolSelect');
+  const prevSymbols = new Set(Array.from(symbolSelect.options).map(o => o.value));
+
+  container.innerHTML = '';
+  for (const [sym, d] of Object.entries(allPrices)) {
+    const up = d.change_24h >= 0;
+    const card = document.createElement('div');
+    card.className = 'col-6 col-md-4 col-lg-2';
+    card.innerHTML = `
+      <div class="price-card ${currentSymbol===sym?'active':''}" onclick="selectSymbol('${sym}')">
+        <div class="d-flex justify-content-between align-items-start">
+          <strong class="small">${sym.split('/')[0]}</strong>
+          <span class="badge-signal ${d.signal==='BUY'?'signal-buy':d.signal==='SELL'?'signal-sell':'signal-hold'}">${d.signal}</span>
+        </div>
+        <div class="fw-bold mt-1">$${formatPrice(d.price)}</div>
+        <div class="small ${up?'price-up':'price-down'}">${up?'+':''}${d.change_24h.toFixed(2)}%</div>
+      </div>`;
+    container.appendChild(card);
+
+    if (!prevSymbols.has(sym)) {
+      const opt = document.createElement('option');
+      opt.value = sym; opt.textContent = sym;
+      symbolSelect.appendChild(opt);
+    }
+  }
+  if (!currentSymbol && Object.keys(allPrices).length > 0) {
+    selectSymbol(Object.keys(allPrices)[0]);
+  }
+}
+
+function formatPrice(p) {
+  if (p >= 1000) return p.toFixed(2);
+  if (p >= 1) return p.toFixed(4);
+  return p.toFixed(6);
+}
+
+function selectSymbol(sym) {
+  currentSymbol = sym;
+  document.getElementById('chartSymbolSelect').value = sym;
+  renderPriceCards();
+  updateIndicatorPanel(sym);
+  updateAIPanel(sym);
+  fetchTradingChart(sym);
+}
+
+async function fetchTradingChart(sym) {
+  try {
+    const ccxSym = sym.replace('/', '');
+    const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=${ccxSym}&interval=15m&limit=50`);
+    const data = await r.json();
+    const labels = data.map(d => new Date(d[0]).toLocaleTimeString('th', {hour:'2-digit',minute:'2-digit'}));
+    const closes = data.map(d => parseFloat(d[4]));
+    charts.trading.data.labels = labels;
+    charts.trading.data.datasets[0].label = sym;
+    charts.trading.data.datasets[0].data = closes;
+    charts.trading.update();
+  } catch {}
+}
+
+function updateTradingChart() {
+  if (currentSymbol) fetchTradingChart(currentSymbol);
+}
+
+function updateIndicatorPanel(sym) {
+  const d = allPrices[sym];
+  const a = allAnalyses[sym];
+  if (!d) return;
+  const rsiColor = d.rsi < 30 ? '#3fb950' : d.rsi > 70 ? '#f85149' : '#8b949e';
+  const panel = document.getElementById('indicatorPanel');
+  panel.innerHTML = `
+    <div class="indicator-row"><span>RSI(14)</span><span style="color:${rsiColor}">${(d.rsi||0).toFixed(1)}</span></div>
+    <div class="indicator-row"><span>Signal</span>
+      <span class="badge-signal ${d.signal==='BUY'?'signal-buy':d.signal==='SELL'?'signal-sell':'signal-hold'}">${d.signal}</span></div>
+    <div class="indicator-row"><span>Confidence</span>
+      <span>${((d.signal_strength||0)*100).toFixed(0)}%
+        <span class="indicator-bar"><span class="indicator-fill" style="width:${(d.signal_strength||0)*100}%;background:#388bfd"></span></span>
+      </span></div>
+    <div class="indicator-row"><span>24h Change</span>
+      <span class="${d.change_24h>=0?'price-up':'price-down'}">${d.change_24h>=0?'+':''}${d.change_24h.toFixed(2)}%</span></div>
+  `;
+}
+
+function updateAIPanel(sym) {
+  const a = allAnalyses[sym];
+  if (!a) return;
+  const signalColor = a.signal === 'BUY' ? '#3fb950' : a.signal === 'SELL' ? '#f85149' : '#8b949e';
+  document.getElementById('aiAnalysisPanel').innerHTML = `
+    <div class="d-flex justify-content-between mb-2">
+      <strong style="color:${signalColor}">${a.signal}</strong>
+      <span class="text-muted small">${((a.confidence||0)*100).toFixed(0)}% confidence</span>
+    </div>
+    <div class="small text-muted mb-2">${a.reasoning || ''}</div>
+    <div class="indicator-row"><span>EMA Trend</span><span class="${a.ema_trend==='BULLISH'?'price-up':a.ema_trend==='BEARISH'?'price-down':'text-muted'}">${a.ema_trend||'—'}</span></div>
+    <div class="indicator-row"><span>Volatility</span><span>${a.volatility||'—'}</span></div>
+    <div class="indicator-row"><span>BB Position</span>
+      <span>${((a.bb_position||0.5)*100).toFixed(0)}%
+        <span class="indicator-bar"><span class="indicator-fill" style="width:${(a.bb_position||0.5)*100}%;background:#a371f7"></span></span>
+      </span></div>
+  `;
+}
+
+function updateOpenPositions(positions) {
+  const el = document.getElementById('openPositionsTable');
+  if (!positions.length) { el.innerHTML = '<div class="p-3 text-muted small text-center">ไม่มี position เปิดอยู่</div>'; return; }
+  el.innerHTML = `<table class="table table-dark table-sm mb-0">
+    <thead><tr><th>Symbol</th><th>Entry</th><th>Now</th><th>PnL</th></tr></thead>
+    <tbody>${positions.map(p => `
+      <tr>
+        <td>${p.symbol}</td>
+        <td>$${formatPrice(p.entry_price)}</td>
+        <td>$${formatPrice(p.price)}</td>
+        <td class="${p.pnl_pct>=0?'text-success':'text-danger'}">${p.pnl_pct>=0?'+':''}${p.pnl_pct.toFixed(2)}%</td>
+      </tr>`).join('')}
+    </tbody></table>`;
+}
+
+function updateHoldings(positions, cash, total) {
+  const body = document.getElementById('holdingsBody');
+  if (!positions.length && cash <= 0) { body.innerHTML = '<tr><td colspan="6" class="text-center text-muted">ไม่มีข้อมูล</td></tr>'; return; }
+  let rows = '';
+  if (cash > 0) rows += `<tr><td>USDT</td><td>${cash.toFixed(2)}</td><td>$1.00</td><td>$${cash.toFixed(2)}</td><td>—</td><td>—</td></tr>`;
+  for (const p of positions) {
+    rows += `<tr>
+      <td>${p.symbol.split('/')[0]}</td>
+      <td>${p.amount.toFixed(6)}</td>
+      <td>$${formatPrice(p.price)}</td>
+      <td>$${p.value.toFixed(2)}</td>
+      <td>$${formatPrice(p.entry_price)}</td>
+      <td class="${p.pnl_pct>=0?'text-success':'text-danger'}">${p.pnl_pct>=0?'+':''}${p.pnl_pct.toFixed(2)}%</td>
+    </tr>`;
+  }
+  body.innerHTML = rows;
+}
+
+function updateAllocationChart(positions, cash) {
+  const labels = ['USDT'];
+  const data = [cash];
+  const colors = ['#388bfd'];
+  const palette = ['#2ea043','#f85149','#d29922','#a371f7','#58a6ff','#3fb950'];
+  positions.forEach((p, i) => {
+    labels.push(p.symbol.split('/')[0]);
+    data.push(p.value);
+    colors.push(palette[i % palette.length]);
+  });
+  charts.allocation.data.labels = labels;
+  charts.allocation.data.datasets[0].data = data;
+  charts.allocation.data.datasets[0].backgroundColor = colors;
+  charts.allocation.update();
+}
+
+// ============================================================
+// Activity Feed
+// ============================================================
+const activityLog = [];
+function addActivity(icon, text, color) {
+  activityLog.unshift({ icon, text, color, time: new Date().toLocaleTimeString('th') });
+  if (activityLog.length > 50) activityLog.pop();
+  const feed = document.getElementById('activityFeed');
+  feed.innerHTML = activityLog.slice(0, 20).map(a =>
+    `<div class="activity-item">
+      <span style="color:${a.color}">${a.icon}</span>
+      <span class="ms-2">${a.text}</span>
+      <span class="float-end text-muted" style="font-size:0.7rem">${a.time}</span>
+    </div>`
+  ).join('');
+}
+
+// ============================================================
+// WebSocket handlers
+// ============================================================
+function handleAnalysisUpdate(d) {
+  allPrices[d.symbol] = { ...d, price: d.price, signal: d.signal, signal_strength: d.confidence };
+  allAnalyses[d.symbol] = d;
+  if (d.signal !== 'HOLD') {
+    const c = d.signal === 'BUY' ? '#3fb950' : '#f85149';
+    addActivity(d.signal === 'BUY' ? '▲' : '▼', `${d.symbol} ${d.signal} (conf: ${(d.confidence*100).toFixed(0)}%)`, c);
+  }
+  if (document.getElementById('sec-dashboard').classList.contains('active')) renderPriceCards();
+  if (currentSymbol === d.symbol) { updateIndicatorPanel(d.symbol); updateAIPanel(d.symbol); }
+}
+
+function handleTradeExecuted(d) {
+  const c = d.side === 'BUY' ? '#3fb950' : '#f85149';
+  addActivity(d.side === 'BUY' ? '🟢' : '🔴',
+    `${d.mode.toUpperCase()} ${d.side} ${d.symbol} @ $${formatPrice(d.price)}`, c);
+  showToast(`${d.side} ${d.symbol}`, `@ $${formatPrice(d.price)} | ${d.strategy}`, d.side === 'BUY' ? 'success' : 'danger');
+}
+
+function handleTradeClosed(d) {
+  const win = d.pnl >= 0;
+  addActivity(win ? '✅' : '❌',
+    `${d.symbol} closed: ${d.pnl_pct >= 0 ? '+' : ''}${d.pnl_pct.toFixed(2)}% (${d.reason})`, win ? '#3fb950' : '#f85149');
+  showToast('Trade Closed', `${d.symbol}: ${d.pnl_pct >= 0 ? '+' : ''}${d.pnl_pct.toFixed(2)}%`, win ? 'success' : 'warning');
+}
+
+// ============================================================
+// Toast notifications
+// ============================================================
+function showToast(title, body, type) {
+  const container = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = `alert alert-${type} alert-dismissible fade show shadow-lg mb-2`;
+  t.innerHTML = `<strong>${title}</strong> — ${body}<button type="button" class="btn-close" onclick="this.parentElement.remove()"></button>`;
+  container.appendChild(t);
+  setTimeout(() => t.remove(), 5000);
+}
+
+// ============================================================
+// History & Training
+// ============================================================
+async function refreshHistory() {
+  try {
+    const r = await fetch('/api/trades?limit=100');
+    const trades = await r.json();
+    document.getElementById('historyCount').textContent = trades.length + ' trades';
+    const body = document.getElementById('historyBody');
+    if (!trades.length) { body.innerHTML = '<tr><td colspan="10" class="text-center text-muted p-3">ยังไม่มีประวัติ</td></tr>'; return; }
+    body.innerHTML = trades.map(t => {
+      const pnlCls = !t.pnl_pct ? '' : t.pnl_pct >= 0 ? 'text-success' : 'text-danger';
+      return `<tr>
+        <td class="text-muted">${t.opened_at ? new Date(t.opened_at).toLocaleString('th') : '—'}</td>
+        <td>${t.symbol}</td>
+        <td class="${t.side==='BUY'?'text-success':'text-danger'}">${t.side}</td>
+        <td>$${formatPrice(t.price)}</td>
+        <td>${(t.amount||0).toFixed(4)}</td>
+        <td class="text-muted">${t.strategy||'—'}</td>
+        <td class="text-muted">${t.ai_model||'—'}</td>
+        <td>${((t.confidence||0)*100).toFixed(0)}%</td>
+        <td><span class="badge bg-${t.status==='closed'?(t.pnl_pct>=0?'success':'danger'):'warning'}">${t.status}</span></td>
+        <td class="${pnlCls}">${t.pnl_pct!=null?(t.pnl_pct>=0?'+':'')+t.pnl_pct.toFixed(2)+'%':'—'}</td>
+      </tr>`;
+    }).join('');
+  } catch {}
+}
+
+async function refreshTraining() {
+  try {
+    const r = await fetch('/api/training');
+    const d = await r.json();
+    document.getElementById('trainTotal').textContent = d.total_records || 0;
+    document.getElementById('trainLabelled').textContent = d.labelled_records || 0;
+    document.getElementById('trainAccuracy').textContent = d.accuracy ? (d.accuracy * 100).toFixed(1) + '%' : '—';
+    document.getElementById('trainStatus').textContent = d.model_ready ? 'Ready ✓' : 'Training...';
+    document.getElementById('trainLastTime').textContent = d.last_trained ? 'Last: ' + new Date(d.last_trained).toLocaleString('th') : 'ยังไม่ได้ train';
+    const interval = 50;
+    const pct = Math.min((d.total_records % interval) / interval * 100, 100);
+    document.getElementById('trainProgress').textContent = `${d.total_records % interval} / ${interval}`;
+    document.getElementById('trainProgressBar').style.width = pct + '%';
+
+    // Mock feature importance if model ready
+    if (d.model_ready) {
+      const importance = [0.18, 0.15, 0.14, 0.12, 0.11, 0.10, 0.11, 0.09];
+      charts.features.data.datasets[0].data = importance;
+      charts.features.update();
+    }
+  } catch {}
+}
+
+async function triggerTraining() {
+  try {
+    const r = await fetch('/api/training/trigger', {method:'POST'});
+    const d = await r.json();
+    const box = document.getElementById('trainResultBox');
+    const msg = document.getElementById('trainResult');
+    box.style.display = '';
+    if (d.success) {
+      msg.className = 'alert alert-success mb-0 small';
+      msg.textContent = `Training complete! Accuracy: ${(d.stats.accuracy * 100).toFixed(1)}% on ${d.stats.training_trades} trades`;
+    } else {
+      msg.className = 'alert alert-warning mb-0 small';
+      msg.textContent = `Not enough data yet (${d.stats.labelled_records || 0} labelled trades, need ${d.stats.min_samples || 30})`;
+    }
+    await refreshTraining();
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+}
+
+async function resetDemo() {
+  if (!confirm('Reset demo portfolio? Virtual balance will return to initial.')) return;
+  try {
+    await fetch('/api/demo/reset', {method:'POST'});
+    portfolioData = { labels: [], values: [] };
+    showToast('Demo Reset', 'Virtual portfolio has been reset', 'info');
+    await fetchPortfolioStats();
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+}
+
+async function refreshPortfolio() {
+  await fetchPortfolioStats();
+}
+
+// ============================================================
+// Settings
+// ============================================================
+async function setMode(mode) {
+  if (mode === 'live' && !confirm('Live mode ใช้เงินจริง! คุณแน่ใจหรือไม่?')) return;
+  try {
+    await fetch('/api/mode', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({mode}) });
+    showToast('Mode', `Switched to ${mode.toUpperCase()} mode`, mode==='demo'?'success':'warning');
+    await fetchStatus();
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+}
+
+async function saveAISettings() {
+  const data = {
+    ai: {
+      default_model: document.getElementById('aiModelSelect').value,
+      claude: {
+        api_key: document.getElementById('claudeApiKey').value || undefined,
+        model: document.getElementById('claudeModel').value,
+      }
+    }
+  };
+  if (!data.ai.claude.api_key) delete data.ai.claude.api_key;
+  try {
+    await fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+    showToast('Saved', 'AI settings saved', 'success');
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+}
+
+async function saveExchangeKey(exchange) {
+  const apiKey = document.getElementById(`${exchange}_api_key`)?.value;
+  const apiSecret = document.getElementById(`${exchange}_api_secret`)?.value;
+  const passphrase = document.getElementById(`${exchange}_passphrase`)?.value;
+  const data = { exchanges: { [exchange]: {} } };
+  if (apiKey) data.exchanges[exchange].api_key = apiKey;
+  if (apiSecret) data.exchanges[exchange].api_secret = apiSecret;
+  if (passphrase) data.exchanges[exchange].passphrase = passphrase;
+  if (apiKey || apiSecret) data.exchanges[exchange].enabled = true;
+  try {
+    await fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+    showToast('Saved', `${exchange} keys saved`, 'success');
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+}
+
+async function saveNotifications() {
+  const data = {
+    notifications: {
+      line: { token: document.getElementById('lineToken').value, enabled: !!document.getElementById('lineToken').value },
+      telegram: {
+        bot_token: document.getElementById('telegramToken').value,
+        chat_id: document.getElementById('telegramChatId').value,
+        enabled: !!document.getElementById('telegramToken').value,
+      }
+    }
+  };
+  try {
+    await fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+    showToast('Saved', 'Notification settings saved', 'success');
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+}
+
+document.getElementById('aiModelSelect').addEventListener('change', async (e) => {
+  try {
+    await fetch('/api/ai-model', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({model: e.target.value}) });
+  } catch {}
+});
+
+document.getElementById('strategySelect').addEventListener('change', async (e) => {
+  try {
+    await fetch('/api/strategy', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({strategy: e.target.value}) });
+  } catch {}
+});
+
+document.getElementById('chartSymbolSelect').addEventListener('change', (e) => selectSymbol(e.target.value));
+
+function setChartRange(range, el) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// ============================================================
+// Init & Poll
+// ============================================================
+async function init() {
+  initCharts();
+  connectWS();
+  await fetchStatus();
+  await fetchPrices();
+  await fetchPortfolioStats();
+  await fetchStats();
+  setInterval(fetchPrices, 5000);
+  setInterval(fetchPortfolioStats, 10000);
+  setInterval(fetchStats, 30000);
+  setInterval(fetchStatus, 60000);
+}
+
+init();
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
