@@ -17,7 +17,8 @@ from .core.database import init_db
 from .exchanges.demo_client import DemoExchange
 from .agent.ai_trader import AITrader
 from .agent.training_loop import TrainingLoop
-from .api.routes import router, set_trader, set_training_loop
+from .agent.hourly_trainer import HourlyTrainer
+from .api.routes import router, set_trader, set_training_loop, set_hourly_trainer
 from .api.websocket import broadcast, websocket_endpoint
 
 logging.basicConfig(
@@ -56,6 +57,7 @@ async def ws_endpoint(websocket: WebSocket):
 _trader: AITrader = None
 _trader_task = None
 _training_loop_inst: TrainingLoop = None
+_hourly_trainer_inst: HourlyTrainer = None
 
 
 async def _snapshot_loop():
@@ -100,7 +102,7 @@ async def _snapshot_loop():
 
 @app.on_event("startup")
 async def startup():
-    global _trader, _trader_task, _training_loop_inst
+    global _trader, _trader_task, _training_loop_inst, _hourly_trainer_inst
 
     init_db()
     logger.info(f"Database initialized")
@@ -110,12 +112,15 @@ async def startup():
     _trader.set_broadcast(broadcast)
 
     _training_loop_inst = TrainingLoop(_trader, broadcast_fn=broadcast)
+    _hourly_trainer_inst = HourlyTrainer(_trader._trainer, broadcast_fn=broadcast)
 
     set_trader(_trader)
     set_training_loop(_training_loop_inst)
+    set_hourly_trainer(_hourly_trainer_inst)
 
     _trader_task = asyncio.create_task(_trader.start())
     asyncio.create_task(_snapshot_loop())
+    _hourly_trainer_inst.start()
     logger.info(f"AI Trader started in {settings.trading_mode} mode with model={settings.ai_model}")
 
     if settings.get("app", "open_browser", default=True):

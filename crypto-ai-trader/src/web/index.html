@@ -674,6 +674,53 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
     </div>
   </div>
 
+  <!-- Hourly Real-Data Trainer card -->
+  <div class="card mb-3" style="border-color:rgba(168,255,83,0.2)">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-clock-history me-2"></i>Hourly Real-Data Training <span class="badge ms-1" style="background:rgba(168,255,83,0.15);color:var(--accent);font-size:0.6rem">LIVE BINANCE</span></span>
+      <button class="btn btn-outline-secondary btn-sm" onclick="triggerHourlyTrain()" id="hourlyRunBtn">
+        <i class="bi bi-play-fill me-1"></i>Run Now
+      </button>
+    </div>
+    <div class="card-body">
+      <div class="row g-2 mb-3">
+        <div class="col-6 col-md-3">
+          <div class="stat-card text-center">
+            <div class="stat-label">Last Run</div>
+            <div class="stat-value" id="htLastRun" style="font-size:0.85rem">—</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="stat-card text-center">
+            <div class="stat-label">Samples Added</div>
+            <div class="stat-value" id="htLastSamples">—</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="stat-card text-center">
+            <div class="stat-label">Total Samples</div>
+            <div class="stat-value" id="htTotalSamples">—</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="stat-card text-center">
+            <div class="stat-label">Model Accuracy</div>
+            <div class="stat-value" id="htAccuracy" style="color:var(--accent)">—</div>
+          </div>
+        </div>
+      </div>
+      <div class="d-flex align-items-center gap-3 flex-wrap">
+        <div class="text-muted" style="font-size:0.75rem;font-family:var(--font-mono)">
+          <i class="bi bi-arrow-repeat me-1"></i>Fetches <strong style="color:var(--text-main)">200 × 1h candles</strong> per symbol from Binance public API every hour — no API key needed
+        </div>
+        <div class="ms-auto text-muted" style="font-size:0.72rem;font-family:var(--font-mono)">
+          Next run in: <span id="htNextRun" style="color:var(--accent)">—</span>
+        </div>
+      </div>
+      <div id="htSymbols" class="mt-2 d-flex gap-2 flex-wrap"></div>
+    </div>
+  </div>
+
   <!-- Manual training card (existing) -->
   <div class="row g-3">
     <div class="col-md-7">
@@ -1258,6 +1305,10 @@ function connectWS() {
     else if (msg.event === 'training_model_updated') handleLoopModelUpdated(msg.data);
     else if (msg.event === 'training_progress') handleLoopProgress(msg.data);
     else if (msg.event === 'training_completed') handleLoopCompleted(msg.data);
+    else if (msg.event === 'hourly_train_done') {
+      refreshHourlyTrainer();
+      showToast('Hourly Training', `Added ${msg.data.last_samples} samples · Acc: ${msg.data.model_accuracy ? (msg.data.model_accuracy*100).toFixed(1)+'%' : 'N/A'}`, 'success');
+    }
   };
   setInterval(() => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({type:'ping'})); }, 25000);
 }
@@ -1279,7 +1330,7 @@ function showSection(name, el) {
   }
   if (name === 'portfolio') refreshPortfolio();
   if (name === 'trade-history') refreshHistory();
-  if (name === 'analytics') { refreshTraining(); refreshLoopStatus(); }
+  if (name === 'analytics') { refreshTraining(); refreshLoopStatus(); refreshHourlyTrainer(); }
   if (name === 'thai-market') loadThaiStocks();
   if (name === 'settings') loadSettings();
   if (name === 'trading' && currentSymbol) loadMTF();
@@ -1710,6 +1761,46 @@ async function refreshTraining() {
       charts.features.updateSeries([{name:'Importance',data:importance}]);
     }
   } catch {}
+}
+
+async function refreshHourlyTrainer() {
+  try {
+    const r = await fetch('/api/training/hourly/status');
+    const d = await r.json();
+    if (!d.enabled) return;
+    const fmt = v => v ? new Date(v + 'Z').toLocaleTimeString('th', {hour:'2-digit',minute:'2-digit'}) : '—';
+    document.getElementById('htLastRun').textContent = fmt(d.last_run);
+    document.getElementById('htLastSamples').textContent = d.last_samples ?? '—';
+    document.getElementById('htTotalSamples').textContent = d.total_samples ?? '—';
+    document.getElementById('htAccuracy').textContent = d.model_accuracy ? (d.model_accuracy * 100).toFixed(1) + '%' : '—';
+    const nr = d.next_run_in;
+    document.getElementById('htNextRun').textContent = nr ? Math.floor(nr / 60) + 'm ' + (nr % 60) + 's' : '—';
+    const symsEl = document.getElementById('htSymbols');
+    if (d.symbols_ok && d.symbols_ok.length) {
+      symsEl.innerHTML = d.symbols_ok.map(s =>
+        `<span class="badge" style="background:rgba(168,255,83,0.12);color:var(--accent);font-family:var(--font-mono);font-size:0.65rem">${s}</span>`
+      ).join('');
+    }
+    if (d.error) document.getElementById('htSymbols').innerHTML += `<span class="text-danger small ms-2">${d.error}</span>`;
+  } catch {}
+}
+
+async function triggerHourlyTrain() {
+  const btn = document.getElementById('hourlyRunBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Running…';
+  try {
+    const r = await fetch('/api/training/hourly/run', {method:'POST'});
+    const d = await r.json();
+    showToast('Hourly Training', `Added ${d.last_samples} samples · Accuracy: ${d.model_accuracy ? (d.model_accuracy*100).toFixed(1)+'%' : 'N/A'}`, 'success');
+    await refreshHourlyTrainer();
+    await refreshTraining();
+  } catch(e) {
+    showToast('Error', e.message, 'danger');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-play-fill me-1"></i>Run Now';
+  }
 }
 
 async function triggerTraining() {
@@ -2488,6 +2579,7 @@ async function init() {
   setInterval(fetchPortfolioStats, 10000);
   setInterval(fetchStats, 30000);
   setInterval(fetchStatus, 60000);
+  setInterval(refreshHourlyTrainer, 30000);
   setInterval(refreshLoopStatus, 3000);
   // E: Chart auto-refresh every 15 minutes
   setInterval(updateTradingChart, 15 * 60 * 1000);

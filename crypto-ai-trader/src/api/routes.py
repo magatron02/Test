@@ -21,6 +21,7 @@ router = APIRouter(prefix="/api")
 # Reference to trader injected at startup
 _trader = None
 _training_loop = None
+_hourly_trainer = None
 
 
 def set_trader(trader):
@@ -31,6 +32,11 @@ def set_trader(trader):
 def set_training_loop(loop):
     global _training_loop
     _training_loop = loop
+
+
+def set_hourly_trainer(ht):
+    global _hourly_trainer
+    _hourly_trainer = ht
 
 
 @router.get("/status")
@@ -504,6 +510,23 @@ async def stop_training_loop():
         raise HTTPException(503, "Training loop not available")
     _training_loop.stop()
     return {"stopped": True}
+
+
+@router.get("/training/hourly/status")
+async def hourly_train_status():
+    """GET /api/training/hourly/status — hourly real-data trainer status."""
+    if not _hourly_trainer:
+        return {"enabled": False}
+    return {"enabled": True, **_hourly_trainer.status}
+
+
+@router.post("/training/hourly/run")
+async def hourly_train_run():
+    """POST /api/training/hourly/run — trigger an immediate training run."""
+    if not _hourly_trainer:
+        raise HTTPException(503, "Hourly trainer not available")
+    result = await _hourly_trainer.run_now()
+    return result
 
 
 @router.get("/exchanges/test")

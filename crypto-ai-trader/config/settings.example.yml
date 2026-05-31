@@ -16,6 +16,7 @@ ai:
     enabled: true
     min_training_samples: 30  # เริ่ม train เมื่อมี trade ครบจำนวนนี้
     retrain_interval: 50      # retrain ทุก N trades
+  hourly_train_interval: 3600  # ดึงข้อมูลจริงจาก Binance ทุก N วินาที (3600 = 1 ชั่วโมง)
 
 exchanges:
   binance:
