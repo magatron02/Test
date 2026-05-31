@@ -273,8 +273,12 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe 
           <span class="small text-muted" style="white-space:nowrap">/ <span id="loopWrTarget">80</span>% target</span>
         </div>
       </div>
-      <div class="d-flex gap-2 align-items-center">
+      <div class="d-flex gap-2 align-items-center flex-wrap">
         <span class="small text-muted">Trades: <b id="loopTradeCount">0</b> &nbsp; Wins: <b id="loopWinCount" class="text-success">0</b></span>
+        <div class="form-check form-check-inline mb-0">
+          <input class="form-check-input" type="checkbox" id="autoTradeCheck">
+          <label class="form-check-label small text-muted" for="autoTradeCheck">🚀 Auto-trade</label>
+        </div>
         <button class="btn btn-success btn-sm px-3" id="loopStartBtn" onclick="startTrainingLoop()">
           <i class="bi bi-play-fill me-1"></i>Start
         </button>
@@ -616,6 +620,7 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe 
               <input class="form-check-input" type="checkbox" id="binance_enabled">
               <label class="form-check-label small" for="binance_enabled">Enable Binance</label>
             </div>
+            <div class="form-check mt-1 mb-2"><input class="form-check-input" type="checkbox" id="binance_testnet"><label class="form-check-label small" for="binance_testnet">ใช้ Testnet (testnet.binance.vision)</label></div>
             <button class="btn btn-primary btn-sm" onclick="saveExchangeKey('binance')"><i class="bi bi-save me-1"></i>Save</button>
           </div>
           <div id="ex-binance_th" class="ex-tab" style="display:none">
@@ -651,6 +656,7 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe 
               <input class="form-check-input" type="checkbox" id="okx_enabled">
               <label class="form-check-label small" for="okx_enabled">Enable OKX</label>
             </div>
+            <div class="form-check mt-1 mb-2"><input class="form-check-input" type="checkbox" id="okx_testnet"><label class="form-check-label small" for="okx_testnet">ใช้ Testnet (Sandbox)</label></div>
             <button class="btn btn-primary btn-sm" onclick="saveExchangeKey('okx')"><i class="bi bi-save me-1"></i>Save</button>
           </div>
         </div>
@@ -1216,17 +1222,19 @@ let loopRunning = false;
 
 async function startTrainingLoop() {
   try {
+    const autoTrade = document.getElementById('autoTradeCheck')?.checked || false;
     const r = await fetch('/api/training/loop/start', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({target: 0.80})
+      body: JSON.stringify({target: 0.80, auto_trade: autoTrade})
     });
     const d = await r.json();
     if (d.started) {
       loopRunning = true;
       updateLoopButtons(true);
       document.getElementById('loopLog').innerHTML = '<span class="text-muted">Training started…</span>';
-      showToast('Training Loop', 'Started — aiming for 80% win rate', 'success');
+      const msg = autoTrade ? 'Started — จะ trade ทันทีเมื่อ WR ≥ 80%' : 'Started — aiming for 80% win rate';
+      showToast('Training Loop', msg, 'success');
     }
   } catch(e) { showToast('Error', e.message, 'danger'); }
 }
@@ -1381,7 +1389,8 @@ async function saveExchangeKey(exchange) {
   const apiSecret = document.getElementById(`${exchange}_api_secret`)?.value;
   const passphrase = document.getElementById(`${exchange}_passphrase`)?.value;
   const enabled   = document.getElementById(`${exchange}_enabled`)?.checked;
-  const data = { exchanges: { [exchange]: { enabled: enabled !== undefined ? enabled : !!(apiKey || apiSecret) } } };
+  const testnet   = document.getElementById(`${exchange}_testnet`)?.checked || false;
+  const data = { exchanges: { [exchange]: { enabled: enabled !== undefined ? enabled : !!(apiKey || apiSecret), testnet: testnet } } };
   if (apiKey)    data.exchanges[exchange].api_key = apiKey;
   if (apiSecret) data.exchanges[exchange].api_secret = apiSecret;
   if (passphrase) data.exchanges[exchange].passphrase = passphrase;
@@ -1408,6 +1417,8 @@ async function loadSettings() {
     ['binance', 'binance_th', 'bitkub', 'okx'].forEach(ex => {
       const cb = document.getElementById(`${ex}_enabled`);
       if (cb && d.exchanges?.[ex]) cb.checked = !!d.exchanges[ex].enabled;
+      const tb = document.getElementById(`${ex}_testnet`);
+      if (tb && d.exchanges?.[ex]) tb.checked = !!d.exchanges[ex].testnet;
     });
     // Notification events
     const notif = d.notifications?.notify_on || {};

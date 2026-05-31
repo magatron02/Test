@@ -326,9 +326,11 @@ async def get_candles(symbol: str = "BTC/USDT", limit: int = 80):
 async def start_training_loop(data: Dict[str, Any] = None):
     if not _training_loop:
         raise HTTPException(503, "Training loop not available")
-    target = (data or {}).get("target", 0.80)
-    await _training_loop.start(target=float(target))
-    return {"started": True, "target": target}
+    d = data or {}
+    target     = float(d.get("target", 0.80))
+    auto_trade = bool(d.get("auto_trade", False))
+    await _training_loop.start(target=target, auto_trade=auto_trade)
+    return {"started": True, "target": target, "auto_trade": auto_trade}
 
 
 @router.get("/training/loop/status")

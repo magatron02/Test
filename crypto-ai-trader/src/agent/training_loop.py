@@ -126,7 +126,7 @@ class TrainingLoop:
         }
 
     # ── public ──────────────────────────────────────────────
-    async def start(self, target: float = 0.80):
+    async def start(self, target: float = 0.80, auto_trade: bool = False):
         if self.running:
             return
         self.running = True
@@ -135,6 +135,7 @@ class TrainingLoop:
             "target": target, "log": [],
             "total_trades": 0, "win_trades": 0,
             "win_rate": 0.0, "iterations": 0,
+            "auto_trade": auto_trade,
         })
         asyncio.create_task(self._loop())
 
@@ -280,6 +281,9 @@ class TrainingLoop:
                                     "accuracy": acc,
                                 })
                                 await self._notify_complete(wr, total)
+                                if self.status.get("auto_trade"):
+                                    self._log("🚀 Auto-trade: triggering trading cycle now...")
+                                    asyncio.create_task(self._trader.run_cycle())
                                 break
 
                     # ── open new trade ──
