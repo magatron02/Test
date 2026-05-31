@@ -137,7 +137,7 @@ async def shutdown():
 def main():
     print(f"""
 ╔══════════════════════════════════════════╗
-║        AI Auto Trader - Starting...      ║
+║          Aiterra v1.0.0 - Starting...    ║
 ║  Mode: {settings.trading_mode.upper():<10} Model: {settings.ai_model:<12}║
 ║  Port: {settings.app_port:<10} URL: http://localhost:{settings.app_port} ║
 ╚══════════════════════════════════════════╝
