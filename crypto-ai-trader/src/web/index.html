@@ -736,6 +736,24 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe 
                 <span class="input-group-text">sec</span>
               </div>
             </div>
+            <div class="col-6">
+              <label class="form-label small mb-1">Risk/Trade %</label>
+              <div class="input-group input-group-sm">
+                <input type="number" class="form-control" id="riskPerTrade" value="2" min="0.5" max="20" step="0.5">
+                <span class="input-group-text">%</span>
+              </div>
+            </div>
+            <div class="col-6">
+              <label class="form-label small mb-1">Max Daily Loss %</label>
+              <div class="input-group input-group-sm">
+                <input type="number" class="form-control" id="maxDailyLoss" value="5" min="1" max="30">
+                <span class="input-group-text">%</span>
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label small mb-1">Max Open Trades</label>
+              <input type="number" class="form-control form-control-sm" id="maxOpenTrades" value="3" min="1" max="10">
+            </div>
           </div>
           <button class="btn btn-primary btn-sm" onclick="saveTradingParams()">
             <i class="bi bi-save me-1"></i>Save Parameters
@@ -764,8 +782,14 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe 
     <!-- RIGHT COLUMN -->
     <div class="col-md-6">
       <div class="card mb-3">
-        <div class="card-header"><i class="bi bi-currency-bitcoin me-2"></i>Exchange API Keys</div>
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-currency-bitcoin me-2"></i>Exchange API Keys</span>
+          <button class="btn btn-outline-info btn-sm" onclick="testExchanges()">
+            <i class="bi bi-wifi me-1"></i>Test Connections
+          </button>
+        </div>
         <div class="card-body">
+          <div id="exchangeTestResult" class="mb-2" style="display:none"></div>
           <ul class="nav nav-tabs nav-fill mb-3" style="border-color:var(--border)">
             <li class="nav-item"><a href="#" class="nav-link text-muted active" onclick="showExTab('binance',this)">Binance</a></li>
             <li class="nav-item"><a href="#" class="nav-link text-muted" onclick="showExTab('binance_th',this)">BinanceTH</a></li>
@@ -1568,6 +1592,27 @@ async function saveExchangeKey(exchange) {
   } catch(e) { showToast('Error', e.message, 'danger'); }
 }
 
+async function testExchanges() {
+  const resultEl = document.getElementById('exchangeTestResult');
+  resultEl.style.display = '';
+  resultEl.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Testing connections...</div>';
+  try {
+    const r = await fetch('/api/exchanges/test');
+    const d = await r.json();
+    const rows = Object.entries(d).map(([name, res]) => {
+      const ok = res.ok === true ? '🟢' : res.ok === false ? '🔴' : '⚪';
+      const detail = res.ok === true ? `$${res.price?.toFixed(2)} (${res.source || 'live'})`
+                   : res.ok === false ? res.error
+                   : 'Not configured';
+      return `<div class="d-flex justify-content-between py-1 border-bottom" style="border-color:var(--border)!important;font-size:0.8rem">
+        <span>${ok} <b>${name}</b></span><span class="text-muted">${detail}</span></div>`;
+    }).join('');
+    resultEl.innerHTML = `<div class="rounded p-2" style="background:var(--bg-card2)">${rows}</div>`;
+  } catch(e) {
+    resultEl.innerHTML = `<div class="text-danger small">${e.message}</div>`;
+  }
+}
+
 async function loadSettings() {
   try {
     const r = await fetch('/api/settings');
@@ -1578,6 +1623,9 @@ async function loadSettings() {
       const sl = d.trading.stop_loss_pct;   if (sl) document.getElementById('slPct').value = (sl * 100).toFixed(1);
       const mc = d.trading.min_confidence;   if (mc) document.getElementById('minConf').value = (mc * 100).toFixed(0);
       const ai = d.trading.analysis_interval; if (ai) document.getElementById('analysisInterval').value = ai;
+      const rp = d.trading.risk_per_trade_pct; if (rp !== undefined) document.getElementById('riskPerTrade').value = (rp * 100).toFixed(1);
+      const dl = d.trading.max_daily_loss_pct; if (dl !== undefined) document.getElementById('maxDailyLoss').value = (dl * 100).toFixed(0);
+      const mo = d.trading.max_open_trades;    if (mo !== undefined) document.getElementById('maxOpenTrades').value = mo;
     }
     // AI model
     if (d.ai?.claude?.model) document.getElementById('claudeModel').value = d.ai.claude.model;
@@ -1605,13 +1653,16 @@ async function saveTradingParams() {
   const sl = parseFloat(document.getElementById('slPct').value) / 100;
   const mc = parseFloat(document.getElementById('minConf').value) / 100;
   const ai = parseInt(document.getElementById('analysisInterval').value);
-  if (isNaN(tp) || isNaN(sl) || isNaN(mc) || isNaN(ai)) { showToast('Error', 'Invalid values', 'danger'); return; }
+  const rp = parseFloat(document.getElementById('riskPerTrade').value) / 100;
+  const dl = parseFloat(document.getElementById('maxDailyLoss').value) / 100;
+  const mo = parseInt(document.getElementById('maxOpenTrades').value);
+  if (isNaN(tp) || isNaN(sl) || isNaN(mc) || isNaN(ai) || isNaN(rp) || isNaN(dl) || isNaN(mo)) { showToast('Error', 'Invalid values', 'danger'); return; }
   try {
     await fetch('/api/settings', {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ trading: { take_profit_pct: tp, stop_loss_pct: sl, min_confidence: mc, analysis_interval: ai } })
+      body: JSON.stringify({ trading: { take_profit_pct: tp, stop_loss_pct: sl, min_confidence: mc, analysis_interval: ai, risk_per_trade_pct: rp, max_daily_loss_pct: dl, max_open_trades: mo } })
     });
-    showToast('Saved', `TP=${tp*100}% SL=${sl*100}% MinConf=${mc*100}% Interval=${ai}s`, 'success');
+    showToast('Saved', `TP=${tp*100}% SL=${sl*100}% MinConf=${mc*100}% Interval=${ai}s Risk=${rp*100}% MaxDL=${dl*100}% MaxTrades=${mo}`, 'success');
   } catch(e) { showToast('Error', e.message, 'danger'); }
 }
 

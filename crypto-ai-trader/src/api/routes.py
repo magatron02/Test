@@ -366,11 +366,26 @@ async def get_advanced_stats(db: Session = Depends(get_db)):
             daily[day] += t.pnl or 0
     daily_pnl = [{"date": d, "pnl": round(v, 2)} for d, v in sorted(daily.items())]
 
+    # Use portfolio snapshots for equity curve if available (better than trade-based)
+    snapshots = db.query(Portfolio).order_by(Portfolio.recorded_at).all()
+    if len(snapshots) >= 2:
+        equity_curve = [{"t": s.recorded_at.isoformat(), "v": round(s.total_value_usdt, 2)}
+                        for s in snapshots]
+        # Recompute drawdown from snapshots
+        eq_snap = np.array([s.total_value_usdt for s in snapshots])
+        run_max_snap = np.maximum.accumulate(eq_snap)
+        max_dd = float(((eq_snap - run_max_snap) / np.where(run_max_snap != 0, run_max_snap, 1)).min() * 100)
+        rets_snap = np.diff(eq_snap) / np.where(eq_snap[:-1] != 0, eq_snap[:-1], 1)
+        if rets_snap.std() > 0:
+            sharpe = float((rets_snap.mean() / rets_snap.std()) * math.sqrt(252 * 288))  # 5-min intervals
+    else:
+        equity_curve = [{"i": i, "v": v} for i, v in enumerate(equity)]
+
     return {
         "sharpe":           round(sharpe, 2),
         "max_drawdown_pct": round(max_dd, 2),
         "daily_pnl":        daily_pnl,
-        "equity_curve":     [{"i": i, "v": v} for i, v in enumerate(equity)],
+        "equity_curve":     equity_curve,
     }
 
 
@@ -489,3 +504,41 @@ async def stop_training_loop():
         raise HTTPException(503, "Training loop not available")
     _training_loop.stop()
     return {"stopped": True}
+
+
+@router.get("/exchanges/test")
+async def test_exchanges():
+    """GET /api/exchanges/test — Ping configured exchanges and return status."""
+    results = {}
+
+    # Always test demo (should always work)
+    if _trader and _trader._exchange:
+        try:
+            ticker = await _trader._exchange.get_ticker("BTC/USDT")
+            results["demo"] = {"ok": True, "price": ticker.price, "source": "live" if ticker.price > 1000 else "simulated"}
+        except Exception as e:
+            results["demo"] = {"ok": False, "error": str(e)}
+
+    # Test each configured live exchange
+    exchange_map = {
+        "binance": ("..exchanges.binance_client", "BinanceClient"),
+        "okx":     ("..exchanges.okx_client",     "OKXClient"),
+        "bitkub":  ("..exchanges.bitkub_client",   "BitkubClient"),
+    }
+    for name, (module_path, class_name) in exchange_map.items():
+        cfg = settings.get("exchanges", name) or {}
+        if not cfg.get("enabled") or not cfg.get("api_key"):
+            results[name] = {"ok": None, "status": "not_configured"}
+            continue
+        try:
+            import importlib
+            mod = importlib.import_module(module_path, package="src.api")
+            cls = getattr(mod, class_name)
+            client = cls()
+            ticker = await client.get_ticker("BTC/USDT")
+            await client.close()
+            results[name] = {"ok": True, "price": ticker.price}
+        except Exception as e:
+            results[name] = {"ok": False, "error": str(e)[:120]}
+
+    return results

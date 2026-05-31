@@ -65,6 +65,10 @@ trading:
   take_profit_pct: 0.06     # Take profit 6%
   min_confidence: 0.60      # เทรดเมื่อ AI มั่นใจ >= 60%
   analysis_interval: 300    # วิเคราะห์ทุก 5 นาที (วินาที)
+  # Risk Management
+  risk_per_trade_pct: 0.02    # ความเสี่ยงต่อ trade = 2% ของพอร์ต
+  max_daily_loss_pct: 0.05    # หยุดเทรดถ้าขาดทุนเกิน 5% ต่อวัน
+  max_open_trades: 3          # จำนวน trade สูงสุดที่เปิดพร้อมกัน
 
 strategy:
   primary: "hybrid"         # dca | trend | mean_reversion | hybrid

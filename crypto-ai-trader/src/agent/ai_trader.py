@@ -1,7 +1,7 @@
 import asyncio
 import logging
-from datetime import datetime
-from typing import Dict, List, Optional
+from datetime import datetime, date
+from typing import Dict, List, Optional, Tuple
 
 from .claude_analyzer import ClaudeAnalyzer
 from .market_analyzer import MarketAnalysis, analyze
@@ -24,6 +24,8 @@ class AITrader:
         self._analyses: Dict[str, MarketAnalysis] = {}
         self._open_trades: Dict[str, dict] = {}   # symbol -> trade info
         self._broadcast_fn = None                  # injected by websocket handler
+        self._daily_pnl: float = 0.0
+        self._daily_reset_date: str = ""
 
     def set_broadcast(self, fn):
         self._broadcast_fn = fn
@@ -70,6 +72,27 @@ class AITrader:
         except Exception:
             return {"cash_usdt": 0, "total_value": 0, "open_positions": 0}
 
+    async def _check_risk_limits(self) -> Tuple[bool, str]:
+        """Check daily loss limit and max open trades. Returns (allowed, reason)."""
+        today = date.today().isoformat()
+        if self._daily_reset_date != today:
+            self._daily_pnl = 0.0
+            self._daily_reset_date = today
+
+        max_daily_loss_pct = float(settings.get("trading", "max_daily_loss_pct", default=0.05))
+        max_open_trades = int(settings.get("trading", "max_open_trades", default=3))
+
+        portfolio = await self._get_portfolio_summary()
+        portfolio_value = portfolio.get("total_value", 0) or 1.0
+
+        if self._daily_pnl <= -(portfolio_value * max_daily_loss_pct):
+            return False, "Daily loss limit reached"
+
+        if len(self._open_trades) >= max_open_trades:
+            return False, "Max open trades reached"
+
+        return True, ""
+
     def _get_final_signal(self, analysis: MarketAnalysis, portfolio: dict) -> TradingSignal:
         ai_model = settings.ai_model
         ml_signal = None
@@ -107,14 +130,23 @@ class AITrader:
         if signal.action not in ("BUY", "SELL"):
             return
 
+        # Check risk limits before executing any trade
+        if signal.action == "BUY":
+            allowed, reason = await self._check_risk_limits()
+            if not allowed:
+                logger.info(f"Skip BUY {symbol}: {reason}")
+                return
+
         try:
             balances = await self._exchange.get_balance()
             cash = balances.get("USDT")
-            max_pct = float(settings.get("trading", "max_position_pct", default=0.15))
 
             if signal.action == "BUY":
                 avail = float(cash.free) if cash else 0
-                amount_usdt = avail * max_pct
+                risk_pct = float(settings.get("trading", "risk_per_trade_pct", default=0.02))
+                portfolio = await self._get_portfolio_summary()
+                portfolio_value = portfolio.get("total_value", avail) or avail
+                amount_usdt = min(portfolio_value * risk_pct, avail * 0.95)
                 if amount_usdt < 10:
                     logger.info(f"Skip BUY {symbol}: insufficient cash ({amount_usdt:.2f} USDT)")
                     return
@@ -232,6 +264,7 @@ class AITrader:
                         db.close()
 
                     self._trainer.update_outcome(trade["trade_id"], pnl_pct)
+                    self._daily_pnl += pnl
                     del self._open_trades[symbol]
 
                     await self._broadcast("trade_closed", {

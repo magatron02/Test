@@ -58,6 +58,46 @@ _trader_task = None
 _training_loop_inst: TrainingLoop = None
 
 
+async def _snapshot_loop():
+    """Save portfolio snapshot to DB every 5 minutes."""
+    from .core.database import Portfolio, SessionLocal
+    await asyncio.sleep(30)  # wait for trader to initialize
+    while True:
+        try:
+            if _trader:
+                balances = await _trader._exchange.get_balance()
+                analyses = _trader.analyses
+                cash_bal = balances.get("USDT")
+                cash = float(cash_bal.free) if cash_bal else 0.0
+                total = cash
+                positions = {}
+                for sym, analysis in analyses.items():
+                    base = sym.split("/")[0]
+                    bal = balances.get(base)
+                    if bal and bal.total > 0:
+                        val = bal.total * analysis.price
+                        total += val
+                        positions[sym] = {"amount": bal.total, "price": analysis.price, "value": val}
+
+                db = SessionLocal()
+                try:
+                    snap = Portfolio(
+                        mode=settings.trading_mode,
+                        exchange=_trader._exchange.name,
+                        total_value_usdt=total,
+                        cash_usdt=cash,
+                        positions=positions,
+                    )
+                    db.add(snap)
+                    db.commit()
+                except Exception:
+                    db.rollback()
+                finally:
+                    db.close()
+        except Exception as e:
+            logger.debug(f"Snapshot error: {e}")
+        await asyncio.sleep(300)  # every 5 minutes
+
 @app.on_event("startup")
 async def startup():
     global _trader, _trader_task, _training_loop_inst
@@ -75,6 +115,7 @@ async def startup():
     set_training_loop(_training_loop_inst)
 
     _trader_task = asyncio.create_task(_trader.start())
+    asyncio.create_task(_snapshot_loop())
     logger.info(f"AI Trader started in {settings.trading_mode} mode with model={settings.ai_model}")
 
     if settings.get("app", "open_browser", default=True):
