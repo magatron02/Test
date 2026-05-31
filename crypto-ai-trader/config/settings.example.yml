@@ -1,0 +1,120 @@
+app:
+  name: "AI Auto Trader"
+  port: 8888
+  open_browser: true
+  log_level: "INFO"
+
+ai:
+  default_model: "hybrid"   # options: claude, rule_based, ml, hybrid
+  claude:
+    api_key: ""             # ใส่ Claude API key ที่นี่
+    model: "claude-sonnet-4-6"  # claude-opus-4-8 | claude-sonnet-4-6 | claude-haiku-4-5-20251001
+    max_tokens: 1024
+  rule_based:
+    enabled: true
+  ml:
+    enabled: true
+    min_training_samples: 30  # เริ่ม train เมื่อมี trade ครบจำนวนนี้
+    retrain_interval: 50      # retrain ทุก N trades
+
+exchanges:
+  binance:
+    api_key: ""
+    api_secret: ""
+    enabled: false
+    testnet: false
+  binance_th:
+    api_key: ""
+    api_secret: ""
+    enabled: false
+    # Binance TH trades THB pairs: BTC/THB, ETH/THB, BNB/THB, XRP/THB, SOL/THB
+    # API uses /api/v1/ endpoints (different from global Binance /api/v3/)
+  bitkub:
+    api_key: ""
+    api_secret: ""
+    enabled: false
+  okx:
+    api_key: ""
+    api_secret: ""
+    passphrase: ""
+    enabled: false
+    testnet: false
+  demo:
+    enabled: true
+    virtual_balance_usdt: 10000.0   # USDT เสมือน
+    virtual_balance_thb: 350000.0   # THB เสมือน (สำหรับ Bitkub)
+    data_source: "binance"          # ดึงข้อมูลตลาดจาก exchange ไหน
+
+trading:
+  mode: "demo"              # demo | live
+  symbols:
+    - "BTC/USDT"
+    - "ETH/USDT"
+    - "BNB/USDT"
+    - "SOL/USDT"
+    - "XRP/USDT"
+  # Binance TH symbols (ใช้เมื่อเปิด binance_th):
+  # - "BTC/THB"
+  # - "ETH/THB"
+  # - "BNB/THB"
+  # - "XRP/THB"
+  # - "SOL/THB"
+  base_currency: "USDT"
+  max_position_pct: 0.15    # สูงสุด 15% ของพอร์ตต่อ trade
+  stop_loss_pct: 0.03       # Stop loss 3%
+  take_profit_pct: 0.06     # Take profit 6%
+  min_confidence: 0.60      # เทรดเมื่อ AI มั่นใจ >= 60%
+  analysis_interval: 300    # วิเคราะห์ทุก 5 นาที (วินาที)
+  # Risk Management
+  risk_per_trade_pct: 0.02    # ความเสี่ยงต่อ trade = 2% ของพอร์ต
+  max_daily_loss_pct: 0.05    # หยุดเทรดถ้าขาดทุนเกิน 5% ต่อวัน
+  max_open_trades: 3          # จำนวน trade สูงสุดที่เปิดพร้อมกัน
+
+strategy:
+  primary: "hybrid"         # dca | trend | mean_reversion | hybrid
+  dca:
+    interval_hours: 24
+    amount_usdt: 50.0
+    rsi_buy_threshold: 35   # ซื้อเมื่อ RSI ต่ำกว่านี้
+    rsi_sell_threshold: 65  # ขายเมื่อ RSI สูงกว่านี้
+  trend:
+    ema_fast: 9
+    ema_slow: 21
+    ema_signal: 50
+  mean_reversion:
+    bb_period: 20
+    bb_std: 2.0
+    rsi_period: 14
+  indicators:
+    rsi_period: 14
+    macd_fast: 12
+    macd_slow: 26
+    macd_signal: 9
+    bb_period: 20
+    bb_std: 2.0
+    atr_period: 14
+    vwap_enabled: true
+
+thai:
+  sec_api_key: ""           # ลงทะเบียนฟรีที่ api-portal.sec.or.th
+  # watch_stocks:           # หุ้นที่ติดตาม (default = SET50 ทั้งหมด)
+  #   - "PTT.BK"
+  #   - "KBANK.BK"
+  # watch_funds:            # กองทุนที่ติดตาม
+  #   - "KFSDIV"
+  #   - "KT-PRECIOUS"
+
+notifications:
+  line:
+    token: ""               # LINE Notify token
+    enabled: false
+  telegram:
+    bot_token: ""           # Telegram Bot token
+    chat_id: ""
+    enabled: false
+  notify_on:
+    trade_open: true
+    trade_close: true
+    stop_loss: true
+    take_profit: true
+    training_complete: false

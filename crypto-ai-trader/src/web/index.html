@@ -1,0 +1,2188 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Auto Trader</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/apexcharts@3.49.0/dist/apexcharts.min.js"></script>
+<style>
+:root {
+  --bg-dark: #0d1117;
+  --bg-card: #161b22;
+  --bg-card2: #1c2128;
+  --border: #30363d;
+  --text-main: #e6edf3;
+  --text-muted: #8b949e;
+  --accent: #2ea043;
+  --accent-red: #f85149;
+  --accent-blue: #388bfd;
+  --accent-yellow: #d29922;
+  --accent-purple: #a371f7;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe UI', sans-serif; margin: 0; }
+.navbar { background: var(--bg-card) !important; border-bottom: 1px solid var(--border); padding: 8px 20px; }
+.navbar-brand { font-weight: 700; font-size: 1.1rem; color: var(--accent) !important; }
+.sidebar { width: 220px; min-height: calc(100vh - 56px); background: var(--bg-card); border-right: 1px solid var(--border); position: fixed; top: 56px; left: 0; overflow-y: auto; z-index: 100; }
+.sidebar .nav-link { color: var(--text-muted); padding: 10px 16px; display: flex; align-items: center; gap: 10px; font-size: 0.9rem; transition: all 0.2s; border-left: 3px solid transparent; }
+.sidebar .nav-link:hover, .sidebar .nav-link.active { color: var(--text-main); background: var(--bg-card2); border-left-color: var(--accent); }
+.main-content { margin-left: 220px; padding: 20px; min-height: calc(100vh - 56px); }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; }
+.card-header { background: var(--bg-card2); border-bottom: 1px solid var(--border); padding: 12px 16px; font-weight: 600; font-size: 0.85rem; }
+.stat-card { border-radius: 8px; padding: 16px; }
+.stat-value { font-size: 1.6rem; font-weight: 700; line-height: 1.2; }
+.stat-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.badge-signal { font-size: 0.7rem; padding: 3px 8px; border-radius: 12px; font-weight: 600; }
+.signal-buy { background: rgba(46,160,67,0.2); color: #3fb950; border: 1px solid rgba(46,160,67,0.3); }
+.signal-sell { background: rgba(248,81,73,0.2); color: #f85149; border: 1px solid rgba(248,81,73,0.3); }
+.signal-hold { background: rgba(139,148,158,0.2); color: #8b949e; border: 1px solid rgba(139,148,158,0.3); }
+.signal-buy-text { color: #3fb950; }
+.signal-sell-text { color: #f85149; }
+.table { color: var(--text-main); }
+.table td, .table th { border-color: var(--border); font-size: 0.82rem; vertical-align: middle; }
+.table thead th { color: var(--text-muted); font-weight: 600; background: var(--bg-card2); }
+.price-card { border-radius: 8px; padding: 12px 16px; background: var(--bg-card); border: 1px solid var(--border); cursor: pointer; transition: border-color 0.2s; }
+.price-card:hover, .price-card.active { border-color: var(--accent-blue); }
+.price-up { color: var(--accent); }
+.price-down { color: var(--accent-red); }
+.indicator-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(48,54,61,0.5); font-size: 0.82rem; }
+.indicator-row:last-child { border-bottom: none; }
+.indicator-bar { width: 60px; height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 6px; }
+.indicator-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
+.activity-item { padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 0.82rem; }
+.activity-item:last-child { border-bottom: none; }
+.mode-badge { padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+.mode-demo { background: rgba(163,113,247,0.2); color: var(--accent-purple); border: 1px solid rgba(163,113,247,0.3); }
+.mode-live { background: rgba(46,160,67,0.2); color: #3fb950; border: 1px solid rgba(46,160,67,0.3); }
+.form-control, .form-select { background: var(--bg-card2); border: 1px solid var(--border); color: var(--text-main); }
+.form-control:focus, .form-select:focus { background: var(--bg-card2); border-color: var(--accent-blue); color: var(--text-main); box-shadow: 0 0 0 0.2rem rgba(56,139,253,0.15); }
+.form-label { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 4px; }
+.progress { background: var(--border); height: 8px; border-radius: 4px; }
+.ws-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.ws-connected { background: var(--accent); animation: pulse 2s infinite; }
+.ws-disconnected { background: var(--accent-red); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+.section { display: none; }
+.section.active { display: block; }
+.chart-container { position: relative; height: 300px; }
+.notification { position: fixed; top: 70px; right: 20px; z-index: 9999; min-width: 280px; }
+.btn-sm { font-size: 0.78rem; padding: 4px 10px; }
+.tab-btn { background: none; border: 1px solid var(--border); color: var(--text-muted); padding: 5px 14px; border-radius: 20px; cursor: pointer; font-size: 0.8rem; }
+.tab-btn.active { background: var(--accent-blue); border-color: var(--accent-blue); color: #fff; }
+</style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+  <div class="d-flex align-items-center gap-3 w-100">
+    <span class="navbar-brand"><i class="bi bi-robot me-2"></i>AI Auto Trader</span>
+    <span class="mode-badge mode-demo" id="modeTag">DEMO</span>
+    <div class="ms-auto d-flex align-items-center gap-3">
+      <span class="text-muted small" id="lastUpdate">--</span>
+      <span class="ws-dot ws-disconnected" id="wsDot" title="WebSocket"></span>
+      <select class="form-select form-select-sm" style="width:auto" id="aiModelSelect">
+        <option value="hybrid">Hybrid AI</option>
+        <option value="rule_based">Rule-based</option>
+        <option value="ml">ML Model</option>
+        <option value="claude">Claude API</option>
+      </select>
+      <select class="form-select form-select-sm" style="width:auto" id="strategySelect">
+        <option value="hybrid">Strategy: Hybrid</option>
+        <option value="dca">DCA</option>
+        <option value="trend">Trend</option>
+        <option value="mean_reversion">Mean Reversion</option>
+      </select>
+    </div>
+  </div>
+</nav>
+
+<div class="d-flex">
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="p-3 pb-1">
+    <small class="text-muted text-uppercase" style="font-size:0.7rem;letter-spacing:1px">เมนู</small>
+  </div>
+  <ul class="nav flex-column">
+    <li><a href="#" class="nav-link active" onclick="showSection('dashboard', this)"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+    <li><a href="#" class="nav-link" onclick="showSection('trading', this)"><i class="bi bi-graph-up-arrow"></i> Trading</a></li>
+    <li><a href="#" class="nav-link" onclick="showSection('portfolio', this)"><i class="bi bi-wallet2"></i> Portfolio</a></li>
+    <li><a href="#" class="nav-link" onclick="showSection('ai-training', this)"><i class="bi bi-cpu"></i> AI Training</a></li>
+    <li><a href="#" class="nav-link" onclick="showSection('trade-history', this)"><i class="bi bi-clock-history"></i> History</a></li>
+    <li><a href="#" class="nav-link" onclick="showSection('thai-market', this)"><i class="bi bi-flag"></i> ตลาดไทย</a></li>
+    <li><a href="#" class="nav-link" onclick="showSection('backtest', this)"><i class="bi bi-skip-backward-circle"></i> Backtest</a></li>
+    <li><a href="#" class="nav-link" onclick="showSection('settings', this)"><i class="bi bi-gear"></i> Settings</a></li>
+  </ul>
+  <div class="p-3 mt-3 border-top" style="border-color:var(--border)!important">
+    <div class="small text-muted mb-2">Demo Portfolio</div>
+    <div class="fw-bold text-success" id="sidebarTotal">$0.00</div>
+    <div class="small mt-1"><span id="sidebarPnl" class="text-muted">+0.00%</span></div>
+  </div>
+</nav>
+
+<!-- Main -->
+<main class="main-content">
+
+<!-- DASHBOARD -->
+<section id="sec-dashboard" class="section active">
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="stat-card" style="background:rgba(46,160,67,0.1);border:1px solid rgba(46,160,67,0.2);">
+        <div class="stat-label">Total Value</div>
+        <div class="stat-value text-success" id="totalValue">$0.00</div>
+        <div class="small text-muted mt-1" id="totalPnl">+0.00 USDT</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card" style="background:rgba(56,139,253,0.1);border:1px solid rgba(56,139,253,0.2);">
+        <div class="stat-label">Cash (USDT)</div>
+        <div class="stat-value" style="color:var(--accent-blue)" id="cashValue">$0.00</div>
+        <div class="small text-muted mt-1" id="positionCount">0 positions</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card" style="background:rgba(210,153,34,0.1);border:1px solid rgba(210,153,34,0.2);">
+        <div class="stat-label">Win Rate</div>
+        <div class="stat-value" style="color:var(--accent-yellow)" id="winRate">0%</div>
+        <div class="small text-muted mt-1" id="totalTrades">0 trades</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card" style="background:rgba(163,113,247,0.1);border:1px solid rgba(163,113,247,0.2);">
+        <div class="stat-label">Avg PnL/Trade</div>
+        <div class="stat-value" style="color:var(--accent-purple)" id="avgPnl">0.00%</div>
+        <div class="small text-muted mt-1" id="bestTrade">Best: 0%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Price Cards -->
+  <div class="row g-2 mb-4" id="priceCardsRow"></div>
+
+  <div class="row g-3">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-bar-chart-line me-2"></i>Portfolio Value</span>
+          <div class="d-flex gap-2">
+            <button class="tab-btn active" onclick="setChartRange('1h', this)">1H</button>
+            <button class="tab-btn" onclick="setChartRange('24h', this)">24H</button>
+          </div>
+        </div>
+        <div class="card-body p-2">
+          <div class="chart-container"><canvas id="portfolioChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header"><i class="bi bi-activity me-2"></i>AI Activity</div>
+        <div class="card-body p-0" style="max-height:320px;overflow-y:auto" id="activityFeed">
+          <div class="p-3 text-muted text-center small">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRADING -->
+<section id="sec-trading" class="section">
+  <div class="row g-3">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-graph-up me-2"></i>Chart & Indicators</span>
+          <select class="form-select form-select-sm" style="width:auto" id="chartSymbolSelect"></select>
+        </div>
+        <div class="card-body p-2">
+          <div id="tradingChart" style="min-height:300px;margin:-4px"></div>
+        </div>
+      </div>
+      <!-- Indicators -->
+      <div class="card mt-3">
+        <div class="card-header"><i class="bi bi-sliders me-2"></i>Technical Indicators</div>
+        <div class="card-body" id="indicatorPanel">
+          <div class="text-muted text-center small py-2">เลือก symbol เพื่อดู indicators</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-cpu me-2"></i>AI Analysis</div>
+        <div class="card-body" id="aiAnalysisPanel">
+          <div class="text-muted text-center small py-2">รอการวิเคราะห์...</div>
+        </div>
+      </div>
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-layers me-2"></i>Multi-Timeframe</span>
+          <button class="btn btn-outline-secondary btn-sm" onclick="loadMTF()">
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
+        </div>
+        <div class="card-body" id="mtfPanel">
+          <div class="text-muted text-center small py-2">เลือก symbol</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><i class="bi bi-list-ul me-2"></i>Open Positions</div>
+        <div class="card-body p-0">
+          <div id="openPositionsTable" class="p-2 small text-muted text-center">ไม่มี position เปิดอยู่</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PORTFOLIO -->
+<section id="sec-portfolio" class="section">
+  <!-- Performance metrics row -->
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-md-3">
+      <div class="stat-card" style="background:rgba(46,160,67,0.1);border:1px solid rgba(46,160,67,0.2)">
+        <div class="stat-label">Max Drawdown</div>
+        <div class="stat-value text-danger" id="maxDrawdown">—</div>
+        <div class="small text-muted">Peak → Trough</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card" style="background:rgba(56,139,253,0.1);border:1px solid rgba(56,139,253,0.2)">
+        <div class="stat-label">Sharpe Ratio</div>
+        <div class="stat-value" style="color:var(--accent-blue)" id="sharpeRatio">—</div>
+        <div class="small text-muted">Risk-adjusted return</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card" style="background:rgba(210,153,34,0.1);border:1px solid rgba(210,153,34,0.2)">
+        <div class="stat-label">Total Trades</div>
+        <div class="stat-value" style="color:var(--accent-yellow)" id="pfTotalTrades">—</div>
+        <div class="small text-muted" id="pfWinRate">Win rate —</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card" style="background:rgba(163,113,247,0.1);border:1px solid rgba(163,113,247,0.2)">
+        <div class="stat-label">Total PnL</div>
+        <div class="stat-value" style="color:var(--accent-purple)" id="pfTotalPnl">—</div>
+        <div class="small text-muted">Closed trades</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Daily PnL chart + Allocation -->
+  <div class="row g-3 mb-3">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header"><i class="bi bi-bar-chart me-2"></i>Daily PnL</div>
+        <div class="card-body p-2">
+          <div class="chart-container"><canvas id="dailyPnlChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header"><i class="bi bi-pie-chart me-2"></i>Asset Allocation</div>
+        <div class="card-body">
+          <div style="max-height:220px"><canvas id="allocationChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><i class="bi bi-wallet2 me-2"></i>Holdings</div>
+    <div class="card-body p-0">
+      <table class="table table-dark mb-0" id="holdingsTable">
+        <thead><tr><th>Asset</th><th>Amount</th><th>Price</th><th>Value</th><th>Entry</th><th>PnL</th></tr></thead>
+        <tbody id="holdingsBody"><tr><td colspan="6" class="text-center text-muted">ไม่มีข้อมูล</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- AI TRAINING -->
+<section id="sec-ai-training" class="section">
+
+  <!-- Fast Training Loop Banner -->
+  <div class="card mb-3" id="loopBanner" style="background:linear-gradient(135deg,rgba(46,160,67,0.15),rgba(56,139,253,0.1));border:1px solid rgba(46,160,67,0.3)">
+    <div class="card-body py-2 d-flex align-items-center gap-3 flex-wrap">
+      <div class="flex-grow-1">
+        <div class="d-flex align-items-center gap-2 mb-1">
+          <span class="fw-bold" style="color:var(--accent-green)"><i class="bi bi-lightning-charge-fill me-1"></i>Fast Training Loop</span>
+          <span class="badge" id="loopBadge" style="background:rgba(100,100,100,0.3);color:#8b949e">Idle</span>
+        </div>
+        <div class="d-flex align-items-center gap-2" style="min-width:260px">
+          <div class="flex-grow-1 position-relative" style="height:18px">
+            <div class="progress" style="height:18px;background:rgba(255,255,255,0.06)">
+              <div class="progress-bar" id="loopWrBar" role="progressbar" style="width:0%;background:linear-gradient(90deg,#2ea043,#388bfd);transition:width 0.4s ease"></div>
+            </div>
+            <!-- 80% target marker -->
+            <div style="position:absolute;top:0;left:80%;height:100%;width:2px;background:#f0883e;pointer-events:none" title="80% target"></div>
+          </div>
+          <span class="small fw-bold" id="loopWrText" style="min-width:48px;color:var(--accent-green)">0%</span>
+          <span class="small text-muted" style="white-space:nowrap">/ <span id="loopWrTarget">80</span>% target</span>
+        </div>
+      </div>
+      <div class="d-flex gap-2 align-items-center flex-wrap">
+        <span class="small text-muted">Trades: <b id="loopTradeCount">0</b> &nbsp; Wins: <b id="loopWinCount" class="text-success">0</b></span>
+        <div class="form-check form-check-inline mb-0">
+          <input class="form-check-input" type="checkbox" id="autoTradeCheck">
+          <label class="form-check-label small text-muted" for="autoTradeCheck">🚀 Auto-trade</label>
+        </div>
+        <button class="btn btn-success btn-sm px-3" id="loopStartBtn" onclick="startTrainingLoop()">
+          <i class="bi bi-play-fill me-1"></i>Start
+        </button>
+        <button class="btn btn-outline-danger btn-sm px-3 d-none" id="loopStopBtn" onclick="stopTrainingLoop()">
+          <i class="bi bi-stop-fill me-1"></i>Stop
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stat row -->
+  <div class="row g-3 mb-3">
+    <div class="col-md-3">
+      <div class="stat-card" style="background:rgba(46,160,67,0.1);border:1px solid rgba(46,160,67,0.2)">
+        <div class="stat-label">Win Rate</div>
+        <div class="stat-value" id="loopWrBig" style="color:var(--accent-green)">—</div>
+        <div class="small text-muted">Fast loop trades</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-card" style="background:rgba(56,139,253,0.1);border:1px solid rgba(56,139,253,0.2)">
+        <div class="stat-label">Closed Trades</div>
+        <div class="stat-value" style="color:var(--accent-blue)" id="loopTotalBig">0</div>
+        <div class="small text-muted">ต้องการ ≥ 40</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-card" style="background:rgba(163,113,247,0.1);border:1px solid rgba(163,113,247,0.2)">
+        <div class="stat-label">Model Accuracy</div>
+        <div class="stat-value" style="color:var(--accent-purple)" id="loopAccuracy">—</div>
+        <div class="small text-muted" id="trainAccuracy">Cross-validation</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-card" style="background:rgba(210,153,34,0.1);border:1px solid rgba(210,153,34,0.2)">
+        <div class="stat-label">Loop Status</div>
+        <div class="stat-value" style="color:var(--accent-yellow);font-size:1rem" id="trainStatus">Idle</div>
+        <div class="small text-muted" id="trainLastTime">ยังไม่ได้ run</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <!-- Live trade log -->
+    <div class="col-md-7">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-activity me-2"></i>Live Trade Log</span>
+          <div class="d-flex gap-2">
+            <span class="small text-muted">Market Regime:</span>
+            <span id="regimesBadges" class="d-flex gap-1 flex-wrap"></span>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <div id="loopLog" style="height:280px;overflow-y:auto;font-family:monospace;font-size:12px;padding:10px;background:var(--bg-card2)">
+            <span class="text-muted">Waiting for training loop to start...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Feature importance -->
+    <div class="col-md-5">
+      <div class="card h-100">
+        <div class="card-header"><i class="bi bi-bar-chart-fill me-2"></i>Feature Importance</div>
+        <div class="card-body p-2">
+          <div style="max-height:280px"><canvas id="featureChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manual training card (existing) -->
+  <div class="row g-3">
+    <div class="col-md-7">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-cpu me-2"></i>Manual Training (Demo trades)</span>
+          <div class="d-flex gap-2 align-items-center">
+            <button class="btn btn-outline-warning btn-sm" onclick="resetDemo()">
+              <i class="bi bi-arrow-counterclockwise me-1"></i>Reset Demo
+            </button>
+            <button class="btn btn-success btn-sm" onclick="triggerTraining()">
+              <i class="bi bi-lightning me-1"></i>Train Now
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="mb-3">
+            <div class="d-flex justify-content-between mb-1">
+              <small class="text-muted">Progress to next training</small>
+              <small id="trainProgress">0 / 50</small>
+            </div>
+            <div class="progress"><div class="progress-bar bg-success" id="trainProgressBar" style="width:0%"></div></div>
+          </div>
+          <div class="p-3 rounded" style="background:var(--bg-card2)">
+            <h6 class="text-muted small mb-2">วิธีทำงาน Fast Training Loop:</h6>
+            <ol class="small text-muted ps-3 mb-0">
+              <li>จำลองตลาด BULL/BEAR/RANGE/VOLATILE พร้อม drift ที่สมจริง</li>
+              <li>เทรด paper trade ด้วย TP=4% / SL=2% ให้ได้ 40+ trades</li>
+              <li>ทุก 25 trades → retrain RandomForest model อัตโนมัติ</li>
+              <li>Loop หยุดอัตโนมัติเมื่อ Win Rate ≥ 80%</li>
+              <li>Model ที่ผ่านการ train แล้วจะถูกใช้ใน live trading ทันที</li>
+            </ol>
+          </div>
+          <div class="mt-3" id="trainResultBox" style="display:none">
+            <div class="alert alert-success mb-0 small" id="trainResult"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-5">
+      <div class="card">
+        <div class="card-header"><i class="bi bi-database me-2"></i>DB Training Stats</div>
+        <div class="card-body">
+          <div class="row g-2">
+            <div class="col-6">
+              <div class="p-2 rounded text-center" style="background:var(--bg-card2)">
+                <div class="small text-muted">Records</div>
+                <div class="fw-bold" id="trainTotal">0</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="p-2 rounded text-center" style="background:var(--bg-card2)">
+                <div class="small text-muted">Labelled</div>
+                <div class="fw-bold text-success" id="trainLabelled">0</div>
+              </div>
+            </div>
+          </div>
+          <div class="mt-2 p-2 rounded text-center" style="background:var(--bg-card2)">
+            <div class="small text-muted">Model Status</div>
+            <div class="fw-bold" id="trainStatusSmall">Not ready</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRADE HISTORY -->
+<section id="sec-trade-history" class="section">
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-clock-history me-2"></i>Trade History</span>
+      <div class="d-flex align-items-center gap-2">
+        <span class="text-muted small" id="historyCount">0 trades</span>
+        <a href="/api/trades/export" class="btn btn-outline-secondary btn-sm" download>
+          <i class="bi bi-download me-1"></i>Export CSV
+        </a>
+      </div>
+    </div>
+    <div class="card-body p-0" style="overflow-x:auto">
+      <table class="table table-dark mb-0">
+        <thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th>Price</th><th>Amount</th><th>Strategy</th><th>Model</th><th>Conf</th><th>Status</th><th>PnL</th></tr></thead>
+        <tbody id="historyBody"><tr><td colspan="10" class="text-center text-muted p-3">ยังไม่มีประวัติ</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- THAI MARKET -->
+<section id="sec-thai-market" class="section">
+
+  <!-- Tabs -->
+  <div class="d-flex gap-2 mb-3">
+    <button class="tab-btn active" id="tabStocks" onclick="thaiTab('stocks',this)">
+      <i class="bi bi-bar-chart me-1"></i>หุ้นไทย (SET)
+    </button>
+    <button class="tab-btn" id="tabFunds" onclick="thaiTab('funds',this)">
+      <i class="bi bi-piggy-bank me-1"></i>กองทุนรวม
+    </button>
+    <div class="ms-auto d-flex align-items-center gap-2">
+      <span class="badge" style="background:rgba(56,139,253,0.2);color:#58a6ff;border:1px solid rgba(56,139,253,0.3)" id="thaiDataSource">simulation</span>
+      <button class="btn btn-outline-secondary btn-sm" onclick="refreshThaiData()">
+        <i class="bi bi-arrow-clockwise"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- หุ้นไทย panel -->
+  <div id="panel-stocks">
+    <div class="row g-3 mb-3">
+      <div class="col-md-8">
+        <div class="card">
+          <div class="card-header d-flex justify-content-between">
+            <span><i class="bi bi-graph-up me-2"></i>SET Stock Chart (Daily)</span>
+            <select class="form-select form-select-sm" style="width:auto" id="setChartSymbol" onchange="loadSetChart(this.value)"></select>
+          </div>
+          <div class="card-body p-2">
+            <div class="chart-container"><canvas id="setChart"></canvas></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card h-100">
+          <div class="card-header"><i class="bi bi-cpu me-2"></i>Technical Analysis</div>
+          <div class="card-body" id="setAnalysisPanel">
+            <div class="text-muted small text-center py-3">เลือกหุ้น</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="row g-2" id="setStockCards">
+      <div class="col-12 text-muted text-center py-4">
+        <div class="spinner-border spinner-border-sm text-secondary me-2"></div>กำลังโหลดข้อมูล...
+      </div>
+    </div>
+  </div>
+
+  <!-- กองทุน panel -->
+  <div id="panel-funds" style="display:none">
+    <div class="row g-3 mb-3">
+      <div class="col-md-8">
+        <div class="card">
+          <div class="card-header d-flex justify-content-between">
+            <span><i class="bi bi-graph-up me-2"></i>NAV History</span>
+            <select class="form-select form-select-sm" style="width:auto" id="fundChartSelect" onchange="loadFundChart(this.value)"></select>
+          </div>
+          <div class="card-body p-2">
+            <div class="chart-container"><canvas id="fundChart"></canvas></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card h-100">
+          <div class="card-header"><i class="bi bi-info-circle me-2"></i>Fund Info</div>
+          <div class="card-body" id="fundInfoPanel">
+            <div class="text-muted small text-center py-3">เลือกกองทุน</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="row g-2" id="fundCards">
+      <div class="col-12 text-muted text-center py-4">
+        <div class="spinner-border spinner-border-sm text-secondary me-2"></div>กำลังโหลด...
+      </div>
+    </div>
+
+    <!-- SEC API key notice -->
+    <div class="alert mt-3" style="background:rgba(56,139,253,0.08);border:1px solid rgba(56,139,253,0.2);border-radius:8px">
+      <i class="bi bi-info-circle me-2" style="color:#388bfd"></i>
+      <strong style="color:#388bfd">ข้อมูล NAV จริง:</strong>
+      ต้องลงทะเบียนรับ API key ฟรีที่
+      <a href="https://api-portal.sec.or.th" target="_blank" style="color:#58a6ff">api-portal.sec.or.th</a>
+      แล้วใส่ใน Settings → Thai Market → SEC API Key
+    </div>
+  </div>
+
+</section>
+
+<!-- BACKTEST -->
+<section id="sec-backtest" class="section">
+  <div class="row g-3 mb-3">
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header"><i class="bi bi-sliders me-2"></i>Backtest Settings</div>
+        <div class="card-body">
+          <div class="mb-2">
+            <label class="form-label small mb-1">Symbol</label>
+            <select class="form-select form-select-sm" id="btSymbol">
+              <option value="BTC/USDT">BTC/USDT</option>
+              <option value="ETH/USDT">ETH/USDT</option>
+              <option value="BNB/USDT">BNB/USDT</option>
+              <option value="SOL/USDT">SOL/USDT</option>
+              <option value="XRP/USDT">XRP/USDT</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small mb-1">Period (days)</label>
+            <select class="form-select form-select-sm" id="btDays">
+              <option value="7">7 days</option>
+              <option value="14">14 days</option>
+              <option value="30" selected>30 days</option>
+              <option value="60">60 days</option>
+              <option value="90">90 days</option>
+            </select>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label small mb-1">Take Profit %</label>
+              <div class="input-group input-group-sm">
+                <input type="number" class="form-control" id="btTp" value="4" min="1" max="50">
+                <span class="input-group-text">%</span>
+              </div>
+            </div>
+            <div class="col-6">
+              <label class="form-label small mb-1">Stop Loss %</label>
+              <div class="input-group input-group-sm">
+                <input type="number" class="form-control" id="btSl" value="2" min="0.5" max="20">
+                <span class="input-group-text">%</span>
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-primary w-100" id="btRunBtn" onclick="runBacktest()">
+            <i class="bi bi-play-fill me-1"></i>Run Backtest
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-8">
+      <div class="row g-3 mb-3" id="btMetrics" style="display:none">
+        <div class="col-6 col-md-3">
+          <div class="stat-card" style="background:rgba(46,160,67,0.1);border:1px solid rgba(46,160,67,0.2)">
+            <div class="stat-label">Total Return</div>
+            <div class="stat-value" id="btReturn">—</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="stat-card" style="background:rgba(210,153,34,0.1);border:1px solid rgba(210,153,34,0.2)">
+            <div class="stat-label">Win Rate</div>
+            <div class="stat-value" style="color:var(--accent-yellow)" id="btWinRate">—</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="stat-card" style="background:rgba(56,139,253,0.1);border:1px solid rgba(56,139,253,0.2)">
+            <div class="stat-label">Sharpe Ratio</div>
+            <div class="stat-value" style="color:var(--accent-blue)" id="btSharpe">—</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="stat-card" style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.2)">
+            <div class="stat-label">Max Drawdown</div>
+            <div class="stat-value text-danger" id="btDrawdown">—</div>
+          </div>
+        </div>
+      </div>
+      <div class="card mb-3" id="btChartCard" style="display:none">
+        <div class="card-header"><i class="bi bi-graph-up me-2"></i>Equity Curve</div>
+        <div class="card-body p-2">
+          <div class="chart-container"><canvas id="btEquityChart"></canvas></div>
+        </div>
+      </div>
+      <div class="card" id="btNoData">
+        <div class="card-body text-center py-5 text-muted">
+          <i class="bi bi-skip-backward-circle" style="font-size:2rem;display:block;margin-bottom:8px"></i>
+          กดปุ่ม Run Backtest เพื่อทดสอบกลยุทธ์บนข้อมูลจำลอง
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="card" id="btTradesCard" style="display:none">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-table me-2"></i>Backtest Trades (last 20)</span>
+      <span class="text-muted small" id="btTradeCount"></span>
+    </div>
+    <div class="card-body p-0" style="overflow-x:auto">
+      <table class="table table-dark table-sm mb-0">
+        <thead><tr><th>Open</th><th>Close</th><th>Side</th><th>PnL %</th><th>Result</th><th>Regime</th></tr></thead>
+        <tbody id="btTradesBody"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- SETTINGS -->
+<section id="sec-settings" class="section">
+  <div class="row g-3">
+    <!-- LEFT COLUMN -->
+    <div class="col-md-6">
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-toggles me-2"></i>Trading Mode</div>
+        <div class="card-body">
+          <div class="d-flex gap-2 mb-2">
+            <button class="btn btn-success btn-sm" id="btnDemo" onclick="setMode('demo')">
+              <i class="bi bi-play-circle me-1"></i>Demo Mode
+            </button>
+            <button class="btn btn-outline-danger btn-sm" id="btnLive" onclick="setMode('live')">
+              <i class="bi bi-exclamation-triangle me-1"></i>Live Mode
+            </button>
+          </div>
+          <small class="text-muted">Demo Mode: เทรดด้วย virtual money ใช้ข้อมูลตลาดจริง</small>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-sliders me-2"></i>Trading Parameters</div>
+        <div class="card-body">
+          <div class="row g-2 mb-2">
+            <div class="col-6">
+              <label class="form-label small mb-1">Take Profit %</label>
+              <div class="input-group input-group-sm">
+                <input type="number" class="form-control" id="tpPct" value="6" min="1" max="50" step="0.5">
+                <span class="input-group-text">%</span>
+              </div>
+            </div>
+            <div class="col-6">
+              <label class="form-label small mb-1">Stop Loss %</label>
+              <div class="input-group input-group-sm">
+                <input type="number" class="form-control" id="slPct" value="3" min="0.5" max="20" step="0.5">
+                <span class="input-group-text">%</span>
+              </div>
+            </div>
+            <div class="col-6">
+              <label class="form-label small mb-1">Min AI Confidence</label>
+              <div class="input-group input-group-sm">
+                <input type="number" class="form-control" id="minConf" value="60" min="30" max="95">
+                <span class="input-group-text">%</span>
+              </div>
+            </div>
+            <div class="col-6">
+              <label class="form-label small mb-1">Analysis Interval</label>
+              <div class="input-group input-group-sm">
+                <input type="number" class="form-control" id="analysisInterval" value="300" min="60" step="30">
+                <span class="input-group-text">sec</span>
+              </div>
+            </div>
+            <div class="col-6">
+              <label class="form-label small mb-1">Risk/Trade %</label>
+              <div class="input-group input-group-sm">
+                <input type="number" class="form-control" id="riskPerTrade" value="2" min="0.5" max="20" step="0.5">
+                <span class="input-group-text">%</span>
+              </div>
+            </div>
+            <div class="col-6">
+              <label class="form-label small mb-1">Max Daily Loss %</label>
+              <div class="input-group input-group-sm">
+                <input type="number" class="form-control" id="maxDailyLoss" value="5" min="1" max="30">
+                <span class="input-group-text">%</span>
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label small mb-1">Max Open Trades</label>
+              <input type="number" class="form-control form-control-sm" id="maxOpenTrades" value="3" min="1" max="10">
+            </div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="saveTradingParams()">
+            <i class="bi bi-save me-1"></i>Save Parameters
+          </button>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-cpu me-2"></i>AI Model</div>
+        <div class="card-body">
+          <label class="form-label small mb-1">Claude API Key</label>
+          <input type="password" class="form-control form-control-sm mb-2" id="claudeApiKey" placeholder="sk-ant-... (เว้นว่างถ้าไม่ใช้ Claude)">
+          <label class="form-label small mb-1">Claude Model</label>
+          <select class="form-select form-select-sm mb-3" id="claudeModel">
+            <option value="claude-sonnet-4-6">claude-sonnet-4-6 (แนะนำ)</option>
+            <option value="claude-opus-4-8">claude-opus-4-8 (ฉลาดสุด)</option>
+            <option value="claude-haiku-4-5-20251001">claude-haiku-4-5 (เร็วสุด)</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="saveAISettings()">
+            <i class="bi bi-save me-1"></i>Save AI Settings
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div class="col-md-6">
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-currency-bitcoin me-2"></i>Exchange API Keys</span>
+          <button class="btn btn-outline-info btn-sm" onclick="testExchanges()">
+            <i class="bi bi-wifi me-1"></i>Test Connections
+          </button>
+        </div>
+        <div class="card-body">
+          <div id="exchangeTestResult" class="mb-2" style="display:none"></div>
+          <ul class="nav nav-tabs nav-fill mb-3" style="border-color:var(--border)">
+            <li class="nav-item"><a href="#" class="nav-link text-muted active" onclick="showExTab('binance',this)">Binance</a></li>
+            <li class="nav-item"><a href="#" class="nav-link text-muted" onclick="showExTab('binance_th',this)">BinanceTH</a></li>
+            <li class="nav-item"><a href="#" class="nav-link text-muted" onclick="showExTab('bitkub',this)">Bitkub</a></li>
+            <li class="nav-item"><a href="#" class="nav-link text-muted" onclick="showExTab('okx',this)">OKX</a></li>
+          </ul>
+          <div id="ex-binance" class="ex-tab">
+            <label class="form-label small mb-1">API Key</label>
+            <input type="password" class="form-control form-control-sm mb-2" id="binance_api_key" placeholder="xxxxxxxxxxxxxxxx">
+            <label class="form-label small mb-1">API Secret</label>
+            <input type="password" class="form-control form-control-sm mb-2" id="binance_api_secret" placeholder="xxxxxxxxxxxxxxxx">
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" id="binance_enabled">
+              <label class="form-check-label small" for="binance_enabled">Enable Binance</label>
+            </div>
+            <div class="form-check mt-1 mb-2"><input class="form-check-input" type="checkbox" id="binance_testnet"><label class="form-check-label small" for="binance_testnet">ใช้ Testnet (testnet.binance.vision)</label></div>
+            <button class="btn btn-primary btn-sm" onclick="saveExchangeKey('binance')"><i class="bi bi-save me-1"></i>Save</button>
+          </div>
+          <div id="ex-binance_th" class="ex-tab" style="display:none">
+            <label class="form-label small mb-1">API Key</label>
+            <input type="password" class="form-control form-control-sm mb-2" id="binance_th_api_key" placeholder="xxxxxxxxxxxxxxxx">
+            <label class="form-label small mb-1">API Secret</label>
+            <input type="password" class="form-control form-control-sm mb-2" id="binance_th_api_secret" placeholder="xxxxxxxxxxxxxxxx">
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" id="binance_th_enabled">
+              <label class="form-check-label small" for="binance_th_enabled">Enable Binance TH</label>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="saveExchangeKey('binance_th')"><i class="bi bi-save me-1"></i>Save</button>
+          </div>
+          <div id="ex-bitkub" class="ex-tab" style="display:none">
+            <label class="form-label small mb-1">API Key</label>
+            <input type="password" class="form-control form-control-sm mb-2" id="bitkub_api_key" placeholder="xxxxxxxxxxxxxxxx">
+            <label class="form-label small mb-1">API Secret</label>
+            <input type="password" class="form-control form-control-sm mb-2" id="bitkub_api_secret" placeholder="xxxxxxxxxxxxxxxx">
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" id="bitkub_enabled">
+              <label class="form-check-label small" for="bitkub_enabled">Enable Bitkub</label>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="saveExchangeKey('bitkub')"><i class="bi bi-save me-1"></i>Save</button>
+          </div>
+          <div id="ex-okx" class="ex-tab" style="display:none">
+            <label class="form-label small mb-1">API Key</label>
+            <input type="password" class="form-control form-control-sm mb-2" id="okx_api_key" placeholder="xxxxxxxxxxxxxxxx">
+            <label class="form-label small mb-1">API Secret</label>
+            <input type="password" class="form-control form-control-sm mb-2" id="okx_api_secret" placeholder="xxxxxxxxxxxxxxxx">
+            <label class="form-label small mb-1">Passphrase</label>
+            <input type="password" class="form-control form-control-sm mb-2" id="okx_passphrase" placeholder="xxxxxxxxxxxxxxxx">
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" id="okx_enabled">
+              <label class="form-check-label small" for="okx_enabled">Enable OKX</label>
+            </div>
+            <div class="form-check mt-1 mb-2"><input class="form-check-input" type="checkbox" id="okx_testnet"><label class="form-check-label small" for="okx_testnet">ใช้ Testnet (Sandbox)</label></div>
+            <button class="btn btn-primary btn-sm" onclick="saveExchangeKey('okx')"><i class="bi bi-save me-1"></i>Save</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-flag me-2"></i>Thai Market</div>
+        <div class="card-body">
+          <label class="form-label small mb-1">SEC Thailand API Key</label>
+          <small class="text-muted d-block mb-2">ลงทะเบียนฟรีที่ api-portal.sec.or.th</small>
+          <input type="password" class="form-control form-control-sm mb-2" id="secApiKey" placeholder="xxxxxxxxxxxxxxxx">
+          <button class="btn btn-primary btn-sm" onclick="saveThaiSettings()"><i class="bi bi-save me-1"></i>Save</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><i class="bi bi-bell me-2"></i>Notifications</div>
+        <div class="card-body">
+          <label class="form-label small mb-1">LINE Notify Token</label>
+          <input type="password" class="form-control form-control-sm mb-2" id="lineToken" placeholder="xxxxxxxxxxxxxxxx">
+          <label class="form-label small mb-1">Telegram Bot Token</label>
+          <input type="password" class="form-control form-control-sm mb-2" id="telegramToken" placeholder="123456789:AABBCCxxxxxxx">
+          <label class="form-label small mb-1">Telegram Chat ID</label>
+          <input type="text" class="form-control form-control-sm mb-3" id="telegramChatId" placeholder="-1001234567890">
+          <div class="p-2 rounded mb-3" style="background:var(--bg-card2)">
+            <div class="small text-muted mb-2">แจ้งเตือนเมื่อ:</div>
+            <div class="row g-1">
+              <div class="col-6">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="notifyTradeOpen" checked>
+                  <label class="form-check-label small" for="notifyTradeOpen">เปิด Trade</label>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="notifyTradeClose" checked>
+                  <label class="form-check-label small" for="notifyTradeClose">ปิด Trade</label>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="notifyStopLoss" checked>
+                  <label class="form-check-label small" for="notifyStopLoss">Stop Loss</label>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="notifyTakeProfit" checked>
+                  <label class="form-check-label small" for="notifyTakeProfit">Take Profit</label>
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="notifyTrainDone">
+                  <label class="form-check-label small" for="notifyTrainDone">🎯 Training สำเร็จ (>80% WR)</label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="saveNotifications()">
+            <i class="bi bi-save me-1"></i>Save Notifications
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+</div>
+
+<!-- Notification Toast Container -->
+<div id="toastContainer" class="notification"></div>
+
+<script>
+// ============================================================
+// State
+// ============================================================
+let ws = null;
+let reconnectTimer = null;
+let portfolioData = { labels: [], values: [] };
+let currentSymbol = null;
+let allPrices = {};
+let allAnalyses = {};
+let charts = {};
+
+// ============================================================
+// WebSocket
+// ============================================================
+function connectWS() {
+  const url = `ws://${location.host}/ws`;
+  ws = new WebSocket(url);
+  ws.onopen = () => {
+    document.getElementById('wsDot').className = 'ws-dot ws-connected';
+    if (reconnectTimer) { clearInterval(reconnectTimer); reconnectTimer = null; }
+  };
+  ws.onclose = () => {
+    document.getElementById('wsDot').className = 'ws-dot ws-disconnected';
+    if (!reconnectTimer) reconnectTimer = setTimeout(connectWS, 3000);
+  };
+  ws.onerror = () => ws.close();
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.event === 'analysis_update') handleAnalysisUpdate(msg.data);
+    else if (msg.event === 'trade_executed') handleTradeExecuted(msg.data);
+    else if (msg.event === 'trade_closed') handleTradeClosed(msg.data);
+    else if (msg.event === 'training_trade_opened') handleLoopTradeOpened(msg.data);
+    else if (msg.event === 'training_trade_closed') handleLoopTradeClosed(msg.data);
+    else if (msg.event === 'training_model_updated') handleLoopModelUpdated(msg.data);
+    else if (msg.event === 'training_progress') handleLoopProgress(msg.data);
+    else if (msg.event === 'training_completed') handleLoopCompleted(msg.data);
+  };
+  setInterval(() => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({type:'ping'})); }, 25000);
+}
+
+// ============================================================
+// Navigation
+// ============================================================
+function showSection(name, el) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  document.getElementById('sec-' + name).classList.add('active');
+  if (el) el.classList.add('active');
+  if (name === 'portfolio') refreshPortfolio();
+  if (name === 'trade-history') refreshHistory();
+  if (name === 'ai-training') { refreshTraining(); refreshLoopStatus(); }
+  if (name === 'thai-market') loadThaiStocks();
+  if (name === 'settings') loadSettings();
+  if (name === 'trading' && currentSymbol) loadMTF();
+}
+
+function showExTab(name, el) {
+  document.querySelectorAll('.ex-tab').forEach(t => t.style.display = 'none');
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  document.getElementById('ex-' + name).style.display = '';
+  if (el) el.classList.add('active');
+}
+
+// ============================================================
+// Charts init
+// ============================================================
+function initCharts() {
+  const gridColor = 'rgba(48,54,61,0.5)';
+  const defaultOpts = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#8b949e', font: {size:11} } } },
+    scales: {
+      x: { ticks: { color: '#8b949e', font:{size:10} }, grid: { color: gridColor } },
+      y: { ticks: { color: '#8b949e', font:{size:10} }, grid: { color: gridColor } },
+    }
+  };
+
+  charts.portfolio = new Chart(document.getElementById('portfolioChart'), {
+    type: 'line',
+    data: { labels: [], datasets: [{ label: 'Portfolio Value (USDT)', data: [], borderColor: '#2ea043', backgroundColor: 'rgba(46,160,67,0.1)', fill: true, tension: 0.4, pointRadius: 2 }] },
+    options: { ...defaultOpts, plugins: { ...defaultOpts.plugins, legend: { display: false } } }
+  });
+
+  charts.trading = new ApexCharts(document.getElementById('tradingChart'), {
+    chart: {
+      type: 'candlestick', height: 300,
+      background: 'transparent', foreColor: '#8b949e',
+      toolbar: { show: false }, animations: { enabled: false },
+      zoom: { enabled: false },
+    },
+    series: [{ data: [] }],
+    xaxis: {
+      type: 'datetime',
+      labels: { style: { colors: '#8b949e', fontSize: '10px' },
+        datetimeFormatter: { hour: 'HH:mm', day: 'dd MMM' } }
+    },
+    yaxis: {
+      tooltip: { enabled: true },
+      labels: { style: { colors: '#8b949e', fontSize: '10px' },
+        formatter: v => formatPrice(v) }
+    },
+    plotOptions: {
+      candlestick: {
+        colors: { upward: '#3fb950', downward: '#f85149' },
+        wick: { useFillColor: true }
+      }
+    },
+    grid: { borderColor: 'rgba(48,54,61,0.5)' },
+    tooltip: { theme: 'dark' },
+    noData: { text: 'เลือก symbol เพื่อดู chart', style: { color: '#8b949e' } },
+  });
+  charts.trading.render();
+
+  charts.allocation = new Chart(document.getElementById('allocationChart'), {
+    type: 'doughnut',
+    data: { labels: ['USDT'], datasets: [{ data: [100], backgroundColor: ['#388bfd'], borderColor: ['#0d1117'], borderWidth: 2 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#8b949e', font:{size:10} } } } }
+  });
+
+  charts.dailyPnl = new Chart(document.getElementById('dailyPnlChart'), {
+    type: 'bar',
+    data: { labels: [], datasets: [{ label: 'Daily PnL (USDT)', data: [], backgroundColor: [], borderRadius: 3 }] },
+    options: {
+      ...defaultOpts,
+      plugins: { ...defaultOpts.plugins, legend: { display: false } },
+    }
+  });
+
+  charts.features = new Chart(document.getElementById('featureChart'), {
+    type: 'bar',
+    data: {
+      labels: ['RSI', 'MACD', 'BB', 'ATR', 'Volume', 'VWAP', '24h chg', 'EMA'],
+      datasets: [{ label: 'Importance', data: [0,0,0,0,0,0,0,0], backgroundColor: 'rgba(163,113,247,0.7)', borderRadius: 4 }]
+    },
+    options: {
+      ...defaultOpts, indexAxis: 'y',
+      plugins: { ...defaultOpts.plugins, legend: { display: false } },
+      scales: { x: { ...defaultOpts.scales.x, max: 1 }, y: { ...defaultOpts.scales.y } }
+    }
+  });
+}
+
+// ============================================================
+// Data fetchers
+// ============================================================
+async function fetchStatus() {
+  try {
+    const r = await fetch('/api/status');
+    const d = await r.json();
+    document.getElementById('modeTag').textContent = d.mode.toUpperCase();
+    document.getElementById('modeTag').className = 'mode-badge mode-' + d.mode;
+    document.getElementById('aiModelSelect').value = d.ai_model;
+    document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('th');
+  } catch {}
+}
+
+async function fetchPrices() {
+  try {
+    const r = await fetch('/api/prices');
+    allPrices = await r.json();
+    renderPriceCards();
+    updateTradingChart();
+  } catch {}
+}
+
+async function fetchPortfolioStats() {
+  try {
+    const r = await fetch('/api/portfolio');
+    const d = await r.json();
+    const initial = 10000;
+    document.getElementById('totalValue').textContent = '$' + d.total_value.toFixed(2);
+    document.getElementById('cashValue').textContent = '$' + d.cash_usdt.toFixed(2);
+    document.getElementById('positionCount').textContent = d.positions.length + ' positions';
+    const pnl = d.total_value - initial;
+    document.getElementById('totalPnl').textContent = (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + ' USDT';
+    document.getElementById('totalPnl').className = 'small mt-1 ' + (pnl >= 0 ? 'text-success' : 'text-danger');
+    document.getElementById('sidebarTotal').textContent = '$' + d.total_value.toFixed(2);
+    const pnlPct = (d.total_value - initial) / initial * 100;
+    document.getElementById('sidebarPnl').textContent = (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '%';
+    document.getElementById('sidebarPnl').className = 'small ' + (pnlPct >= 0 ? 'text-success' : 'text-danger');
+
+    // Update portfolio chart
+    const now = new Date().toLocaleTimeString('th', {hour:'2-digit', minute:'2-digit'});
+    if (portfolioData.labels.length > 60) { portfolioData.labels.shift(); portfolioData.values.shift(); }
+    portfolioData.labels.push(now);
+    portfolioData.values.push(d.total_value);
+    charts.portfolio.data.labels = portfolioData.labels;
+    charts.portfolio.data.datasets[0].data = portfolioData.values;
+    charts.portfolio.update('none');
+
+    updateOpenPositions(d.positions);
+    updateHoldings(d.positions, d.cash_usdt, d.total_value);
+    updateAllocationChart(d.positions, d.cash_usdt);
+  } catch {}
+}
+
+async function fetchStats() {
+  try {
+    const r = await fetch('/api/stats');
+    const d = await r.json();
+    document.getElementById('winRate').textContent = d.win_rate.toFixed(1) + '%';
+    document.getElementById('totalTrades').textContent = d.total_trades + ' trades';
+    document.getElementById('avgPnl').textContent = (d.avg_pnl_pct >= 0 ? '+' : '') + d.avg_pnl_pct.toFixed(2) + '%';
+    document.getElementById('bestTrade').textContent = 'Best: ' + (d.best_trade >= 0 ? '+' : '') + (d.best_trade || 0).toFixed(2) + '%';
+  } catch {}
+}
+
+// ============================================================
+// Rendering
+// ============================================================
+function renderPriceCards() {
+  const container = document.getElementById('priceCardsRow');
+  const symbolSelect = document.getElementById('chartSymbolSelect');
+  const prevSymbols = new Set(Array.from(symbolSelect.options).map(o => o.value));
+
+  container.innerHTML = '';
+  for (const [sym, d] of Object.entries(allPrices)) {
+    const up = d.change_24h >= 0;
+    const card = document.createElement('div');
+    card.className = 'col-6 col-md-4 col-lg-2';
+    card.innerHTML = `
+      <div class="price-card ${currentSymbol===sym?'active':''}" onclick="selectSymbol('${sym}')">
+        <div class="d-flex justify-content-between align-items-start">
+          <strong class="small">${sym.split('/')[0]}</strong>
+          <span class="badge-signal ${d.signal==='BUY'?'signal-buy':d.signal==='SELL'?'signal-sell':'signal-hold'}">${d.signal}</span>
+        </div>
+        <div class="fw-bold mt-1">$${formatPrice(d.price)}</div>
+        <div class="small ${up?'price-up':'price-down'}">${up?'+':''}${d.change_24h.toFixed(2)}%</div>
+      </div>`;
+    container.appendChild(card);
+
+    if (!prevSymbols.has(sym)) {
+      const opt = document.createElement('option');
+      opt.value = sym; opt.textContent = sym;
+      symbolSelect.appendChild(opt);
+    }
+  }
+  if (!currentSymbol && Object.keys(allPrices).length > 0) {
+    selectSymbol(Object.keys(allPrices)[0]);
+  }
+}
+
+function formatPrice(p) {
+  if (p >= 1000) return p.toFixed(2);
+  if (p >= 1) return p.toFixed(4);
+  return p.toFixed(6);
+}
+
+function selectSymbol(sym) {
+  currentSymbol = sym;
+  document.getElementById('chartSymbolSelect').value = sym;
+  renderPriceCards();
+  updateIndicatorPanel(sym);
+  updateAIPanel(sym);
+  fetchTradingChart(sym);
+  if (document.getElementById('sec-trading').classList.contains('active')) loadMTF();
+}
+
+async function fetchTradingChart(sym) {
+  try {
+    const r = await fetch(`/api/candles?symbol=${encodeURIComponent(sym)}&limit=80`);
+    const data = await r.json();
+    const series = data.map(d => ({ x: new Date(d.t), y: [d.o, d.h, d.l, d.c] }));
+    charts.trading.updateSeries([{ name: sym, data: series }]);
+  } catch {}
+}
+
+function updateTradingChart() {
+  if (currentSymbol) fetchTradingChart(currentSymbol);
+}
+
+function updateIndicatorPanel(sym) {
+  const d = allPrices[sym];
+  const a = allAnalyses[sym];
+  if (!d) return;
+  const rsiColor = d.rsi < 30 ? '#3fb950' : d.rsi > 70 ? '#f85149' : '#8b949e';
+  const panel = document.getElementById('indicatorPanel');
+  panel.innerHTML = `
+    <div class="indicator-row"><span>RSI(14)</span><span style="color:${rsiColor}">${(d.rsi||0).toFixed(1)}</span></div>
+    <div class="indicator-row"><span>Signal</span>
+      <span class="badge-signal ${d.signal==='BUY'?'signal-buy':d.signal==='SELL'?'signal-sell':'signal-hold'}">${d.signal}</span></div>
+    <div class="indicator-row"><span>Confidence</span>
+      <span>${((d.signal_strength||0)*100).toFixed(0)}%
+        <span class="indicator-bar"><span class="indicator-fill" style="width:${(d.signal_strength||0)*100}%;background:#388bfd"></span></span>
+      </span></div>
+    <div class="indicator-row"><span>24h Change</span>
+      <span class="${d.change_24h>=0?'price-up':'price-down'}">${d.change_24h>=0?'+':''}${d.change_24h.toFixed(2)}%</span></div>
+  `;
+}
+
+function updateAIPanel(sym) {
+  const a = allAnalyses[sym];
+  if (!a) return;
+  const signalColor = a.signal === 'BUY' ? '#3fb950' : a.signal === 'SELL' ? '#f85149' : '#8b949e';
+  document.getElementById('aiAnalysisPanel').innerHTML = `
+    <div class="d-flex justify-content-between mb-2">
+      <strong style="color:${signalColor}">${a.signal}</strong>
+      <span class="text-muted small">${((a.confidence||0)*100).toFixed(0)}% confidence</span>
+    </div>
+    <div class="small text-muted mb-2">${a.reasoning || ''}</div>
+    <div class="indicator-row"><span>EMA Trend</span><span class="${a.ema_trend==='BULLISH'?'price-up':a.ema_trend==='BEARISH'?'price-down':'text-muted'}">${a.ema_trend||'—'}</span></div>
+    <div class="indicator-row"><span>Volatility</span><span>${a.volatility||'—'}</span></div>
+    <div class="indicator-row"><span>BB Position</span>
+      <span>${((a.bb_position||0.5)*100).toFixed(0)}%
+        <span class="indicator-bar"><span class="indicator-fill" style="width:${(a.bb_position||0.5)*100}%;background:#a371f7"></span></span>
+      </span></div>
+  `;
+}
+
+function updateOpenPositions(positions) {
+  const el = document.getElementById('openPositionsTable');
+  if (!positions.length) { el.innerHTML = '<div class="p-3 text-muted small text-center">ไม่มี position เปิดอยู่</div>'; return; }
+  el.innerHTML = `<table class="table table-dark table-sm mb-0">
+    <thead><tr><th>Symbol</th><th>Entry</th><th>Now</th><th>PnL</th></tr></thead>
+    <tbody>${positions.map(p => `
+      <tr>
+        <td>${p.symbol}</td>
+        <td>$${formatPrice(p.entry_price)}</td>
+        <td>$${formatPrice(p.price)}</td>
+        <td class="${p.pnl_pct>=0?'text-success':'text-danger'}">${p.pnl_pct>=0?'+':''}${p.pnl_pct.toFixed(2)}%</td>
+      </tr>`).join('')}
+    </tbody></table>`;
+}
+
+function updateHoldings(positions, cash, total) {
+  const body = document.getElementById('holdingsBody');
+  if (!positions.length && cash <= 0) { body.innerHTML = '<tr><td colspan="6" class="text-center text-muted">ไม่มีข้อมูล</td></tr>'; return; }
+  let rows = '';
+  if (cash > 0) rows += `<tr><td>USDT</td><td>${cash.toFixed(2)}</td><td>$1.00</td><td>$${cash.toFixed(2)}</td><td>—</td><td>—</td></tr>`;
+  for (const p of positions) {
+    rows += `<tr>
+      <td>${p.symbol.split('/')[0]}</td>
+      <td>${p.amount.toFixed(6)}</td>
+      <td>$${formatPrice(p.price)}</td>
+      <td>$${p.value.toFixed(2)}</td>
+      <td>$${formatPrice(p.entry_price)}</td>
+      <td class="${p.pnl_pct>=0?'text-success':'text-danger'}">${p.pnl_pct>=0?'+':''}${p.pnl_pct.toFixed(2)}%</td>
+    </tr>`;
+  }
+  body.innerHTML = rows;
+}
+
+function updateAllocationChart(positions, cash) {
+  const labels = ['USDT'];
+  const data = [cash];
+  const colors = ['#388bfd'];
+  const palette = ['#2ea043','#f85149','#d29922','#a371f7','#58a6ff','#3fb950'];
+  positions.forEach((p, i) => {
+    labels.push(p.symbol.split('/')[0]);
+    data.push(p.value);
+    colors.push(palette[i % palette.length]);
+  });
+  charts.allocation.data.labels = labels;
+  charts.allocation.data.datasets[0].data = data;
+  charts.allocation.data.datasets[0].backgroundColor = colors;
+  charts.allocation.update();
+}
+
+// ============================================================
+// Activity Feed
+// ============================================================
+const activityLog = [];
+function addActivity(icon, text, color) {
+  activityLog.unshift({ icon, text, color, time: new Date().toLocaleTimeString('th') });
+  if (activityLog.length > 50) activityLog.pop();
+  const feed = document.getElementById('activityFeed');
+  feed.innerHTML = activityLog.slice(0, 20).map(a =>
+    `<div class="activity-item">
+      <span style="color:${a.color}">${a.icon}</span>
+      <span class="ms-2">${a.text}</span>
+      <span class="float-end text-muted" style="font-size:0.7rem">${a.time}</span>
+    </div>`
+  ).join('');
+}
+
+// ============================================================
+// WebSocket handlers
+// ============================================================
+function handleAnalysisUpdate(d) {
+  allPrices[d.symbol] = { ...d, price: d.price, signal: d.signal, signal_strength: d.confidence };
+  allAnalyses[d.symbol] = d;
+  if (d.signal !== 'HOLD') {
+    const c = d.signal === 'BUY' ? '#3fb950' : '#f85149';
+    addActivity(d.signal === 'BUY' ? '▲' : '▼', `${d.symbol} ${d.signal} (conf: ${(d.confidence*100).toFixed(0)}%)`, c);
+  }
+  if (document.getElementById('sec-dashboard').classList.contains('active')) renderPriceCards();
+  if (currentSymbol === d.symbol) { updateIndicatorPanel(d.symbol); updateAIPanel(d.symbol); }
+}
+
+function handleTradeExecuted(d) {
+  const c = d.side === 'BUY' ? '#3fb950' : '#f85149';
+  addActivity(d.side === 'BUY' ? '🟢' : '🔴',
+    `${d.mode.toUpperCase()} ${d.side} ${d.symbol} @ $${formatPrice(d.price)}`, c);
+  showToast(`${d.side} ${d.symbol}`, `@ $${formatPrice(d.price)} | ${d.strategy}`, d.side === 'BUY' ? 'success' : 'danger');
+}
+
+function handleTradeClosed(d) {
+  const win = d.pnl >= 0;
+  addActivity(win ? '✅' : '❌',
+    `${d.symbol} closed: ${d.pnl_pct >= 0 ? '+' : ''}${d.pnl_pct.toFixed(2)}% (${d.reason})`, win ? '#3fb950' : '#f85149');
+  showToast('Trade Closed', `${d.symbol}: ${d.pnl_pct >= 0 ? '+' : ''}${d.pnl_pct.toFixed(2)}%`, win ? 'success' : 'warning');
+}
+
+// ============================================================
+// Toast notifications
+// ============================================================
+function showToast(title, body, type) {
+  const container = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = `alert alert-${type} alert-dismissible fade show shadow-lg mb-2`;
+  t.innerHTML = `<strong>${title}</strong> — ${body}<button type="button" class="btn-close" onclick="this.parentElement.remove()"></button>`;
+  container.appendChild(t);
+  setTimeout(() => t.remove(), 5000);
+}
+
+// ============================================================
+// History & Training
+// ============================================================
+async function refreshHistory() {
+  try {
+    const r = await fetch('/api/trades?limit=100');
+    const trades = await r.json();
+    document.getElementById('historyCount').textContent = trades.length + ' trades';
+    const body = document.getElementById('historyBody');
+    if (!trades.length) { body.innerHTML = '<tr><td colspan="10" class="text-center text-muted p-3">ยังไม่มีประวัติ</td></tr>'; return; }
+    body.innerHTML = trades.map(t => {
+      const pnlCls = !t.pnl_pct ? '' : t.pnl_pct >= 0 ? 'text-success' : 'text-danger';
+      return `<tr>
+        <td class="text-muted">${t.opened_at ? new Date(t.opened_at).toLocaleString('th') : '—'}</td>
+        <td>${t.symbol}</td>
+        <td class="${t.side==='BUY'?'text-success':'text-danger'}">${t.side}</td>
+        <td>$${formatPrice(t.price)}</td>
+        <td>${(t.amount||0).toFixed(4)}</td>
+        <td class="text-muted">${t.strategy||'—'}</td>
+        <td class="text-muted">${t.ai_model||'—'}</td>
+        <td>${((t.confidence||0)*100).toFixed(0)}%</td>
+        <td><span class="badge bg-${t.status==='closed'?(t.pnl_pct>=0?'success':'danger'):'warning'}">${t.status}</span></td>
+        <td class="${pnlCls}">${t.pnl_pct!=null?(t.pnl_pct>=0?'+':'')+t.pnl_pct.toFixed(2)+'%':'—'}</td>
+      </tr>`;
+    }).join('');
+  } catch {}
+}
+
+async function refreshTraining() {
+  try {
+    const r = await fetch('/api/training');
+    const d = await r.json();
+    document.getElementById('trainTotal').textContent = d.total_records || 0;
+    document.getElementById('trainLabelled').textContent = d.labelled_records || 0;
+    document.getElementById('trainAccuracy').textContent = d.accuracy ? (d.accuracy * 100).toFixed(1) + '%' : '—';
+    document.getElementById('trainStatus').textContent = d.model_ready ? 'Ready ✓' : 'Training...';
+    document.getElementById('trainLastTime').textContent = d.last_trained ? 'Last: ' + new Date(d.last_trained).toLocaleString('th') : 'ยังไม่ได้ train';
+    const interval = 50;
+    const pct = Math.min((d.total_records % interval) / interval * 100, 100);
+    document.getElementById('trainProgress').textContent = `${d.total_records % interval} / ${interval}`;
+    document.getElementById('trainProgressBar').style.width = pct + '%';
+
+    // Mock feature importance if model ready
+    if (d.model_ready) {
+      const importance = [0.18, 0.15, 0.14, 0.12, 0.11, 0.10, 0.11, 0.09];
+      charts.features.data.datasets[0].data = importance;
+      charts.features.update();
+    }
+  } catch {}
+}
+
+async function triggerTraining() {
+  try {
+    const r = await fetch('/api/training/trigger', {method:'POST'});
+    const d = await r.json();
+    const box = document.getElementById('trainResultBox');
+    const msg = document.getElementById('trainResult');
+    box.style.display = '';
+    if (d.success) {
+      msg.className = 'alert alert-success mb-0 small';
+      msg.textContent = `Training complete! Accuracy: ${(d.stats.accuracy * 100).toFixed(1)}% on ${d.stats.training_trades} trades`;
+    } else {
+      msg.className = 'alert alert-warning mb-0 small';
+      msg.textContent = `Not enough data yet (${d.stats.labelled_records || 0} labelled trades, need ${d.stats.min_samples || 30})`;
+    }
+    await refreshTraining();
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+}
+
+async function resetDemo() {
+  if (!confirm('Reset demo portfolio? Virtual balance will return to initial.')) return;
+  try {
+    await fetch('/api/demo/reset', {method:'POST'});
+    portfolioData = { labels: [], values: [] };
+    showToast('Demo Reset', 'Virtual portfolio has been reset', 'info');
+    await fetchPortfolioStats();
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+}
+
+// ============================================================
+// Fast Training Loop
+// ============================================================
+let loopRunning = false;
+
+async function startTrainingLoop() {
+  try {
+    const autoTrade = document.getElementById('autoTradeCheck')?.checked || false;
+    const r = await fetch('/api/training/loop/start', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({target: 0.80, auto_trade: autoTrade})
+    });
+    const d = await r.json();
+    if (d.started) {
+      loopRunning = true;
+      updateLoopButtons(true);
+      document.getElementById('loopLog').innerHTML = '<span class="text-muted">Training started…</span>';
+      const msg = autoTrade ? 'Started — จะ trade ทันทีเมื่อ WR ≥ 80%' : 'Started — aiming for 80% win rate';
+      showToast('Training Loop', msg, 'success');
+    }
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+}
+
+async function stopTrainingLoop() {
+  try {
+    await fetch('/api/training/loop/stop', {method: 'POST'});
+    loopRunning = false;
+    updateLoopButtons(false);
+    showToast('Training Loop', 'Stopped', 'warning');
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+}
+
+function updateLoopButtons(running) {
+  document.getElementById('loopStartBtn').classList.toggle('d-none', running);
+  document.getElementById('loopStopBtn').classList.toggle('d-none', !running);
+  const badge = document.getElementById('loopBadge');
+  if (running) {
+    badge.textContent = '● Running';
+    badge.style.background = 'rgba(46,160,67,0.3)';
+    badge.style.color = '#3fb950';
+  } else {
+    badge.textContent = 'Idle';
+    badge.style.background = 'rgba(100,100,100,0.3)';
+    badge.style.color = '#8b949e';
+  }
+}
+
+function appendLoopLog(html) {
+  const log = document.getElementById('loopLog');
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  log.insertBefore(div, log.firstChild);
+  while (log.children.length > 80) log.removeChild(log.lastChild);
+}
+
+function updateLoopStats(d) {
+  const wr = d.win_rate || 0;
+  const total = d.total_trades || 0;
+  const wins = d.win_trades || 0;
+  const target = d.target || 0.80;
+
+  document.getElementById('loopTradeCount').textContent = total;
+  document.getElementById('loopWinCount').textContent = wins;
+  document.getElementById('loopWrText').textContent = (wr * 100).toFixed(1) + '%';
+  document.getElementById('loopWrBar').style.width = Math.min(wr / target * 100, 100) + '%';
+  document.getElementById('loopWrBar').style.background =
+    wr >= target ? 'linear-gradient(90deg,#2ea043,#1a7f37)' : 'linear-gradient(90deg,#2ea043,#388bfd)';
+  document.getElementById('loopWrBig').textContent = (wr * 100).toFixed(1) + '%';
+  document.getElementById('loopWrBig').style.color = wr >= target ? '#3fb950' : 'var(--accent-green)';
+  document.getElementById('loopTotalBig').textContent = total;
+  document.getElementById('loopWrTarget').textContent = Math.round(target * 100);
+  if (d.accuracy) document.getElementById('loopAccuracy').textContent = (d.accuracy * 100).toFixed(1) + '%';
+  if (d.running !== undefined) {
+    loopRunning = d.running;
+    updateLoopButtons(d.running);
+    document.getElementById('trainStatus').textContent = d.completed ? '🎯 Done!' : d.running ? '⚡ Running' : 'Idle';
+  }
+  if (d.last_regime && Object.keys(d.last_regime).length) {
+    const colors = {BULL:'#3fb950', BEAR:'#f85149', RANGE:'#388bfd', VOLATILE:'#f0883e'};
+    document.getElementById('regimesBadges').innerHTML = Object.entries(d.last_regime)
+      .map(([sym, r]) => `<span class="badge" style="background:${colors[r]||'#888'}22;color:${colors[r]||'#888'};border:1px solid ${colors[r]||'#888'}44;font-size:10px">${sym.split('/')[0]}:${r}</span>`)
+      .join('');
+  }
+}
+
+function handleLoopTradeOpened(d) {
+  const icon = d.side === 'BUY' ? '🟢' : '🔴';
+  const col = d.side === 'BUY' ? '#3fb950' : '#f85149';
+  appendLoopLog(`<span style="color:${col}">${icon} OPEN ${d.side} ${d.symbol} @ ${d.price} | conf:${(d.confidence*100).toFixed(0)}% | <span style="color:#888">${d.regime}</span></span>`);
+}
+
+function handleLoopTradeClosed(d) {
+  const icon = d.win ? '✅' : '❌';
+  const col = d.win ? '#3fb950' : '#f85149';
+  const wr = (d.win_rate * 100).toFixed(1);
+  appendLoopLog(`<span style="color:${col}">${icon} CLOSE ${d.symbol} ${d.pnl_pct >= 0 ? '+' : ''}${d.pnl_pct.toFixed(2)}% | WR=${wr}% (${d.wins}/${d.total}) | <span style="color:#888">${d.regime}</span></span>`);
+  updateLoopStats(d);
+}
+
+function handleLoopModelUpdated(d) {
+  appendLoopLog(`<span style="color:#a371f7">🧠 Model retrained — accuracy: ${d.accuracy ? (d.accuracy*100).toFixed(1)+'%' : 'N/A'} | trades: ${d.total}</span>`);
+  if (d.accuracy) document.getElementById('loopAccuracy').textContent = (d.accuracy * 100).toFixed(1) + '%';
+}
+
+function handleLoopProgress(d) {
+  updateLoopStats(d);
+  if (d.log && d.log.length) {
+    const log = document.getElementById('loopLog');
+    log.innerHTML = d.log.map(l => {
+      const col = l.includes('✅') ? '#3fb950' : l.includes('❌') ? '#f85149' : l.includes('🧠') ? '#a371f7' : l.includes('🎯') ? '#f0883e' : '#8b949e';
+      return `<div style="color:${col}">${l}</div>`;
+    }).join('');
+  }
+}
+
+function handleLoopCompleted(d) {
+  loopRunning = false;
+  updateLoopButtons(false);
+  document.getElementById('trainStatus').textContent = '🎯 Done!';
+  updateLoopStats({...d, running: false, completed: true});
+  showToast('🎯 Training Complete!', `Win Rate: ${(d.win_rate*100).toFixed(1)}% on ${d.total_trades} trades`, 'success');
+  appendLoopLog(`<span style="color:#f0883e;font-weight:bold">🎯 TARGET REACHED! WR=${(d.win_rate*100).toFixed(1)}% — ${d.total_trades} trades</span>`);
+}
+
+async function refreshLoopStatus() {
+  try {
+    const r = await fetch('/api/training/loop/status');
+    const d = await r.json();
+    updateLoopStats(d);
+    if (d.log && d.log.length && d.running) {
+      handleLoopProgress(d);
+    }
+  } catch {}
+}
+
+// ============================================================
+// Settings
+// ============================================================
+async function setMode(mode) {
+  if (mode === 'live' && !confirm('Live mode ใช้เงินจริง! คุณแน่ใจหรือไม่?')) return;
+  try {
+    await fetch('/api/mode', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({mode}) });
+    showToast('Mode', `Switched to ${mode.toUpperCase()} mode`, mode==='demo'?'success':'warning');
+    await fetchStatus();
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+}
+
+async function saveAISettings() {
+  const data = {
+    ai: {
+      default_model: document.getElementById('aiModelSelect').value,
+      claude: {
+        api_key: document.getElementById('claudeApiKey').value || undefined,
+        model: document.getElementById('claudeModel').value,
+      }
+    }
+  };
+  if (!data.ai.claude.api_key) delete data.ai.claude.api_key;
+  try {
+    await fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+    showToast('Saved', 'AI settings saved', 'success');
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+}
+
+async function saveExchangeKey(exchange) {
+  const apiKey    = document.getElementById(`${exchange}_api_key`)?.value;
+  const apiSecret = document.getElementById(`${exchange}_api_secret`)?.value;
+  const passphrase = document.getElementById(`${exchange}_passphrase`)?.value;
+  const enabled   = document.getElementById(`${exchange}_enabled`)?.checked;
+  const testnet   = document.getElementById(`${exchange}_testnet`)?.checked || false;
+  const data = { exchanges: { [exchange]: { enabled: enabled !== undefined ? enabled : !!(apiKey || apiSecret), testnet: testnet } } };
+  if (apiKey)    data.exchanges[exchange].api_key = apiKey;
+  if (apiSecret) data.exchanges[exchange].api_secret = apiSecret;
+  if (passphrase) data.exchanges[exchange].passphrase = passphrase;
+  try {
+    await fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+    showToast('Saved', `${exchange} settings saved`, 'success');
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+}
+
+async function testExchanges() {
+  const resultEl = document.getElementById('exchangeTestResult');
+  resultEl.style.display = '';
+  resultEl.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Testing connections...</div>';
+  try {
+    const r = await fetch('/api/exchanges/test');
+    const d = await r.json();
+    const rows = Object.entries(d).map(([name, res]) => {
+      const ok = res.ok === true ? '🟢' : res.ok === false ? '🔴' : '⚪';
+      const detail = res.ok === true ? `$${res.price?.toFixed(2)} (${res.source || 'live'})`
+                   : res.ok === false ? res.error
+                   : 'Not configured';
+      return `<div class="d-flex justify-content-between py-1 border-bottom" style="border-color:var(--border)!important;font-size:0.8rem">
+        <span>${ok} <b>${name}</b></span><span class="text-muted">${detail}</span></div>`;
+    }).join('');
+    resultEl.innerHTML = `<div class="rounded p-2" style="background:var(--bg-card2)">${rows}</div>`;
+  } catch(e) {
+    resultEl.innerHTML = `<div class="text-danger small">${e.message}</div>`;
+  }
+}
+
+async function loadSettings() {
+  try {
+    const r = await fetch('/api/settings');
+    const d = await r.json();
+    // Trading params
+    if (d.trading) {
+      const tp = d.trading.take_profit_pct; if (tp) document.getElementById('tpPct').value = (tp * 100).toFixed(1);
+      const sl = d.trading.stop_loss_pct;   if (sl) document.getElementById('slPct').value = (sl * 100).toFixed(1);
+      const mc = d.trading.min_confidence;   if (mc) document.getElementById('minConf').value = (mc * 100).toFixed(0);
+      const ai = d.trading.analysis_interval; if (ai) document.getElementById('analysisInterval').value = ai;
+      const rp = d.trading.risk_per_trade_pct; if (rp !== undefined) document.getElementById('riskPerTrade').value = (rp * 100).toFixed(1);
+      const dl = d.trading.max_daily_loss_pct; if (dl !== undefined) document.getElementById('maxDailyLoss').value = (dl * 100).toFixed(0);
+      const mo = d.trading.max_open_trades;    if (mo !== undefined) document.getElementById('maxOpenTrades').value = mo;
+    }
+    // AI model
+    if (d.ai?.claude?.model) document.getElementById('claudeModel').value = d.ai.claude.model;
+    // Exchange enabled states
+    ['binance', 'binance_th', 'bitkub', 'okx'].forEach(ex => {
+      const cb = document.getElementById(`${ex}_enabled`);
+      if (cb && d.exchanges?.[ex]) cb.checked = !!d.exchanges[ex].enabled;
+      const tb = document.getElementById(`${ex}_testnet`);
+      if (tb && d.exchanges?.[ex]) tb.checked = !!d.exchanges[ex].testnet;
+    });
+    // Notification events
+    const notif = d.notifications?.notify_on || {};
+    const safe = (id, def) => { const el = document.getElementById(id); if (el) el.checked = notif[def] !== false; };
+    safe('notifyTradeOpen',   'trade_open');
+    safe('notifyTradeClose',  'trade_close');
+    safe('notifyStopLoss',    'stop_loss');
+    safe('notifyTakeProfit',  'take_profit');
+    const trainEl = document.getElementById('notifyTrainDone');
+    if (trainEl) trainEl.checked = notif.training_complete === true;
+  } catch {}
+}
+
+async function saveTradingParams() {
+  const tp = parseFloat(document.getElementById('tpPct').value) / 100;
+  const sl = parseFloat(document.getElementById('slPct').value) / 100;
+  const mc = parseFloat(document.getElementById('minConf').value) / 100;
+  const ai = parseInt(document.getElementById('analysisInterval').value);
+  const rp = parseFloat(document.getElementById('riskPerTrade').value) / 100;
+  const dl = parseFloat(document.getElementById('maxDailyLoss').value) / 100;
+  const mo = parseInt(document.getElementById('maxOpenTrades').value);
+  if (isNaN(tp) || isNaN(sl) || isNaN(mc) || isNaN(ai) || isNaN(rp) || isNaN(dl) || isNaN(mo)) { showToast('Error', 'Invalid values', 'danger'); return; }
+  try {
+    await fetch('/api/settings', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ trading: { take_profit_pct: tp, stop_loss_pct: sl, min_confidence: mc, analysis_interval: ai, risk_per_trade_pct: rp, max_daily_loss_pct: dl, max_open_trades: mo } })
+    });
+    showToast('Saved', `TP=${tp*100}% SL=${sl*100}% MinConf=${mc*100}% Interval=${ai}s Risk=${rp*100}% MaxDL=${dl*100}% MaxTrades=${mo}`, 'success');
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+}
+
+async function saveNotifications() {
+  const data = {
+    notifications: {
+      line: { token: document.getElementById('lineToken').value, enabled: !!document.getElementById('lineToken').value },
+      telegram: {
+        bot_token: document.getElementById('telegramToken').value,
+        chat_id: document.getElementById('telegramChatId').value,
+        enabled: !!document.getElementById('telegramToken').value,
+      },
+      notify_on: {
+        trade_open:        document.getElementById('notifyTradeOpen')?.checked !== false,
+        trade_close:       document.getElementById('notifyTradeClose')?.checked !== false,
+        stop_loss:         document.getElementById('notifyStopLoss')?.checked !== false,
+        take_profit:       document.getElementById('notifyTakeProfit')?.checked !== false,
+        training_complete: document.getElementById('notifyTrainDone')?.checked === true,
+      }
+    }
+  };
+  try {
+    await fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+    showToast('Saved', 'Notification settings saved', 'success');
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+}
+
+document.getElementById('aiModelSelect').addEventListener('change', async (e) => {
+  try {
+    await fetch('/api/ai-model', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({model: e.target.value}) });
+  } catch {}
+});
+
+document.getElementById('strategySelect').addEventListener('change', async (e) => {
+  try {
+    await fetch('/api/strategy', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({strategy: e.target.value}) });
+  } catch {}
+});
+
+document.getElementById('chartSymbolSelect').addEventListener('change', (e) => selectSymbol(e.target.value));
+
+function setChartRange(range, el) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// ============================================================
+// Thai Market
+// ============================================================
+let thaiStocksData = [];
+let thaiFundsData  = [];
+let setChartObj    = null;
+let fundChartObj   = null;
+
+function thaiTab(tab, el) {
+  document.getElementById('panel-stocks').style.display = tab === 'stocks' ? '' : 'none';
+  document.getElementById('panel-funds').style.display  = tab === 'funds'  ? '' : 'none';
+  document.querySelectorAll('#sec-thai-market .tab-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  if (tab === 'stocks' && !thaiStocksData.length) loadThaiStocks();
+  if (tab === 'funds'  && !thaiFundsData.length)  loadThaiFunds();
+}
+
+async function refreshThaiData() {
+  thaiStocksData = []; thaiFundsData = [];
+  if (document.getElementById('panel-stocks').style.display !== 'none') await loadThaiStocks();
+  else await loadThaiFunds();
+}
+
+async function loadThaiStocks() {
+  document.getElementById('setStockCards').innerHTML =
+    '<div class="col-12 text-muted text-center py-4"><div class="spinner-border spinner-border-sm text-secondary me-2"></div>กำลังวิเคราะห์...</div>';
+  try {
+    const r = await fetch('/api/thai/stocks');
+    thaiStocksData = await r.json();
+    renderSetCards(thaiStocksData);
+    // populate chart selector
+    const sel = document.getElementById('setChartSymbol');
+    sel.innerHTML = '';
+    thaiStocksData.forEach(s => {
+      const o = document.createElement('option');
+      o.value = s.symbol; o.textContent = `${s.name} (${s.symbol.replace('.BK','')})`;
+      sel.appendChild(o);
+    });
+    if (thaiStocksData.length) loadSetChart(thaiStocksData[0].symbol);
+    const src = thaiStocksData[0]?.analysis ? 'yfinance' : 'simulation';
+    document.getElementById('thaiDataSource').textContent = src;
+  } catch(e) { document.getElementById('setStockCards').innerHTML = '<div class="col-12 text-danger p-3">โหลดไม่ได้: '+e.message+'</div>'; }
+}
+
+function renderSetCards(stocks) {
+  const container = document.getElementById('setStockCards');
+  container.innerHTML = '';
+  const sectorColor = {
+    'พลังงาน':'rgba(210,153,34,0.15)', 'การเงิน':'rgba(56,139,253,0.12)',
+    'สื่อสาร':'rgba(163,113,247,0.12)', 'ขนส่ง':'rgba(46,160,67,0.12)',
+    'สุขภาพ':'rgba(248,81,73,0.1)', 'พาณิชย์':'rgba(88,166,255,0.12)',
+    'อุตสาหกรรม':'rgba(139,148,158,0.12)', 'ท่องเที่ยว':'rgba(63,185,80,0.1)',
+    'เกษตร':'rgba(46,160,67,0.15)',
+  };
+  stocks.forEach(s => {
+    const a = s.analysis || {};
+    const up = s.change_1d >= 0;
+    const sigCls = a.signal === 'BUY' ? 'signal-buy' : a.signal === 'SELL' ? 'signal-sell' : 'signal-hold';
+    const bgCol = sectorColor[s.sector] || 'rgba(48,54,61,0.3)';
+    const col = document.createElement('div');
+    col.className = 'col-6 col-md-4 col-lg-3 col-xl-2';
+    col.innerHTML = `
+      <div class="price-card" onclick="selectSetStock('${s.symbol}')" style="background:${bgCol};cursor:pointer">
+        <div class="d-flex justify-content-between align-items-start mb-1">
+          <div>
+            <strong class="small">${s.name}</strong><br>
+            <span style="font-size:0.65rem;color:var(--text-muted)">${s.sector}</span>
+          </div>
+          ${a.signal ? `<span class="badge-signal ${sigCls}">${a.signal}</span>` : ''}
+        </div>
+        <div class="fw-bold">฿${s.price?.toFixed(2)}</div>
+        <div class="small ${up?'price-up':'price-down'}">${up?'+':''}${s.change_1d?.toFixed(2)}%</div>
+        ${a.rsi ? `<div style="font-size:0.65rem;color:var(--text-muted);margin-top:3px">RSI ${a.rsi}</div>` : ''}
+      </div>`;
+    container.appendChild(col);
+  });
+}
+
+function selectSetStock(symbol) {
+  document.getElementById('setChartSymbol').value = symbol;
+  loadSetChart(symbol);
+}
+
+async function loadSetChart(symbol) {
+  if (!symbol) return;
+  const stock = thaiStocksData.find(s => s.symbol === symbol);
+  try {
+    const r = await fetch(`/api/thai/stocks/${encodeURIComponent(symbol)}/history?days=60`);
+    const history = await r.json();
+    if (!history.length) return;
+
+    const labels = history.map(h => h.date);
+    const closes = history.map(h => h.close);
+    const gridColor = 'rgba(48,54,61,0.5)';
+
+    if (!setChartObj) {
+      setChartObj = new Chart(document.getElementById('setChart'), {
+        type: 'line',
+        data: { labels, datasets: [{
+          label: symbol, data: closes,
+          borderColor: '#d29922', backgroundColor: 'rgba(210,153,34,0.08)',
+          fill: true, tension: 0.2, pointRadius: 0,
+        }]},
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color:'#8b949e', maxTicksLimit: 8, font:{size:10} }, grid:{color:gridColor} },
+            y: { ticks: { color:'#8b949e', font:{size:10} }, grid:{color:gridColor} },
+          }
+        }
+      });
+    } else {
+      setChartObj.data.labels = labels;
+      setChartObj.data.datasets[0].data = closes;
+      setChartObj.data.datasets[0].label = symbol;
+      setChartObj.update();
+    }
+
+    // Update analysis panel
+    if (stock?.analysis) {
+      const a = stock.analysis;
+      const sigColor = a.signal==='BUY'?'#3fb950':a.signal==='SELL'?'#f85149':'#8b949e';
+      document.getElementById('setAnalysisPanel').innerHTML = `
+        <div class="d-flex justify-content-between mb-2">
+          <strong style="color:${sigColor}">${a.signal}</strong>
+          <span class="text-muted small">${(a.confidence*100).toFixed(0)}%</span>
+        </div>
+        <div class="small text-muted mb-3 p-2 rounded" style="background:rgba(48,54,61,0.4)">${a.reasoning}</div>
+        <div class="indicator-row"><span>RSI(14)</span>
+          <span style="color:${a.rsi<35?'#3fb950':a.rsi>65?'#f85149':'#8b949e'}">${a.rsi} [${a.rsi_signal}]</span></div>
+        <div class="indicator-row"><span>MACD</span>
+          <span class="${a.macd_trend==='BULLISH'?'price-up':a.macd_trend==='BEARISH'?'price-down':'text-muted'}">${a.macd_trend}</span></div>
+        <div class="indicator-row"><span>EMA Trend</span>
+          <span class="${a.ema_trend==='BULLISH'?'price-up':a.ema_trend==='BEARISH'?'price-down':'text-muted'}">${a.ema_trend}</span></div>
+        <div class="indicator-row"><span>Bollinger</span>
+          <span class="${a.bb_signal==='OVERSOLD'?'price-up':a.bb_signal==='OVERBOUGHT'?'price-down':'text-muted'}">${a.bb_signal}</span></div>
+        <div class="indicator-row"><span>Volatility</span><span>${a.volatility}</span></div>
+        <div class="indicator-row"><span>Support</span><span class="price-up">฿${a.support}</span></div>
+        <div class="indicator-row"><span>Resistance</span><span class="price-down">฿${a.resistance}</span></div>`;
+    }
+  } catch(e) { console.error('loadSetChart', e); }
+}
+
+async function loadThaiFunds() {
+  document.getElementById('fundCards').innerHTML =
+    '<div class="col-12 text-muted text-center py-4"><div class="spinner-border spinner-border-sm text-secondary me-2"></div>กำลังโหลด NAV...</div>';
+  try {
+    const r = await fetch('/api/thai/funds');
+    thaiFundsData = await r.json();
+    renderFundCards(thaiFundsData);
+
+    const sel = document.getElementById('fundChartSelect');
+    sel.innerHTML = '';
+    thaiFundsData.forEach(f => {
+      const o = document.createElement('option');
+      o.value = f.code; o.textContent = f.name;
+      sel.appendChild(o);
+    });
+    if (thaiFundsData.length) loadFundChart(thaiFundsData[0].code);
+    const src = thaiFundsData[0]?.source || 'simulation';
+    document.getElementById('thaiDataSource').textContent = src;
+  } catch(e) { document.getElementById('fundCards').innerHTML = '<div class="col-12 text-danger p-3">'+e.message+'</div>'; }
+}
+
+function renderFundCards(funds) {
+  const container = document.getElementById('fundCards');
+  container.innerHTML = '';
+  const typeColor = {
+    equity:'rgba(46,160,67,0.12)', equity_esg:'rgba(46,160,67,0.08)',
+    fixed_income:'rgba(56,139,253,0.12)', money_market:'rgba(139,148,158,0.12)',
+    commodity:'rgba(210,153,34,0.12)', mixed:'rgba(163,113,247,0.12)',
+    foreign:'rgba(88,166,255,0.12)',
+  };
+  const typeLabel = {
+    equity:'หุ้นไทย', equity_esg:'หุ้น ESG', fixed_income:'ตราสารหนี้',
+    money_market:'ตลาดเงิน', commodity:'สินค้าโภคภัณฑ์', mixed:'ผสม', foreign:'ต่างประเทศ',
+  };
+  funds.forEach(f => {
+    const bg = typeColor[f.type] || 'rgba(48,54,61,0.2)';
+    const ret1d = f.ret_1d != null ? f.ret_1d : null;
+    const ret1m = f.ret_1m != null ? f.ret_1m : null;
+    const ret1y = f.ret_1y != null ? f.ret_1y : null;
+    const up = ret1d == null ? true : ret1d >= 0;
+    const col = document.createElement('div');
+    col.className = 'col-12 col-md-6 col-lg-4';
+    col.innerHTML = `
+      <div class="price-card" onclick="selectFund('${f.code}')" style="background:${bg}">
+        <div class="d-flex justify-content-between align-items-start mb-1">
+          <div>
+            <strong class="small">${f.name}</strong><br>
+            <span style="font-size:0.65rem;color:var(--text-muted)">${f.amcTH} · ${typeLabel[f.type]||f.type}</span>
+          </div>
+          ${f.source==='simulation'?'<span style="font-size:0.6rem;color:var(--text-muted);border:1px solid var(--border);border-radius:4px;padding:1px 5px">sim</span>':''}
+        </div>
+        <div class="fw-bold mt-1">฿${f.nav?.toFixed(4) || '—'}</div>
+        <div class="d-flex gap-3 mt-1" style="font-size:0.75rem">
+          <span>1D: <span class="${ret1d==null?'text-muted':ret1d>=0?'price-up':'price-down'}">${ret1d!=null?(ret1d>=0?'+':'')+ret1d.toFixed(2)+'%':'—'}</span></span>
+          <span>1M: <span class="${ret1m==null?'text-muted':ret1m>=0?'price-up':'price-down'}">${ret1m!=null?(ret1m>=0?'+':'')+ret1m.toFixed(2)+'%':'—'}</span></span>
+          <span>1Y: <span class="${ret1y==null?'text-muted':ret1y>=0?'price-up':'price-down'}">${ret1y!=null?(ret1y>=0?'+':'')+ret1y.toFixed(2)+'%':'—'}</span></span>
+        </div>
+      </div>`;
+    container.appendChild(col);
+  });
+}
+
+function selectFund(code) {
+  document.getElementById('fundChartSelect').value = code;
+  loadFundChart(code);
+}
+
+async function loadFundChart(code) {
+  const fund = thaiFundsData.find(f => f.code === code);
+  if (!fund) return;
+  try {
+    const history = fund.history || [];
+    if (!history.length) return;
+    const labels = history.map(h => h.date);
+    const navs   = history.map(h => h.nav);
+    const gridColor = 'rgba(48,54,61,0.5)';
+
+    if (!fundChartObj) {
+      fundChartObj = new Chart(document.getElementById('fundChart'), {
+        type: 'line',
+        data: { labels, datasets: [{
+          label: 'NAV (฿)', data: navs,
+          borderColor: '#a371f7', backgroundColor: 'rgba(163,113,247,0.08)',
+          fill: true, tension: 0.3, pointRadius: 0,
+        }]},
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks:{color:'#8b949e',maxTicksLimit:6,font:{size:10}},grid:{color:gridColor} },
+            y: { ticks:{color:'#8b949e',font:{size:10}},grid:{color:gridColor} },
+          }
+        }
+      });
+    } else {
+      fundChartObj.data.labels = labels;
+      fundChartObj.data.datasets[0].data = navs;
+      fundChartObj.data.datasets[0].label = `${fund.name} NAV`;
+      fundChartObj.update();
+    }
+
+    const typeLabel = {
+      equity:'หุ้นไทย',equity_esg:'หุ้น ESG',fixed_income:'ตราสารหนี้',
+      money_market:'ตลาดเงิน',commodity:'สินค้าโภคภัณฑ์',mixed:'ผสม',foreign:'ต่างประเทศ'
+    };
+    document.getElementById('fundInfoPanel').innerHTML = `
+      <div class="fw-bold mb-2">${fund.name}</div>
+      <div class="indicator-row"><span>บลจ.</span><span>${fund.amcTH}</span></div>
+      <div class="indicator-row"><span>ประเภท</span><span>${typeLabel[fund.type]||fund.type}</span></div>
+      <div class="indicator-row"><span>NAV/หน่วย</span><span>฿${fund.nav?.toFixed(4)||'—'}</span></div>
+      <div class="indicator-row"><span>1 วัน</span>
+        <span class="${!fund.ret_1d?'text-muted':fund.ret_1d>=0?'price-up':'price-down'}">${fund.ret_1d!=null?(fund.ret_1d>=0?'+':'')+fund.ret_1d.toFixed(2)+'%':'—'}</span></div>
+      <div class="indicator-row"><span>1 เดือน</span>
+        <span class="${!fund.ret_1m?'text-muted':fund.ret_1m>=0?'price-up':'price-down'}">${fund.ret_1m!=null?(fund.ret_1m>=0?'+':'')+fund.ret_1m.toFixed(2)+'%':'—'}</span></div>
+      <div class="indicator-row"><span>3 เดือน</span>
+        <span class="${!fund.ret_3m?'text-muted':fund.ret_3m>=0?'price-up':'price-down'}">${fund.ret_3m!=null?(fund.ret_3m>=0?'+':'')+fund.ret_3m.toFixed(2)+'%':'—'}</span></div>
+      <div class="indicator-row"><span>6 เดือน</span>
+        <span class="${!fund.ret_6m?'text-muted':fund.ret_6m>=0?'price-up':'price-down'}">${fund.ret_6m!=null?(fund.ret_6m>=0?'+':'')+fund.ret_6m.toFixed(2)+'%':'—'}</span></div>
+      <div class="indicator-row"><span>1 ปี</span>
+        <span class="${!fund.ret_1y?'text-muted':fund.ret_1y>=0?'price-up':'price-down'}">${fund.ret_1y!=null?(fund.ret_1y>=0?'+':'')+fund.ret_1y.toFixed(2)+'%':'—'}</span></div>
+      <div class="indicator-row"><span>YTD</span>
+        <span class="${!fund.ret_ytd?'text-muted':fund.ret_ytd>=0?'price-up':'price-down'}">${fund.ret_ytd!=null?(fund.ret_ytd>=0?'+':'')+fund.ret_ytd.toFixed(2)+'%':'—'}</span></div>
+      <div class="mt-2">
+        <span style="font-size:0.65rem;color:var(--text-muted)">แหล่งข้อมูล: ${fund.source==='sec_api'?'SEC Thailand':'Simulation'}</span>
+      </div>`;
+  } catch(e) { console.error('loadFundChart', e); }
+}
+
+// ============================================================
+// Multi-Timeframe Analysis (H)
+// ============================================================
+async function loadMTF() {
+  if (!currentSymbol) return;
+  const panel = document.getElementById('mtfPanel');
+  panel.innerHTML = '<div class="text-muted text-center small py-2"><div class="spinner-border spinner-border-sm me-2"></div>Loading...</div>';
+  try {
+    const r = await fetch(`/api/analysis/mtf?symbol=${encodeURIComponent(currentSymbol)}`);
+    const d = await r.json();
+    const sigColor = s => s === 'BUY' ? '#3fb950' : s === 'SELL' ? '#f85149' : '#8b949e';
+    const sigCls = s => s === 'BUY' ? 'signal-buy' : s === 'SELL' ? 'signal-sell' : 'signal-hold';
+    const tfRows = Object.entries(d.timeframes).map(([tf, a]) => `
+      <div class="indicator-row">
+        <span class="text-muted">${tf}</span>
+        <span class="d-flex align-items-center gap-2">
+          <span class="badge-signal ${sigCls(a.signal)}">${a.signal}</span>
+          <span style="font-size:0.75rem;color:${sigColor(a.signal)}">${(a.confidence*100).toFixed(0)}%</span>
+          <span class="text-muted" style="font-size:0.72rem">RSI ${a.rsi}</span>
+        </span>
+      </div>`).join('');
+    const combColor = sigColor(d.combined_signal);
+    panel.innerHTML = `
+      <div class="d-flex align-items-center gap-2 mb-2 pb-2" style="border-bottom:1px solid var(--border)">
+        <span class="fw-bold" style="color:${combColor}">${d.combined_signal}</span>
+        <span class="text-muted small">Combined (${(d.combined_conf*100).toFixed(0)}%)</span>
+      </div>
+      ${tfRows}`;
+  } catch {
+    panel.innerHTML = '<div class="text-muted small text-center">Error loading MTF</div>';
+  }
+}
+
+// ============================================================
+// Portfolio Advanced Metrics (F)
+// ============================================================
+async function refreshAdvancedStats() {
+  try {
+    const r = await fetch('/api/stats/advanced');
+    const d = await r.json();
+    const md = document.getElementById('maxDrawdown');
+    if (md) {
+      md.textContent = d.max_drawdown_pct.toFixed(2) + '%';
+      md.className = 'stat-value ' + (d.max_drawdown_pct < -5 ? 'text-danger' : 'text-warning');
+    }
+    const sr = document.getElementById('sharpeRatio');
+    if (sr) {
+      sr.textContent = d.sharpe.toFixed(2);
+      sr.style.color = d.sharpe >= 1 ? '#3fb950' : d.sharpe >= 0 ? '#d29922' : '#f85149';
+    }
+
+    if (d.daily_pnl && d.daily_pnl.length) {
+      const labels = d.daily_pnl.map(x => x.date);
+      const values = d.daily_pnl.map(x => x.pnl);
+      const colors = values.map(v => v >= 0 ? 'rgba(46,160,67,0.7)' : 'rgba(248,81,73,0.7)');
+      charts.dailyPnl.data.labels = labels;
+      charts.dailyPnl.data.datasets[0].data = values;
+      charts.dailyPnl.data.datasets[0].backgroundColor = colors;
+      charts.dailyPnl.update('none');
+    }
+  } catch {}
+}
+
+async function refreshPortfolio() {
+  await fetchPortfolioStats();
+  await refreshAdvancedStats();
+  try {
+    const r = await fetch('/api/stats');
+    const d = await r.json();
+    const pt = document.getElementById('pfTotalTrades');
+    if (pt) pt.textContent = d.total_trades;
+    const pw = document.getElementById('pfWinRate');
+    if (pw) pw.textContent = 'Win rate ' + d.win_rate.toFixed(1) + '%';
+    const pp = document.getElementById('pfTotalPnl');
+    if (pp) {
+      pp.textContent = (d.total_pnl >= 0 ? '+' : '') + d.total_pnl.toFixed(2) + ' USDT';
+      pp.style.color = d.total_pnl >= 0 ? '#3fb950' : '#f85149';
+    }
+  } catch {}
+}
+
+// ============================================================
+// Backtesting (G)
+// ============================================================
+let btEquityChart = null;
+
+async function runBacktest() {
+  const btn = document.getElementById('btRunBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Running...';
+  document.getElementById('btNoData').style.display = '';
+  document.getElementById('btMetrics').style.display = 'none';
+  document.getElementById('btChartCard').style.display = 'none';
+  document.getElementById('btTradesCard').style.display = 'none';
+
+  try {
+    const r = await fetch('/api/backtest', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        symbol: document.getElementById('btSymbol').value,
+        days:   parseInt(document.getElementById('btDays').value),
+        tp_pct: parseFloat(document.getElementById('btTp').value) / 100,
+        sl_pct: parseFloat(document.getElementById('btSl').value) / 100,
+      })
+    });
+    const d = await r.json();
+    if (!r.ok) { showToast('Error', d.detail || 'Backtest failed', 'danger'); return; }
+
+    const retColor = d.total_return_pct >= 0 ? '#3fb950' : '#f85149';
+    document.getElementById('btReturn').textContent   = (d.total_return_pct >= 0 ? '+' : '') + d.total_return_pct.toFixed(2) + '%';
+    document.getElementById('btReturn').style.color   = retColor;
+    document.getElementById('btWinRate').textContent   = d.win_rate.toFixed(1) + '%';
+    document.getElementById('btSharpe').textContent    = d.sharpe.toFixed(2);
+    document.getElementById('btDrawdown').textContent  = d.max_drawdown_pct.toFixed(2) + '%';
+    document.getElementById('btMetrics').style.display = '';
+    document.getElementById('btNoData').style.display  = 'none';
+
+    if (d.equity_curve && d.equity_curve.length) {
+      const labels = d.equity_curve.map(p => p.i);
+      const values = d.equity_curve.map(p => p.v);
+      const gridColor = 'rgba(48,54,61,0.5)';
+      const equityEl = document.getElementById('btEquityChart');
+      if (!btEquityChart) {
+        btEquityChart = new Chart(equityEl, {
+          type: 'line',
+          data: { labels, datasets: [{ label: 'Portfolio Value', data: values,
+            borderColor: retColor, backgroundColor: retColor.replace(')', ',0.1)').replace('rgb', 'rgba'),
+            fill: true, tension: 0.3, pointRadius: 0 }] },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { display: false },
+              y: { ticks: { color: '#8b949e', font: {size:10} }, grid: { color: gridColor } }
+            }
+          }
+        });
+      } else {
+        btEquityChart.data.labels = labels;
+        btEquityChart.data.datasets[0].data = values;
+        btEquityChart.data.datasets[0].borderColor = retColor;
+        btEquityChart.update();
+      }
+      document.getElementById('btChartCard').style.display = '';
+    }
+
+    if (d.trades && d.trades.length) {
+      document.getElementById('btTradeCount').textContent = d.total_trades + ' total trades';
+      document.getElementById('btTradesBody').innerHTML = d.trades.map(t => `
+        <tr>
+          <td class="text-muted" style="font-size:0.75rem">${t.open_at.split('T')[0]}</td>
+          <td class="text-muted" style="font-size:0.75rem">${t.close_at.split('T')[0]}</td>
+          <td class="${t.side==='BUY'?'text-success':'text-danger'}">${t.side}</td>
+          <td class="${t.pnl_pct>=0?'text-success':'text-danger'}">${t.pnl_pct>=0?'+':''}${t.pnl_pct}%</td>
+          <td>${t.win ? '✅' : '❌'}</td>
+          <td><span class="badge" style="font-size:0.65rem;background:rgba(100,100,100,0.2)">${t.regime}</span></td>
+        </tr>`).join('');
+      document.getElementById('btTradesCard').style.display = '';
+    }
+
+    showToast('Backtest Complete', `${d.symbol} ${d.days}d | Return: ${d.total_return_pct.toFixed(2)}% | Sharpe: ${d.sharpe.toFixed(2)}`, d.total_return_pct >= 0 ? 'success' : 'warning');
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+  finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-play-fill me-1"></i>Run Backtest';
+  }
+}
+
+async function saveThaiSettings() {
+  const key = document.getElementById('secApiKey').value;
+  if (key) {
+    await fetch('/api/thai/settings', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({sec_api_key: key}),
+    });
+    showToast('Saved', 'SEC API key saved — NAV จะดึงจาก SEC Thailand', 'success');
+  }
+}
+
+// ============================================================
+// Init & Poll
+// ============================================================
+async function init() {
+  initCharts();
+  connectWS();
+  await fetchStatus();
+  await fetchPrices();
+  await fetchPortfolioStats();
+  await fetchStats();
+  setInterval(fetchPrices, 5000);
+  setInterval(fetchPortfolioStats, 10000);
+  setInterval(fetchStats, 30000);
+  setInterval(fetchStatus, 60000);
+  setInterval(refreshLoopStatus, 3000);
+  // E: Chart auto-refresh every 15 minutes
+  setInterval(updateTradingChart, 15 * 60 * 1000);
+}
+
+init();
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
