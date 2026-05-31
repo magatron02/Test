@@ -113,6 +113,7 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe 
     <li><a href="#" class="nav-link" onclick="showSection('ai-training', this)"><i class="bi bi-cpu"></i> AI Training</a></li>
     <li><a href="#" class="nav-link" onclick="showSection('trade-history', this)"><i class="bi bi-clock-history"></i> History</a></li>
     <li><a href="#" class="nav-link" onclick="showSection('thai-market', this)"><i class="bi bi-flag"></i> ตลาดไทย</a></li>
+    <li><a href="#" class="nav-link" onclick="showSection('backtest', this)"><i class="bi bi-skip-backward-circle"></i> Backtest</a></li>
     <li><a href="#" class="nav-link" onclick="showSection('settings', this)"><i class="bi bi-gear"></i> Settings</a></li>
   </ul>
   <div class="p-3 mt-3 border-top" style="border-color:var(--border)!important">
@@ -215,6 +216,17 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe 
           <div class="text-muted text-center small py-2">รอการวิเคราะห์...</div>
         </div>
       </div>
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-layers me-2"></i>Multi-Timeframe</span>
+          <button class="btn btn-outline-secondary btn-sm" onclick="loadMTF()">
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
+        </div>
+        <div class="card-body" id="mtfPanel">
+          <div class="text-muted text-center small py-2">เลือก symbol</div>
+        </div>
+      </div>
       <div class="card">
         <div class="card-header"><i class="bi bi-list-ul me-2"></i>Open Positions</div>
         <div class="card-body p-0">
@@ -227,25 +239,65 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe 
 
 <!-- PORTFOLIO -->
 <section id="sec-portfolio" class="section">
+  <!-- Performance metrics row -->
   <div class="row g-3 mb-3">
-    <div class="col-md-4">
+    <div class="col-6 col-md-3">
+      <div class="stat-card" style="background:rgba(46,160,67,0.1);border:1px solid rgba(46,160,67,0.2)">
+        <div class="stat-label">Max Drawdown</div>
+        <div class="stat-value text-danger" id="maxDrawdown">—</div>
+        <div class="small text-muted">Peak → Trough</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card" style="background:rgba(56,139,253,0.1);border:1px solid rgba(56,139,253,0.2)">
+        <div class="stat-label">Sharpe Ratio</div>
+        <div class="stat-value" style="color:var(--accent-blue)" id="sharpeRatio">—</div>
+        <div class="small text-muted">Risk-adjusted return</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card" style="background:rgba(210,153,34,0.1);border:1px solid rgba(210,153,34,0.2)">
+        <div class="stat-label">Total Trades</div>
+        <div class="stat-value" style="color:var(--accent-yellow)" id="pfTotalTrades">—</div>
+        <div class="small text-muted" id="pfWinRate">Win rate —</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card" style="background:rgba(163,113,247,0.1);border:1px solid rgba(163,113,247,0.2)">
+        <div class="stat-label">Total PnL</div>
+        <div class="stat-value" style="color:var(--accent-purple)" id="pfTotalPnl">—</div>
+        <div class="small text-muted">Closed trades</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Daily PnL chart + Allocation -->
+  <div class="row g-3 mb-3">
+    <div class="col-md-8">
       <div class="card">
+        <div class="card-header"><i class="bi bi-bar-chart me-2"></i>Daily PnL</div>
+        <div class="card-body p-2">
+          <div class="chart-container"><canvas id="dailyPnlChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card h-100">
         <div class="card-header"><i class="bi bi-pie-chart me-2"></i>Asset Allocation</div>
         <div class="card-body">
           <div style="max-height:220px"><canvas id="allocationChart"></canvas></div>
         </div>
       </div>
     </div>
-    <div class="col-md-8">
-      <div class="card">
-        <div class="card-header"><i class="bi bi-wallet2 me-2"></i>Holdings</div>
-        <div class="card-body p-0">
-          <table class="table table-dark mb-0" id="holdingsTable">
-            <thead><tr><th>Asset</th><th>Amount</th><th>Price</th><th>Value</th><th>Entry</th><th>PnL</th></tr></thead>
-            <tbody id="holdingsBody"><tr><td colspan="6" class="text-center text-muted">ไม่มีข้อมูล</td></tr></tbody>
-          </table>
-        </div>
-      </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><i class="bi bi-wallet2 me-2"></i>Holdings</div>
+    <div class="card-body p-0">
+      <table class="table table-dark mb-0" id="holdingsTable">
+        <thead><tr><th>Asset</th><th>Amount</th><th>Price</th><th>Value</th><th>Entry</th><th>PnL</th></tr></thead>
+        <tbody id="holdingsBody"><tr><td colspan="6" class="text-center text-muted">ไม่มีข้อมูล</td></tr></tbody>
+      </table>
     </div>
   </div>
 </section>
@@ -422,7 +474,12 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe 
   <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
       <span><i class="bi bi-clock-history me-2"></i>Trade History</span>
-      <span class="text-muted small" id="historyCount">0 trades</span>
+      <div class="d-flex align-items-center gap-2">
+        <span class="text-muted small" id="historyCount">0 trades</span>
+        <a href="/api/trades/export" class="btn btn-outline-secondary btn-sm" download>
+          <i class="bi bi-download me-1"></i>Export CSV
+        </a>
+      </div>
     </div>
     <div class="card-body p-0" style="overflow-x:auto">
       <table class="table table-dark mb-0">
@@ -521,6 +578,110 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: 'Segoe 
     </div>
   </div>
 
+</section>
+
+<!-- BACKTEST -->
+<section id="sec-backtest" class="section">
+  <div class="row g-3 mb-3">
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header"><i class="bi bi-sliders me-2"></i>Backtest Settings</div>
+        <div class="card-body">
+          <div class="mb-2">
+            <label class="form-label small mb-1">Symbol</label>
+            <select class="form-select form-select-sm" id="btSymbol">
+              <option value="BTC/USDT">BTC/USDT</option>
+              <option value="ETH/USDT">ETH/USDT</option>
+              <option value="BNB/USDT">BNB/USDT</option>
+              <option value="SOL/USDT">SOL/USDT</option>
+              <option value="XRP/USDT">XRP/USDT</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small mb-1">Period (days)</label>
+            <select class="form-select form-select-sm" id="btDays">
+              <option value="7">7 days</option>
+              <option value="14">14 days</option>
+              <option value="30" selected>30 days</option>
+              <option value="60">60 days</option>
+              <option value="90">90 days</option>
+            </select>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label small mb-1">Take Profit %</label>
+              <div class="input-group input-group-sm">
+                <input type="number" class="form-control" id="btTp" value="4" min="1" max="50">
+                <span class="input-group-text">%</span>
+              </div>
+            </div>
+            <div class="col-6">
+              <label class="form-label small mb-1">Stop Loss %</label>
+              <div class="input-group input-group-sm">
+                <input type="number" class="form-control" id="btSl" value="2" min="0.5" max="20">
+                <span class="input-group-text">%</span>
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-primary w-100" id="btRunBtn" onclick="runBacktest()">
+            <i class="bi bi-play-fill me-1"></i>Run Backtest
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-8">
+      <div class="row g-3 mb-3" id="btMetrics" style="display:none">
+        <div class="col-6 col-md-3">
+          <div class="stat-card" style="background:rgba(46,160,67,0.1);border:1px solid rgba(46,160,67,0.2)">
+            <div class="stat-label">Total Return</div>
+            <div class="stat-value" id="btReturn">—</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="stat-card" style="background:rgba(210,153,34,0.1);border:1px solid rgba(210,153,34,0.2)">
+            <div class="stat-label">Win Rate</div>
+            <div class="stat-value" style="color:var(--accent-yellow)" id="btWinRate">—</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="stat-card" style="background:rgba(56,139,253,0.1);border:1px solid rgba(56,139,253,0.2)">
+            <div class="stat-label">Sharpe Ratio</div>
+            <div class="stat-value" style="color:var(--accent-blue)" id="btSharpe">—</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="stat-card" style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.2)">
+            <div class="stat-label">Max Drawdown</div>
+            <div class="stat-value text-danger" id="btDrawdown">—</div>
+          </div>
+        </div>
+      </div>
+      <div class="card mb-3" id="btChartCard" style="display:none">
+        <div class="card-header"><i class="bi bi-graph-up me-2"></i>Equity Curve</div>
+        <div class="card-body p-2">
+          <div class="chart-container"><canvas id="btEquityChart"></canvas></div>
+        </div>
+      </div>
+      <div class="card" id="btNoData">
+        <div class="card-body text-center py-5 text-muted">
+          <i class="bi bi-skip-backward-circle" style="font-size:2rem;display:block;margin-bottom:8px"></i>
+          กดปุ่ม Run Backtest เพื่อทดสอบกลยุทธ์บนข้อมูลจำลอง
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="card" id="btTradesCard" style="display:none">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-table me-2"></i>Backtest Trades (last 20)</span>
+      <span class="text-muted small" id="btTradeCount"></span>
+    </div>
+    <div class="card-body p-0" style="overflow-x:auto">
+      <table class="table table-dark table-sm mb-0">
+        <thead><tr><th>Open</th><th>Close</th><th>Side</th><th>PnL %</th><th>Result</th><th>Regime</th></tr></thead>
+        <tbody id="btTradesBody"></tbody>
+      </table>
+    </div>
+  </div>
 </section>
 
 <!-- SETTINGS -->
@@ -785,6 +946,7 @@ function showSection(name, el) {
   if (name === 'ai-training') { refreshTraining(); refreshLoopStatus(); }
   if (name === 'thai-market') loadThaiStocks();
   if (name === 'settings') loadSettings();
+  if (name === 'trading' && currentSymbol) loadMTF();
 }
 
 function showExTab(name, el) {
@@ -848,6 +1010,15 @@ function initCharts() {
     type: 'doughnut',
     data: { labels: ['USDT'], datasets: [{ data: [100], backgroundColor: ['#388bfd'], borderColor: ['#0d1117'], borderWidth: 2 }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#8b949e', font:{size:10} } } } }
+  });
+
+  charts.dailyPnl = new Chart(document.getElementById('dailyPnlChart'), {
+    type: 'bar',
+    data: { labels: [], datasets: [{ label: 'Daily PnL (USDT)', data: [], backgroundColor: [], borderRadius: 3 }] },
+    options: {
+      ...defaultOpts,
+      plugins: { ...defaultOpts.plugins, legend: { display: false } },
+    }
   });
 
   charts.features = new Chart(document.getElementById('featureChart'), {
@@ -977,6 +1148,7 @@ function selectSymbol(sym) {
   updateIndicatorPanel(sym);
   updateAIPanel(sym);
   fetchTradingChart(sym);
+  if (document.getElementById('sec-trading').classList.contains('active')) loadMTF();
 }
 
 async function fetchTradingChart(sym) {
@@ -1349,10 +1521,6 @@ async function refreshLoopStatus() {
       handleLoopProgress(d);
     }
   } catch {}
-}
-
-async function refreshPortfolio() {
-  await fetchPortfolioStats();
 }
 
 // ============================================================
@@ -1762,6 +1930,175 @@ async function loadFundChart(code) {
   } catch(e) { console.error('loadFundChart', e); }
 }
 
+// ============================================================
+// Multi-Timeframe Analysis (H)
+// ============================================================
+async function loadMTF() {
+  if (!currentSymbol) return;
+  const panel = document.getElementById('mtfPanel');
+  panel.innerHTML = '<div class="text-muted text-center small py-2"><div class="spinner-border spinner-border-sm me-2"></div>Loading...</div>';
+  try {
+    const r = await fetch(`/api/analysis/mtf?symbol=${encodeURIComponent(currentSymbol)}`);
+    const d = await r.json();
+    const sigColor = s => s === 'BUY' ? '#3fb950' : s === 'SELL' ? '#f85149' : '#8b949e';
+    const sigCls = s => s === 'BUY' ? 'signal-buy' : s === 'SELL' ? 'signal-sell' : 'signal-hold';
+    const tfRows = Object.entries(d.timeframes).map(([tf, a]) => `
+      <div class="indicator-row">
+        <span class="text-muted">${tf}</span>
+        <span class="d-flex align-items-center gap-2">
+          <span class="badge-signal ${sigCls(a.signal)}">${a.signal}</span>
+          <span style="font-size:0.75rem;color:${sigColor(a.signal)}">${(a.confidence*100).toFixed(0)}%</span>
+          <span class="text-muted" style="font-size:0.72rem">RSI ${a.rsi}</span>
+        </span>
+      </div>`).join('');
+    const combColor = sigColor(d.combined_signal);
+    panel.innerHTML = `
+      <div class="d-flex align-items-center gap-2 mb-2 pb-2" style="border-bottom:1px solid var(--border)">
+        <span class="fw-bold" style="color:${combColor}">${d.combined_signal}</span>
+        <span class="text-muted small">Combined (${(d.combined_conf*100).toFixed(0)}%)</span>
+      </div>
+      ${tfRows}`;
+  } catch {
+    panel.innerHTML = '<div class="text-muted small text-center">Error loading MTF</div>';
+  }
+}
+
+// ============================================================
+// Portfolio Advanced Metrics (F)
+// ============================================================
+async function refreshAdvancedStats() {
+  try {
+    const r = await fetch('/api/stats/advanced');
+    const d = await r.json();
+    const md = document.getElementById('maxDrawdown');
+    if (md) {
+      md.textContent = d.max_drawdown_pct.toFixed(2) + '%';
+      md.className = 'stat-value ' + (d.max_drawdown_pct < -5 ? 'text-danger' : 'text-warning');
+    }
+    const sr = document.getElementById('sharpeRatio');
+    if (sr) {
+      sr.textContent = d.sharpe.toFixed(2);
+      sr.style.color = d.sharpe >= 1 ? '#3fb950' : d.sharpe >= 0 ? '#d29922' : '#f85149';
+    }
+
+    if (d.daily_pnl && d.daily_pnl.length) {
+      const labels = d.daily_pnl.map(x => x.date);
+      const values = d.daily_pnl.map(x => x.pnl);
+      const colors = values.map(v => v >= 0 ? 'rgba(46,160,67,0.7)' : 'rgba(248,81,73,0.7)');
+      charts.dailyPnl.data.labels = labels;
+      charts.dailyPnl.data.datasets[0].data = values;
+      charts.dailyPnl.data.datasets[0].backgroundColor = colors;
+      charts.dailyPnl.update('none');
+    }
+  } catch {}
+}
+
+async function refreshPortfolio() {
+  await fetchPortfolioStats();
+  await refreshAdvancedStats();
+  try {
+    const r = await fetch('/api/stats');
+    const d = await r.json();
+    const pt = document.getElementById('pfTotalTrades');
+    if (pt) pt.textContent = d.total_trades;
+    const pw = document.getElementById('pfWinRate');
+    if (pw) pw.textContent = 'Win rate ' + d.win_rate.toFixed(1) + '%';
+    const pp = document.getElementById('pfTotalPnl');
+    if (pp) {
+      pp.textContent = (d.total_pnl >= 0 ? '+' : '') + d.total_pnl.toFixed(2) + ' USDT';
+      pp.style.color = d.total_pnl >= 0 ? '#3fb950' : '#f85149';
+    }
+  } catch {}
+}
+
+// ============================================================
+// Backtesting (G)
+// ============================================================
+let btEquityChart = null;
+
+async function runBacktest() {
+  const btn = document.getElementById('btRunBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Running...';
+  document.getElementById('btNoData').style.display = '';
+  document.getElementById('btMetrics').style.display = 'none';
+  document.getElementById('btChartCard').style.display = 'none';
+  document.getElementById('btTradesCard').style.display = 'none';
+
+  try {
+    const r = await fetch('/api/backtest', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        symbol: document.getElementById('btSymbol').value,
+        days:   parseInt(document.getElementById('btDays').value),
+        tp_pct: parseFloat(document.getElementById('btTp').value) / 100,
+        sl_pct: parseFloat(document.getElementById('btSl').value) / 100,
+      })
+    });
+    const d = await r.json();
+    if (!r.ok) { showToast('Error', d.detail || 'Backtest failed', 'danger'); return; }
+
+    const retColor = d.total_return_pct >= 0 ? '#3fb950' : '#f85149';
+    document.getElementById('btReturn').textContent   = (d.total_return_pct >= 0 ? '+' : '') + d.total_return_pct.toFixed(2) + '%';
+    document.getElementById('btReturn').style.color   = retColor;
+    document.getElementById('btWinRate').textContent   = d.win_rate.toFixed(1) + '%';
+    document.getElementById('btSharpe').textContent    = d.sharpe.toFixed(2);
+    document.getElementById('btDrawdown').textContent  = d.max_drawdown_pct.toFixed(2) + '%';
+    document.getElementById('btMetrics').style.display = '';
+    document.getElementById('btNoData').style.display  = 'none';
+
+    if (d.equity_curve && d.equity_curve.length) {
+      const labels = d.equity_curve.map(p => p.i);
+      const values = d.equity_curve.map(p => p.v);
+      const gridColor = 'rgba(48,54,61,0.5)';
+      const equityEl = document.getElementById('btEquityChart');
+      if (!btEquityChart) {
+        btEquityChart = new Chart(equityEl, {
+          type: 'line',
+          data: { labels, datasets: [{ label: 'Portfolio Value', data: values,
+            borderColor: retColor, backgroundColor: retColor.replace(')', ',0.1)').replace('rgb', 'rgba'),
+            fill: true, tension: 0.3, pointRadius: 0 }] },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { display: false },
+              y: { ticks: { color: '#8b949e', font: {size:10} }, grid: { color: gridColor } }
+            }
+          }
+        });
+      } else {
+        btEquityChart.data.labels = labels;
+        btEquityChart.data.datasets[0].data = values;
+        btEquityChart.data.datasets[0].borderColor = retColor;
+        btEquityChart.update();
+      }
+      document.getElementById('btChartCard').style.display = '';
+    }
+
+    if (d.trades && d.trades.length) {
+      document.getElementById('btTradeCount').textContent = d.total_trades + ' total trades';
+      document.getElementById('btTradesBody').innerHTML = d.trades.map(t => `
+        <tr>
+          <td class="text-muted" style="font-size:0.75rem">${t.open_at.split('T')[0]}</td>
+          <td class="text-muted" style="font-size:0.75rem">${t.close_at.split('T')[0]}</td>
+          <td class="${t.side==='BUY'?'text-success':'text-danger'}">${t.side}</td>
+          <td class="${t.pnl_pct>=0?'text-success':'text-danger'}">${t.pnl_pct>=0?'+':''}${t.pnl_pct}%</td>
+          <td>${t.win ? '✅' : '❌'}</td>
+          <td><span class="badge" style="font-size:0.65rem;background:rgba(100,100,100,0.2)">${t.regime}</span></td>
+        </tr>`).join('');
+      document.getElementById('btTradesCard').style.display = '';
+    }
+
+    showToast('Backtest Complete', `${d.symbol} ${d.days}d | Return: ${d.total_return_pct.toFixed(2)}% | Sharpe: ${d.sharpe.toFixed(2)}`, d.total_return_pct >= 0 ? 'success' : 'warning');
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+  finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-play-fill me-1"></i>Run Backtest';
+  }
+}
+
 async function saveThaiSettings() {
   const key = document.getElementById('secApiKey').value;
   if (key) {
@@ -1788,6 +2125,8 @@ async function init() {
   setInterval(fetchStats, 30000);
   setInterval(fetchStatus, 60000);
   setInterval(refreshLoopStatus, 3000);
+  // E: Chart auto-refresh every 15 minutes
+  setInterval(updateTradingChart, 15 * 60 * 1000);
 }
 
 init();

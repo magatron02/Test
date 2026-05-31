@@ -1,9 +1,14 @@
 import asyncio
+import csv
+import io
 import logging
+import math
 from datetime import datetime, timedelta
 from typing import Any, Dict, List
 
+import numpy as np
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from ..core.config import settings
@@ -304,18 +309,156 @@ async def save_thai_settings(data: Dict[str, Any]):
     return {"success": True}
 
 
+@router.get("/trades/export")
+async def export_trades(db: Session = Depends(get_db)):
+    """GET /api/trades/export — Download all trades as CSV."""
+    trades = db.query(Trade).order_by(Trade.opened_at.desc()).all()
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["id", "symbol", "side", "price", "amount", "cost", "mode",
+                     "exchange", "strategy", "ai_model", "confidence", "status",
+                     "close_price", "pnl", "pnl_pct", "opened_at", "closed_at"])
+    for t in trades:
+        writer.writerow([
+            t.id, t.symbol, t.side, t.price, t.amount, t.cost, t.mode,
+            t.exchange, t.strategy, t.ai_model, t.confidence, t.status,
+            t.close_price, t.pnl, t.pnl_pct,
+            t.opened_at.isoformat() if t.opened_at else "",
+            t.closed_at.isoformat() if t.closed_at else "",
+        ])
+    buf.seek(0)
+    filename = f"trades_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
+    return StreamingResponse(
+        io.BytesIO(buf.getvalue().encode()),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.get("/stats/advanced")
+async def get_advanced_stats(db: Session = Depends(get_db)):
+    """GET /api/stats/advanced — Sharpe ratio, Max Drawdown, daily PnL."""
+    closed = db.query(Trade).filter(Trade.status == "closed").order_by(Trade.closed_at).all()
+    if len(closed) < 2:
+        return {"sharpe": 0, "max_drawdown_pct": 0, "daily_pnl": []}
+
+    # Cumulative equity from trades (start at 10000 for display)
+    capital = 10000.0
+    equity  = [capital]
+    for t in closed:
+        pnl = t.pnl or 0
+        capital += pnl
+        equity.append(round(capital, 2))
+
+    eq = np.array(equity, dtype=float)
+    rets = np.diff(eq) / np.where(eq[:-1] != 0, eq[:-1], 1)
+    sharpe = float((rets.mean() / rets.std()) * math.sqrt(252)) if rets.std() > 0 else 0.0
+
+    run_max = np.maximum.accumulate(eq)
+    max_dd  = float(((eq - run_max) / np.where(run_max != 0, run_max, 1)).min() * 100)
+
+    # Daily PnL aggregation
+    from collections import defaultdict
+    daily: dict = defaultdict(float)
+    for t in closed:
+        if t.closed_at:
+            day = t.closed_at.strftime("%Y-%m-%d")
+            daily[day] += t.pnl or 0
+    daily_pnl = [{"date": d, "pnl": round(v, 2)} for d, v in sorted(daily.items())]
+
+    return {
+        "sharpe":           round(sharpe, 2),
+        "max_drawdown_pct": round(max_dd, 2),
+        "daily_pnl":        daily_pnl,
+        "equity_curve":     [{"i": i, "v": v} for i, v in enumerate(equity)],
+    }
+
+
 @router.get("/candles")
-async def get_candles(symbol: str = "BTC/USDT", limit: int = 80):
-    """GET /api/candles?symbol=BTC/USDT&limit=80 — OHLCV for candlestick chart."""
+async def get_candles(symbol: str = "BTC/USDT", limit: int = 80, timeframe: str = "15m"):
+    """GET /api/candles?symbol=BTC/USDT&limit=80&timeframe=15m — OHLCV for candlestick chart."""
     if not _trader:
         raise HTTPException(503, "Trader not running")
     try:
-        candles = await _trader._exchange.get_ohlcv(symbol, limit=limit)
+        candles = await _trader._exchange.get_ohlcv(symbol, timeframe=timeframe, limit=limit)
         return [
             {"t": int(c.timestamp.timestamp() * 1000),
              "o": c.open, "h": c.high, "l": c.low, "c": c.close, "v": c.volume}
             for c in candles
         ]
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@router.get("/analysis/mtf")
+async def get_mtf_analysis(symbol: str = "BTC/USDT"):
+    """GET /api/analysis/mtf — Multi-timeframe analysis (15m + 1h + 4h)."""
+    if not _trader:
+        raise HTTPException(503, "Trader not running")
+    from ..agent.market_analyzer import analyze
+
+    async def _tf(tf: str, limit: int):
+        try:
+            candles = await _trader._exchange.get_ohlcv(symbol, timeframe=tf, limit=limit)
+            ticker  = await _trader._exchange.get_ticker(symbol)
+            result  = analyze(symbol, candles, ticker.price, ticker.change_24h)
+            return {
+                "timeframe":  tf,
+                "signal":     result.overall_signal,
+                "confidence": round(result.signal_strength, 2),
+                "rsi":        round(result.rsi, 1),
+                "ema_trend":  result.ema_trend,
+                "macd_trend": result.macd_trend,
+                "bb_signal":  result.bb_signal,
+            }
+        except Exception:
+            return {"timeframe": tf, "signal": "HOLD", "confidence": 0,
+                    "rsi": 50, "ema_trend": "NEUTRAL", "macd_trend": "NEUTRAL", "bb_signal": "NEUTRAL"}
+
+    results = {}
+    for tf, limit in [("15m", 80), ("1h", 80), ("4h", 60)]:
+        results[tf] = await _tf(tf, limit)
+
+    # Weighted combined signal (15m:0.3, 1h:0.4, 4h:0.3)
+    weights = {"15m": 0.3, "1h": 0.4, "4h": 0.3}
+    buy_score = sell_score = 0.0
+    for tf, w in weights.items():
+        sig = results[tf]["signal"]
+        conf = results[tf]["confidence"]
+        if sig == "BUY":   buy_score  += w * conf
+        elif sig == "SELL": sell_score += w * conf
+
+    if buy_score > sell_score and buy_score >= 0.25:
+        combined = "BUY"
+        combined_conf = round(buy_score, 2)
+    elif sell_score > buy_score and sell_score >= 0.25:
+        combined = "SELL"
+        combined_conf = round(sell_score, 2)
+    else:
+        combined = "HOLD"
+        combined_conf = round(max(buy_score, sell_score), 2)
+
+    return {
+        "symbol":           symbol,
+        "timeframes":       results,
+        "combined_signal":  combined,
+        "combined_conf":    combined_conf,
+    }
+
+
+@router.post("/backtest")
+async def run_backtest(data: Dict[str, Any]):
+    """POST /api/backtest — Run backtest on simulated historical data."""
+    from ..agent.backtest import run_backtest as _run
+    symbol  = data.get("symbol", "BTC/USDT")
+    days    = int(data.get("days", 30))
+    tp_pct  = float(data.get("tp_pct", 0.04))
+    sl_pct  = float(data.get("sl_pct", 0.02))
+    if days < 7 or days > 365:
+        raise HTTPException(400, "days must be 7-365")
+    try:
+        result = run_backtest(symbol, days=days, tp_pct=tp_pct, sl_pct=sl_pct)
+        return result
     except Exception as e:
         raise HTTPException(500, str(e))
 
