@@ -19,31 +19,31 @@
   --border2:   #2a2a2a;
   --text-main: #ffffff;
   --text-muted:#666666;
-  --accent:        #F5C518;   /* yellow — primary */
+  --accent:        #A8FF53;   /* yellow — primary */
   --accent-buy:    #39d98a;   /* green  — BUY  */
   --accent-red:    #ff6b35;   /* orange — SELL */
-  --accent-blue:   #F5C518;   /* repurposed → yellow */
-  --accent-yellow: #F5C518;
-  --accent-purple: #F5C518;
+  --accent-blue:   #A8FF53;   /* repurposed → yellow */
+  --accent-yellow: #A8FF53;
+  --accent-purple: #A8FF53;
   --font-mono: 'Space Mono', 'Courier New', monospace;
 }
 * { box-sizing: border-box; }
 body { background: var(--bg-dark); color: var(--text-main); font-family: var(--font-mono); margin: 0; font-size: 13px; }
 
-/* ── Navbar ── */
-.navbar { background: #000 !important; border-bottom: 1px solid var(--border); padding: 10px 24px; }
-.navbar-brand { font-weight: 700; font-size: 1.05rem; color: var(--text-main) !important; letter-spacing: 0.5px; }
-.navbar-brand small { color: var(--text-muted) !important; }
-
-/* ── Sidebar ── */
-.sidebar { width: 200px; min-height: calc(100vh - 50px); background: #000; border-right: 1px solid var(--border); position: fixed; top: 50px; left: 0; overflow-y: auto; z-index: 100; }
-.sidebar .nav-link { color: var(--text-muted); padding: 9px 16px; display: flex; align-items: center; gap: 10px; font-size: 0.78rem; transition: all 0.15s; border-left: 2px solid transparent; text-decoration: none; }
-.sidebar .nav-link:hover { color: var(--text-main); background: var(--bg-card); }
-.sidebar .nav-link.active { color: var(--accent); background: rgba(245,197,24,0.06); border-left-color: var(--accent); }
-.sidebar .nav-link i { font-size: 0.85rem; }
+/* ── Top Nav ── */
+.topnav { background: #000; border-bottom: 1px solid var(--border); padding: 0 28px; height: 60px; display: flex; align-items: center; gap: 20px; position: sticky; top: 0; z-index: 200; }
+.brand-wrap { display: flex; align-items: center; gap: 10px; text-decoration: none; flex-shrink: 0; }
+.brand-icon { width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), #39d98a); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; font-weight: 700; color: #000; font-family: var(--font-mono); }
+.brand-name { font-weight: 700; font-size: 1rem; color: var(--text-main); font-family: var(--font-mono); }
+.brand-name small { color: var(--text-muted); font-size: 0.6em; margin-left: 4px; }
+.topnav-pills { display: flex; gap: 3px; background: var(--bg-card); padding: 4px; border-radius: 100px; border: 1px solid var(--border); flex-shrink: 0; }
+.pill-link { padding: 5px 14px; border-radius: 100px; color: var(--text-muted); cursor: pointer; font-size: 0.75rem; font-family: var(--font-mono); transition: all 0.15s; white-space: nowrap; border: none; background: none; text-decoration: none; display: inline-block; }
+.pill-link:hover { color: var(--text-main); }
+.pill-link.active { background: var(--text-main); color: #000; font-weight: 700; }
+.topnav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 
 /* ── Layout ── */
-.main-content { margin-left: 200px; padding: 24px; min-height: calc(100vh - 50px); }
+.main-content { padding: 28px 32px; min-height: calc(100vh - 60px); }
 
 /* ── Cards ── */
 .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 2px; }
@@ -67,7 +67,7 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: var(--f
 .table { color: var(--text-main); }
 .table td, .table th { border-color: var(--border); font-size: 0.78rem; vertical-align: middle; padding: 7px 10px; }
 .table thead th { color: var(--text-muted); font-weight: 700; background: var(--bg-card2); text-transform: uppercase; font-size: 0.68rem; letter-spacing: 0.8px; }
-.table-hover tbody tr:hover td { background: rgba(245,197,24,0.04); }
+.table-hover tbody tr:hover td { background: rgba(168,255,83,0.04); }
 
 /* ── Price cards ── */
 .price-card { border-radius: 2px; padding: 12px 14px; background: var(--bg-card); border: 1px solid var(--border); cursor: pointer; transition: border-color 0.15s; }
@@ -87,7 +87,7 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: var(--f
 
 /* ── Mode badge ── */
 .mode-badge { padding: 2px 10px; border-radius: 2px; font-size: 0.68rem; font-weight: 700; letter-spacing: 1px; }
-.mode-demo { background: rgba(245,197,24,0.1); color: var(--accent); border: 1px solid rgba(245,197,24,0.3); }
+.mode-demo { background: rgba(168,255,83,0.10); color: var(--accent); border: 1px solid rgba(168,255,83,0.30); }
 .mode-live { background: rgba(57,217,138,0.1); color: var(--accent-buy); border: 1px solid rgba(57,217,138,0.3); }
 
 /* ── Forms ── */
@@ -97,7 +97,7 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: var(--f
 }
 .form-control:focus, .form-select:focus {
   background: var(--bg-card2); border-color: var(--accent);
-  color: var(--text-main); box-shadow: 0 0 0 2px rgba(245,197,24,0.12);
+  color: var(--text-main); box-shadow: 0 0 0 2px rgba(168,255,83,0.12);
 }
 .form-control::placeholder { color: var(--text-muted); }
 .form-label { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -107,11 +107,11 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: var(--f
   background: var(--accent); border-color: var(--accent); color: #000;
   font-family: var(--font-mono); font-weight: 700; letter-spacing: 0.5px; border-radius: 2px;
 }
-.btn-primary:hover { background: #ffd740; border-color: #ffd740; color: #000; }
+.btn-primary:hover { background: #C6FF80; border-color: #C6FF80; color: #000; }
 .btn-outline-secondary {
   border-color: var(--border2); color: var(--text-muted); font-family: var(--font-mono); border-radius: 2px;
 }
-.btn-outline-secondary:hover { border-color: var(--accent); color: var(--accent); background: rgba(245,197,24,0.06); }
+.btn-outline-secondary:hover { border-color: var(--accent); color: var(--accent); background: rgba(168,255,83,0.06); }
 .btn-success { background: var(--accent-buy); border-color: var(--accent-buy); color: #000; font-family: var(--font-mono); font-weight: 700; border-radius: 2px; }
 .btn-danger  { background: var(--accent-red);  border-color: var(--accent-red);  color: #000; font-family: var(--font-mono); font-weight: 700; border-radius: 2px; }
 .btn-sm { font-size: 0.72rem; padding: 3px 9px; }
@@ -148,9 +148,9 @@ body { background: var(--bg-dark); color: var(--text-main); font-family: var(--f
 .border-top   { border-color: var(--border) !important; }
 .border-bottom{ border-color: var(--border) !important; }
 hr { border-color: var(--border); }
-code { color: var(--accent); background: rgba(245,197,24,0.08); padding: 1px 5px; border-radius: 2px; font-family: var(--font-mono); }
+code { color: var(--accent); background: rgba(168,255,83,0.08); padding: 1px 5px; border-radius: 2px; font-family: var(--font-mono); }
 a { color: var(--accent); }
-a:hover { color: #ffd740; }
+a:hover { color: #C6FF80; }
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: #000; }
 ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 0; }
@@ -159,50 +159,39 @@ a:hover { color: #ffd740; }
 </head>
 <body>
 
-<!-- Navbar -->
-<nav class="navbar navbar-expand-lg navbar-dark sticky-top">
-  <div class="d-flex align-items-center gap-3 w-100">
-    <span class="navbar-brand"><i class="bi bi-robot me-2"></i>Aiterra <small class="text-muted" style="font-size:0.65em;vertical-align:middle">v1.0.0</small></span>
-    <span class="mode-badge mode-demo" id="modeTag">DEMO</span>
-    <div class="ms-auto d-flex align-items-center gap-3">
-      <span class="text-muted small" id="lastUpdate">--</span>
-      <span class="ws-dot ws-disconnected" id="wsDot" title="WebSocket"></span>
-      <select class="form-select form-select-sm" style="width:auto" id="aiModelSelect">
-        <option value="hybrid">Hybrid AI</option>
-        <option value="rule_based">Rule-based</option>
-        <option value="ml">ML Model</option>
-        <option value="claude">Claude API</option>
-      </select>
-      <select class="form-select form-select-sm" style="width:auto" id="strategySelect">
-        <option value="hybrid">Strategy: Hybrid</option>
-        <option value="dca">DCA</option>
-        <option value="trend">Trend</option>
-        <option value="mean_reversion">Mean Reversion</option>
-      </select>
-    </div>
-  </div>
-</nav>
+<!-- Top Nav -->
+<nav class="topnav">
+  <a class="brand-wrap" href="#">
+    <div class="brand-icon">AT</div>
+    <span class="brand-name">Aiterra <small>v1.0.0</small></span>
+  </a>
 
-<div class="d-flex">
-<!-- Sidebar -->
-<nav class="sidebar">
-  <div class="p-3 pb-1">
-    <small class="text-muted text-uppercase" style="font-size:0.7rem;letter-spacing:1px">เมนู</small>
+  <div class="topnav-pills">
+    <a class="pill-link nav-link active" onclick="showSection('dashboard',this)">Dashboard</a>
+    <a class="pill-link nav-link" onclick="showSection('trading',this)">Trading</a>
+    <a class="pill-link nav-link" onclick="showSection('portfolio',this)">Portfolio</a>
+    <a class="pill-link nav-link" onclick="showSection('analytics',this)">Analytics</a>
+    <a class="pill-link nav-link" onclick="showSection('trade-history',this)">History</a>
+    <a class="pill-link nav-link" onclick="showSection('thai-market',this)">ตลาดไทย</a>
+    <a class="pill-link nav-link" onclick="showSection('settings',this)">Settings</a>
   </div>
-  <ul class="nav flex-column">
-    <li><a href="#" class="nav-link active" onclick="showSection('dashboard', this)"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
-    <li><a href="#" class="nav-link" onclick="showSection('trading', this)"><i class="bi bi-graph-up-arrow"></i> Trading</a></li>
-    <li><a href="#" class="nav-link" onclick="showSection('portfolio', this)"><i class="bi bi-wallet2"></i> Portfolio</a></li>
-    <li><a href="#" class="nav-link" onclick="showSection('ai-training', this)"><i class="bi bi-cpu"></i> AI Training</a></li>
-    <li><a href="#" class="nav-link" onclick="showSection('trade-history', this)"><i class="bi bi-clock-history"></i> History</a></li>
-    <li><a href="#" class="nav-link" onclick="showSection('thai-market', this)"><i class="bi bi-flag"></i> ตลาดไทย</a></li>
-    <li><a href="#" class="nav-link" onclick="showSection('backtest', this)"><i class="bi bi-skip-backward-circle"></i> Backtest</a></li>
-    <li><a href="#" class="nav-link" onclick="showSection('settings', this)"><i class="bi bi-gear"></i> Settings</a></li>
-  </ul>
-  <div class="p-3 mt-3 border-top" style="border-color:var(--border)!important">
-    <div class="small text-muted mb-2">Demo Portfolio</div>
-    <div class="fw-bold text-success" id="sidebarTotal">$0.00</div>
-    <div class="small mt-1"><span id="sidebarPnl" class="text-muted">+0.00%</span></div>
+
+  <div class="topnav-right">
+    <span class="text-muted" style="font-size:0.72rem" id="lastUpdate">--</span>
+    <span class="ws-dot ws-disconnected" id="wsDot" title="WebSocket"></span>
+    <span class="mode-badge mode-demo" id="modeTag">DEMO</span>
+    <select class="form-select form-select-sm" style="width:auto;font-size:0.72rem" id="aiModelSelect">
+      <option value="hybrid">Hybrid AI</option>
+      <option value="rule_based">Rule-based</option>
+      <option value="ml">ML</option>
+      <option value="claude">Claude API</option>
+    </select>
+    <select class="form-select form-select-sm" style="width:auto;font-size:0.72rem" id="strategySelect">
+      <option value="hybrid">Hybrid</option>
+      <option value="dca">DCA</option>
+      <option value="trend">Trend</option>
+      <option value="mean_reversion">MeanRev</option>
+    </select>
   </div>
 </nav>
 
@@ -211,48 +200,45 @@ a:hover { color: #ffd740; }
 
 <!-- DASHBOARD -->
 <section id="sec-dashboard" class="section active">
-  <div class="row g-3 mb-4">
-    <div class="col-6 col-md-3">
-      <div class="stat-card" style="background:rgba(57,217,138,0.06);border:1px solid rgba(57,217,138,0.18);">
-        <div class="stat-label">Total Value</div>
-        <div class="stat-value text-success" id="totalValue">$0.00</div>
-        <div class="small text-muted mt-1" id="totalPnl">+0.00 USDT</div>
+
+  <!-- Hero row -->
+  <div class="row g-0 mb-4 align-items-end">
+    <div class="col-md-6">
+      <div class="text-muted mb-1" style="font-size:0.72rem;text-transform:uppercase;letter-spacing:1px">Total Portfolio</div>
+      <div style="font-size:2.8rem;font-weight:700;line-height:1.1;letter-spacing:-1px">
+        <span id="totalValue">$0.00</span>
+        <span id="totalPnlPct" class="ms-3" style="font-size:1rem;color:var(--accent);vertical-align:middle">+0.00%</span>
+      </div>
+      <div class="text-muted mt-1" style="font-size:0.8rem">Available: <strong id="cashValue" style="color:var(--text-main)">$0.00</strong>&nbsp;&nbsp;|&nbsp;&nbsp;<span id="positionCount">0 positions</span></div>
+      <div class="d-flex gap-2 mt-3">
+        <button class="btn btn-sm px-3" style="background:var(--accent);color:#000;font-weight:700;border:none;border-radius:100px" onclick="showSection('trading',document.querySelector('.pill-link:nth-child(2)'))">
+          Buy / Sell ↑
+        </button>
+        <button class="btn btn-sm px-3" style="background:var(--bg-card);color:var(--text-main);border:1px solid var(--border);border-radius:100px" onclick="showSection('portfolio',document.querySelector('.pill-link:nth-child(3)'))">
+          Portfolio →
+        </button>
       </div>
     </div>
-    <div class="col-6 col-md-3">
-      <div class="stat-card" style="background:rgba(245,197,24,0.06);border:1px solid rgba(245,197,24,0.18);">
-        <div class="stat-label">Cash (USDT)</div>
-        <div class="stat-value" style="color:var(--accent)" id="cashValue">$0.00</div>
-        <div class="small text-muted mt-1" id="positionCount">0 positions</div>
-      </div>
-    </div>
-    <div class="col-6 col-md-3">
-      <div class="stat-card" style="background:rgba(245,197,24,0.06);border:1px solid rgba(245,197,24,0.18);">
-        <div class="stat-label">Win Rate</div>
-        <div class="stat-value" style="color:var(--accent)" id="winRate">0%</div>
-        <div class="small text-muted mt-1" id="totalTrades">0 trades</div>
-      </div>
-    </div>
-    <div class="col-6 col-md-3">
-      <div class="stat-card" style="background:rgba(255,107,53,0.06);border:1px solid rgba(255,107,53,0.18);">
-        <div class="stat-label">Avg PnL/Trade</div>
-        <div class="stat-value" style="color:var(--accent-red)" id="avgPnl">0.00%</div>
-        <div class="small text-muted mt-1" id="bestTrade">Best: 0%</div>
+    <div class="col-md-6 text-md-end d-flex justify-content-md-end align-items-center gap-2 mt-3 mt-md-0">
+      <div class="d-flex gap-2 p-1" style="background:var(--bg-card);border:1px solid var(--border);border-radius:100px">
+        <button class="tab-btn active" onclick="setChartRange('1h',this)" style="border-radius:100px">1H</button>
+        <button class="tab-btn" onclick="setChartRange('24h',this)" style="border-radius:100px">24H</button>
+        <button class="tab-btn" onclick="setChartRange('7d',this)" style="border-radius:100px">7D</button>
       </div>
     </div>
   </div>
 
-  <!-- Price Cards -->
+  <!-- Price ticker row -->
   <div class="row g-2 mb-4" id="priceCardsRow"></div>
 
+  <!-- Chart + Activity row -->
   <div class="row g-3">
     <div class="col-md-8">
       <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-bar-chart-line me-2"></i>Portfolio Value</span>
-          <div class="d-flex gap-2">
-            <button class="tab-btn active" onclick="setChartRange('1h', this)">1H</button>
-            <button class="tab-btn" onclick="setChartRange('24h', this)">24H</button>
+          <span>Portfolio Value</span>
+          <div class="d-flex gap-2 align-items-center">
+            <span class="text-muted" style="font-size:0.72rem" id="totalPnl">+0.00 USDT</span>
           </div>
         </div>
         <div class="card-body p-2">
@@ -262,10 +248,48 @@ a:hover { color: #ffd740; }
     </div>
     <div class="col-md-4">
       <div class="card h-100">
-        <div class="card-header"><i class="bi bi-activity me-2"></i>AI Activity</div>
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span>AI Activity</span>
+          <div class="d-flex gap-3" style="font-size:0.72rem">
+            <span>WR <strong id="winRate" style="color:var(--accent)">0%</strong></span>
+            <span>Trades <strong id="totalTrades" style="color:var(--text-main)">0</strong></span>
+          </div>
+        </div>
         <div class="card-body p-0" style="max-height:320px;overflow-y:auto" id="activityFeed">
           <div class="p-3 text-muted text-center small">รอข้อมูล...</div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom stats row -->
+  <div class="row g-3 mt-1">
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="stat-label">Win Rate</div>
+        <div class="stat-value" style="color:var(--accent)" id="winRateBottom">0%</div>
+        <div class="small text-muted mt-1" id="totalTradesBottom">0 trades</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="stat-label">Avg PnL/Trade</div>
+        <div class="stat-value text-success" id="avgPnl">0.00%</div>
+        <div class="small text-muted mt-1" id="bestTrade">Best: 0%</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="stat-label">Open Positions</div>
+        <div class="stat-value" style="color:var(--text-main)" id="openPosCount">0</div>
+        <div class="small text-muted mt-1">Active trades</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="stat-label">Today PnL</div>
+        <div class="stat-value text-success" id="todayPnl">$0.00</div>
+        <div class="small text-muted mt-1">24h change</div>
       </div>
     </div>
   </div>
@@ -332,14 +356,14 @@ a:hover { color: #ffd740; }
       </div>
     </div>
     <div class="col-6 col-md-3">
-      <div class="stat-card" style="background:rgba(245,197,24,0.06);border:1px solid rgba(245,197,24,0.18)">
+      <div class="stat-card" style="background:rgba(168,255,83,0.06);border:1px solid rgba(168,255,83,0.18)">
         <div class="stat-label">Sharpe Ratio</div>
         <div class="stat-value" style="color:var(--accent)" id="sharpeRatio">—</div>
         <div class="small text-muted">Risk-adjusted return</div>
       </div>
     </div>
     <div class="col-6 col-md-3">
-      <div class="stat-card" style="background:rgba(245,197,24,0.06);border:1px solid rgba(245,197,24,0.18)">
+      <div class="stat-card" style="background:rgba(168,255,83,0.06);border:1px solid rgba(168,255,83,0.18)">
         <div class="stat-label">Total Trades</div>
         <div class="stat-value" style="color:var(--accent-yellow)" id="pfTotalTrades">—</div>
         <div class="small text-muted" id="pfWinRate">Win rate —</div>
@@ -385,11 +409,18 @@ a:hover { color: #ffd740; }
   </div>
 </section>
 
-<!-- AI TRAINING -->
-<section id="sec-ai-training" class="section">
+<!-- ANALYTICS (AI Training + Backtest) -->
+<section id="sec-analytics" class="section">
+  <div class="d-flex gap-2 mb-4">
+    <button class="tab-btn active" id="anlTab-training" onclick="anlTab('training',this)">AI Training</button>
+    <button class="tab-btn" id="anlTab-backtest" onclick="anlTab('backtest',this)">Backtest</button>
+  </div>
+  <div id="anl-training">
+<!-- AI TRAINING inner content start -->
+<section id="sec-ai-training" class="section active" style="display:block">
 
   <!-- Fast Training Loop Banner -->
-  <div class="card mb-3" id="loopBanner" style="background:rgba(245,197,24,0.04);border:1px solid rgba(57,217,138,0.25)">
+  <div class="card mb-3" id="loopBanner" style="background:rgba(168,255,83,0.04);border:1px solid rgba(57,217,138,0.25)">
     <div class="card-body py-2 d-flex align-items-center gap-3 flex-wrap">
       <div class="flex-grow-1">
         <div class="d-flex align-items-center gap-2 mb-1">
@@ -434,7 +465,7 @@ a:hover { color: #ffd740; }
       </div>
     </div>
     <div class="col-md-3">
-      <div class="stat-card" style="background:rgba(245,197,24,0.06);border:1px solid rgba(245,197,24,0.18)">
+      <div class="stat-card" style="background:rgba(168,255,83,0.06);border:1px solid rgba(168,255,83,0.18)">
         <div class="stat-label">Closed Trades</div>
         <div class="stat-value" style="color:var(--accent)" id="loopTotalBig">0</div>
         <div class="small text-muted">ต้องการ ≥ 40</div>
@@ -448,7 +479,7 @@ a:hover { color: #ffd740; }
       </div>
     </div>
     <div class="col-md-3">
-      <div class="stat-card" style="background:rgba(245,197,24,0.06);border:1px solid rgba(245,197,24,0.18)">
+      <div class="stat-card" style="background:rgba(168,255,83,0.06);border:1px solid rgba(168,255,83,0.18)">
         <div class="stat-label">Loop Status</div>
         <div class="stat-value" style="color:var(--accent-yellow);font-size:1rem" id="trainStatus">Idle</div>
         <div class="small text-muted" id="trainLastTime">ยังไม่ได้ run</div>
@@ -551,8 +582,10 @@ a:hover { color: #ffd740; }
     </div>
   </div>
 </section>
+<!-- AI TRAINING inner content end -->
+  </div><!-- end anl-training -->
+  <div id="anl-backtest-section" style="display:none">
 
-<!-- TRADE HISTORY -->
 <section id="sec-trade-history" class="section">
   <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
@@ -585,7 +618,7 @@ a:hover { color: #ffd740; }
       <i class="bi bi-piggy-bank me-1"></i>กองทุนรวม
     </button>
     <div class="ms-auto d-flex align-items-center gap-2">
-      <span class="badge" style="background:rgba(245,197,24,0.18);color:#F5C518;border:1px solid rgba(245,197,24,0.25)" id="thaiDataSource">simulation</span>
+      <span class="badge" style="background:rgba(168,255,83,0.18);color:#A8FF53;border:1px solid rgba(168,255,83,0.25)" id="thaiDataSource">simulation</span>
       <button class="btn btn-outline-secondary btn-sm" onclick="refreshThaiData()">
         <i class="bi bi-arrow-clockwise"></i>
       </button>
@@ -652,19 +685,19 @@ a:hover { color: #ffd740; }
     </div>
 
     <!-- SEC API key notice -->
-    <div class="alert mt-3" style="background:rgba(245,197,24,0.06);border:1px solid rgba(245,197,24,0.18);border-radius:8px">
-      <i class="bi bi-info-circle me-2" style="color:#F5C518"></i>
-      <strong style="color:#F5C518">ข้อมูล NAV จริง:</strong>
+    <div class="alert mt-3" style="background:rgba(168,255,83,0.06);border:1px solid rgba(168,255,83,0.18);border-radius:8px">
+      <i class="bi bi-info-circle me-2" style="color:#A8FF53"></i>
+      <strong style="color:#A8FF53">ข้อมูล NAV จริง:</strong>
       ต้องลงทะเบียนรับ API key ฟรีที่
-      <a href="https://api-portal.sec.or.th" target="_blank" style="color:#F5C518">api-portal.sec.or.th</a>
+      <a href="https://api-portal.sec.or.th" target="_blank" style="color:#A8FF53">api-portal.sec.or.th</a>
       แล้วใส่ใน Settings → Thai Market → SEC API Key
     </div>
   </div>
 
 </section>
 
-<!-- BACKTEST -->
-<section id="sec-backtest" class="section">
+<!-- BACKTEST inner content (inside analytics anl-backtest-section div) -->
+<section id="sec-analytics-backtest" class="section active" style="display:block">
   <div class="row g-3 mb-3">
     <div class="col-md-4">
       <div class="card">
@@ -721,13 +754,13 @@ a:hover { color: #ffd740; }
           </div>
         </div>
         <div class="col-6 col-md-3">
-          <div class="stat-card" style="background:rgba(245,197,24,0.06);border:1px solid rgba(245,197,24,0.18)">
+          <div class="stat-card" style="background:rgba(168,255,83,0.06);border:1px solid rgba(168,255,83,0.18)">
             <div class="stat-label">Win Rate</div>
             <div class="stat-value" style="color:var(--accent-yellow)" id="btWinRate">—</div>
           </div>
         </div>
         <div class="col-6 col-md-3">
-          <div class="stat-card" style="background:rgba(245,197,24,0.06);border:1px solid rgba(245,197,24,0.18)">
+          <div class="stat-card" style="background:rgba(168,255,83,0.06);border:1px solid rgba(168,255,83,0.18)">
             <div class="stat-label">Sharpe Ratio</div>
             <div class="stat-value" style="color:var(--accent)" id="btSharpe">—</div>
           </div>
@@ -765,7 +798,9 @@ a:hover { color: #ffd740; }
       </table>
     </div>
   </div>
-</section>
+</section><!-- end sec-analytics-backtest -->
+  </div><!-- end anl-backtest-section -->
+</section><!-- end sec-analytics -->
 
 <!-- SETTINGS -->
 <section id="sec-settings" class="section">
@@ -994,7 +1029,6 @@ a:hover { color: #ffd740; }
 </section>
 
 </main>
-</div>
 
 <!-- Notification Toast Container -->
 <div id="toastContainer" class="notification"></div>
@@ -1046,15 +1080,32 @@ function connectWS() {
 function showSection(name, el) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-  document.getElementById('sec-' + name).classList.add('active');
+  const target = document.getElementById('sec-' + name);
+  if (target) target.classList.add('active');
+  // also handle pill links that may not have el passed
   if (el) el.classList.add('active');
+  else {
+    document.querySelectorAll('.pill-link').forEach(l => {
+      if (l.getAttribute('onclick') && l.getAttribute('onclick').includes("'" + name + "'")) l.classList.add('active');
+    });
+  }
   if (name === 'portfolio') refreshPortfolio();
   if (name === 'trade-history') refreshHistory();
-  if (name === 'ai-training') { refreshTraining(); refreshLoopStatus(); }
+  if (name === 'analytics') { refreshTraining(); refreshLoopStatus(); }
   if (name === 'thai-market') loadThaiStocks();
   if (name === 'settings') loadSettings();
   if (name === 'trading' && currentSymbol) loadMTF();
 }
+
+function anlTab(tab, el) {
+  document.getElementById('anl-training').style.display = tab === 'training' ? '' : 'none';
+  document.getElementById('anl-backtest-section').style.display = tab === 'backtest' ? '' : 'none';
+  document.querySelectorAll('[id^="anlTab-"]').forEach(b => b.classList.remove('active'));
+  if (el) el.classList.add('active');
+}
+
+// shim for old ai-training section ref
+function showAITraining() { showSection('analytics', null); }
 
 function showExTab(name, el) {
   document.querySelectorAll('.ex-tab').forEach(t => t.style.display = 'none');
@@ -1067,56 +1118,56 @@ function showExTab(name, el) {
 // Charts init
 // ============================================================
 function initCharts() {
-  const gridColor = 'rgba(48,54,61,0.5)';
+  const gridColor = 'rgba(34,34,34,0.8)';
   const defaultOpts = {
     responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { labels: { color: '#8b949e', font: {size:11} } } },
+    plugins: { legend: { labels: { color: '#555555', font: {size:11} } } },
     scales: {
-      x: { ticks: { color: '#8b949e', font:{size:10} }, grid: { color: gridColor } },
-      y: { ticks: { color: '#8b949e', font:{size:10} }, grid: { color: gridColor } },
+      x: { ticks: { color: '#555555', font:{size:10} }, grid: { color: gridColor } },
+      y: { ticks: { color: '#555555', font:{size:10} }, grid: { color: gridColor } },
     }
   };
 
   charts.portfolio = new Chart(document.getElementById('portfolioChart'), {
     type: 'line',
-    data: { labels: [], datasets: [{ label: 'Portfolio Value (USDT)', data: [], borderColor: '#39d98a', backgroundColor: 'rgba(57,217,138,0.06)', fill: true, tension: 0.4, pointRadius: 2 }] },
+    data: { labels: [], datasets: [{ label: 'Portfolio Value (USDT)', data: [], borderColor: '#A8FF53', backgroundColor: 'rgba(168,255,83,0.08)', fill: true, tension: 0.4, pointRadius: 2 }] },
     options: { ...defaultOpts, plugins: { ...defaultOpts.plugins, legend: { display: false } } }
   });
 
   charts.trading = new ApexCharts(document.getElementById('tradingChart'), {
     chart: {
       type: 'candlestick', height: 300,
-      background: 'transparent', foreColor: '#8b949e',
+      background: 'transparent', foreColor: '#555555',
       toolbar: { show: false }, animations: { enabled: false },
       zoom: { enabled: false },
     },
     series: [{ data: [] }],
     xaxis: {
       type: 'datetime',
-      labels: { style: { colors: '#8b949e', fontSize: '10px' },
+      labels: { style: { colors: '#555555', fontSize: '10px' },
         datetimeFormatter: { hour: 'HH:mm', day: 'dd MMM' } }
     },
     yaxis: {
       tooltip: { enabled: true },
-      labels: { style: { colors: '#8b949e', fontSize: '10px' },
+      labels: { style: { colors: '#555555', fontSize: '10px' },
         formatter: v => formatPrice(v) }
     },
     plotOptions: {
       candlestick: {
-        colors: { upward: '#3fb950', downward: '#f85149' },
+        colors: { upward: '#A8FF53', downward: '#ff6b35' },
         wick: { useFillColor: true }
       }
     },
-    grid: { borderColor: 'rgba(48,54,61,0.5)' },
+    grid: { borderColor: 'rgba(34,34,34,0.8)' },
     tooltip: { theme: 'dark' },
-    noData: { text: 'เลือก symbol เพื่อดู chart', style: { color: '#8b949e' } },
+    noData: { text: 'เลือก symbol เพื่อดู chart', style: { color: '#555555' } },
   });
   charts.trading.render();
 
   charts.allocation = new Chart(document.getElementById('allocationChart'), {
     type: 'doughnut',
-    data: { labels: ['USDT'], datasets: [{ data: [100], backgroundColor: ['#F5C518'], borderColor: ['#000000'], borderWidth: 2 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#8b949e', font:{size:10} } } } }
+    data: { labels: ['USDT'], datasets: [{ data: [100], backgroundColor: ['#A8FF53'], borderColor: ['#111111'], borderWidth: 2 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#555555', font:{size:10} } } } }
   });
 
   charts.dailyPnl = new Chart(document.getElementById('dailyPnlChart'), {
@@ -1132,7 +1183,7 @@ function initCharts() {
     type: 'bar',
     data: {
       labels: ['RSI', 'MACD', 'BB', 'ATR', 'Volume', 'VWAP', '24h chg', 'EMA'],
-      datasets: [{ label: 'Importance', data: [0,0,0,0,0,0,0,0], backgroundColor: 'rgba(245,197,24,0.7)', borderRadius: 4 }]
+      datasets: [{ label: 'Importance', data: [0,0,0,0,0,0,0,0], backgroundColor: 'rgba(168,255,83,0.7)', borderRadius: 4 }]
     },
     options: {
       ...defaultOpts, indexAxis: 'y',
@@ -1175,11 +1226,13 @@ async function fetchPortfolioStats() {
     document.getElementById('positionCount').textContent = d.positions.length + ' positions';
     const pnl = d.total_value - initial;
     document.getElementById('totalPnl').textContent = (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + ' USDT';
-    document.getElementById('totalPnl').className = 'small mt-1 ' + (pnl >= 0 ? 'text-success' : 'text-danger');
-    document.getElementById('sidebarTotal').textContent = '$' + d.total_value.toFixed(2);
+    document.getElementById('totalPnl').className = 'small ' + (pnl >= 0 ? 'text-success' : 'text-danger');
     const pnlPct = (d.total_value - initial) / initial * 100;
-    document.getElementById('sidebarPnl').textContent = (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '%';
-    document.getElementById('sidebarPnl').className = 'small ' + (pnlPct >= 0 ? 'text-success' : 'text-danger');
+    const pnlPctEl = document.getElementById('totalPnlPct');
+    if (pnlPctEl) { pnlPctEl.textContent = (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '%'; pnlPctEl.style.color = pnlPct >= 0 ? 'var(--accent)' : 'var(--accent-red)'; }
+    const todayEl = document.getElementById('todayPnl');
+    if (todayEl) { todayEl.textContent = (pnl >= 0 ? '+$' : '-$') + Math.abs(pnl).toFixed(2); todayEl.className = 'stat-value ' + (pnl >= 0 ? 'text-success' : 'text-danger'); }
+    const oc = document.getElementById('openPosCount'); if (oc) oc.textContent = d.positions.length;
 
     // Update portfolio chart
     const now = new Date().toLocaleTimeString('th', {hour:'2-digit', minute:'2-digit'});
@@ -1200,8 +1253,10 @@ async function fetchStats() {
   try {
     const r = await fetch('/api/stats');
     const d = await r.json();
-    document.getElementById('winRate').textContent = d.win_rate.toFixed(1) + '%';
-    document.getElementById('totalTrades').textContent = d.total_trades + ' trades';
+    const wr = d.win_rate.toFixed(1) + '%';
+    ['winRate','winRateBottom'].forEach(id => { const e=document.getElementById(id); if(e) e.textContent=wr; });
+    const tt = d.total_trades + ' trades';
+    ['totalTrades','totalTradesBottom'].forEach(id => { const e=document.getElementById(id); if(e) e.textContent=tt; });
     document.getElementById('avgPnl').textContent = (d.avg_pnl_pct >= 0 ? '+' : '') + d.avg_pnl_pct.toFixed(2) + '%';
     document.getElementById('bestTrade').textContent = 'Best: ' + (d.best_trade >= 0 ? '+' : '') + (d.best_trade || 0).toFixed(2) + '%';
   } catch {}
@@ -1275,7 +1330,7 @@ function updateIndicatorPanel(sym) {
   const d = allPrices[sym];
   const a = allAnalyses[sym];
   if (!d) return;
-  const rsiColor = d.rsi < 30 ? '#3fb950' : d.rsi > 70 ? '#f85149' : '#8b949e';
+  const rsiColor = d.rsi < 30 ? '#A8FF53' : d.rsi > 70 ? '#ff6b35' : '#555555';
   const panel = document.getElementById('indicatorPanel');
   panel.innerHTML = `
     <div class="indicator-row"><span>RSI(14)</span><span style="color:${rsiColor}">${(d.rsi||0).toFixed(1)}</span></div>
@@ -1283,7 +1338,7 @@ function updateIndicatorPanel(sym) {
       <span class="badge-signal ${d.signal==='BUY'?'signal-buy':d.signal==='SELL'?'signal-sell':'signal-hold'}">${d.signal}</span></div>
     <div class="indicator-row"><span>Confidence</span>
       <span>${((d.signal_strength||0)*100).toFixed(0)}%
-        <span class="indicator-bar"><span class="indicator-fill" style="width:${(d.signal_strength||0)*100}%;background:#F5C518"></span></span>
+        <span class="indicator-bar"><span class="indicator-fill" style="width:${(d.signal_strength||0)*100}%;background:#A8FF53"></span></span>
       </span></div>
     <div class="indicator-row"><span>24h Change</span>
       <span class="${d.change_24h>=0?'price-up':'price-down'}">${d.change_24h>=0?'+':''}${d.change_24h.toFixed(2)}%</span></div>
@@ -1293,7 +1348,7 @@ function updateIndicatorPanel(sym) {
 function updateAIPanel(sym) {
   const a = allAnalyses[sym];
   if (!a) return;
-  const signalColor = a.signal === 'BUY' ? '#3fb950' : a.signal === 'SELL' ? '#f85149' : '#8b949e';
+  const signalColor = a.signal === 'BUY' ? '#A8FF53' : a.signal === 'SELL' ? '#ff6b35' : '#555555';
   document.getElementById('aiAnalysisPanel').innerHTML = `
     <div class="d-flex justify-content-between mb-2">
       <strong style="color:${signalColor}">${a.signal}</strong>
@@ -1304,7 +1359,7 @@ function updateAIPanel(sym) {
     <div class="indicator-row"><span>Volatility</span><span>${a.volatility||'—'}</span></div>
     <div class="indicator-row"><span>BB Position</span>
       <span>${((a.bb_position||0.5)*100).toFixed(0)}%
-        <span class="indicator-bar"><span class="indicator-fill" style="width:${(a.bb_position||0.5)*100}%;background:#F5C518"></span></span>
+        <span class="indicator-bar"><span class="indicator-fill" style="width:${(a.bb_position||0.5)*100}%;background:#A8FF53"></span></span>
       </span></div>
   `;
 }
@@ -1345,8 +1400,8 @@ function updateHoldings(positions, cash, total) {
 function updateAllocationChart(positions, cash) {
   const labels = ['USDT'];
   const data = [cash];
-  const colors = ['#F5C518'];
-  const palette = ['#39d98a','#f85149','#d29922','#F5C518','#F5C518','#3fb950'];
+  const colors = ['#A8FF53'];
+  const palette = ['#39d98a','#ff6b35','#d29922','#A8FF53','#A8FF53','#A8FF53'];
   positions.forEach((p, i) => {
     labels.push(p.symbol.split('/')[0]);
     data.push(p.value);
@@ -1382,7 +1437,7 @@ function handleAnalysisUpdate(d) {
   allPrices[d.symbol] = { ...d, price: d.price, signal: d.signal, signal_strength: d.confidence };
   allAnalyses[d.symbol] = d;
   if (d.signal !== 'HOLD') {
-    const c = d.signal === 'BUY' ? '#3fb950' : '#f85149';
+    const c = d.signal === 'BUY' ? '#A8FF53' : '#ff6b35';
     addActivity(d.signal === 'BUY' ? '▲' : '▼', `${d.symbol} ${d.signal} (conf: ${(d.confidence*100).toFixed(0)}%)`, c);
   }
   if (document.getElementById('sec-dashboard').classList.contains('active')) renderPriceCards();
@@ -1390,7 +1445,7 @@ function handleAnalysisUpdate(d) {
 }
 
 function handleTradeExecuted(d) {
-  const c = d.side === 'BUY' ? '#3fb950' : '#f85149';
+  const c = d.side === 'BUY' ? '#A8FF53' : '#ff6b35';
   addActivity(d.side === 'BUY' ? '🟢' : '🔴',
     `${d.mode.toUpperCase()} ${d.side} ${d.symbol} @ $${formatPrice(d.price)}`, c);
   showToast(`${d.side} ${d.symbol}`, `@ $${formatPrice(d.price)} | ${d.strategy}`, d.side === 'BUY' ? 'success' : 'danger');
@@ -1399,7 +1454,7 @@ function handleTradeExecuted(d) {
 function handleTradeClosed(d) {
   const win = d.pnl >= 0;
   addActivity(win ? '✅' : '❌',
-    `${d.symbol} closed: ${d.pnl_pct >= 0 ? '+' : ''}${d.pnl_pct.toFixed(2)}% (${d.reason})`, win ? '#3fb950' : '#f85149');
+    `${d.symbol} closed: ${d.pnl_pct >= 0 ? '+' : ''}${d.pnl_pct.toFixed(2)}% (${d.reason})`, win ? '#A8FF53' : '#ff6b35');
   showToast('Trade Closed', `${d.symbol}: ${d.pnl_pct >= 0 ? '+' : ''}${d.pnl_pct.toFixed(2)}%`, win ? 'success' : 'warning');
 }
 
@@ -1534,11 +1589,11 @@ function updateLoopButtons(running) {
   if (running) {
     badge.textContent = '● Running';
     badge.style.background = 'rgba(57,217,138,0.25)';
-    badge.style.color = '#3fb950';
+    badge.style.color = '#A8FF53';
   } else {
     badge.textContent = 'Idle';
     badge.style.background = 'rgba(100,100,100,0.3)';
-    badge.style.color = '#8b949e';
+    badge.style.color = '#555555';
   }
 }
 
@@ -1563,7 +1618,7 @@ function updateLoopStats(d) {
   document.getElementById('loopWrBar').style.background =
     wr >= target ? 'linear-gradient(90deg,#39d98a,#1a7f37)' : 'var(--accent)';
   document.getElementById('loopWrBig').textContent = (wr * 100).toFixed(1) + '%';
-  document.getElementById('loopWrBig').style.color = wr >= target ? '#3fb950' : 'var(--accent-green)';
+  document.getElementById('loopWrBig').style.color = wr >= target ? '#A8FF53' : 'var(--accent-green)';
   document.getElementById('loopTotalBig').textContent = total;
   document.getElementById('loopWrTarget').textContent = Math.round(target * 100);
   if (d.accuracy) document.getElementById('loopAccuracy').textContent = (d.accuracy * 100).toFixed(1) + '%';
@@ -1573,7 +1628,7 @@ function updateLoopStats(d) {
     document.getElementById('trainStatus').textContent = d.completed ? '🎯 Done!' : d.running ? '⚡ Running' : 'Idle';
   }
   if (d.last_regime && Object.keys(d.last_regime).length) {
-    const colors = {BULL:'#3fb950', BEAR:'#f85149', RANGE:'#F5C518', VOLATILE:'#f0883e'};
+    const colors = {BULL:'#A8FF53', BEAR:'#ff6b35', RANGE:'#A8FF53', VOLATILE:'#f0883e'};
     document.getElementById('regimesBadges').innerHTML = Object.entries(d.last_regime)
       .map(([sym, r]) => `<span class="badge" style="background:${colors[r]||'#888'}22;color:${colors[r]||'#888'};border:1px solid ${colors[r]||'#888'}44;font-size:10px">${sym.split('/')[0]}:${r}</span>`)
       .join('');
@@ -1582,20 +1637,20 @@ function updateLoopStats(d) {
 
 function handleLoopTradeOpened(d) {
   const icon = d.side === 'BUY' ? '🟢' : '🔴';
-  const col = d.side === 'BUY' ? '#3fb950' : '#f85149';
+  const col = d.side === 'BUY' ? '#A8FF53' : '#ff6b35';
   appendLoopLog(`<span style="color:${col}">${icon} OPEN ${d.side} ${d.symbol} @ ${d.price} | conf:${(d.confidence*100).toFixed(0)}% | <span style="color:#888">${d.regime}</span></span>`);
 }
 
 function handleLoopTradeClosed(d) {
   const icon = d.win ? '✅' : '❌';
-  const col = d.win ? '#3fb950' : '#f85149';
+  const col = d.win ? '#A8FF53' : '#ff6b35';
   const wr = (d.win_rate * 100).toFixed(1);
   appendLoopLog(`<span style="color:${col}">${icon} CLOSE ${d.symbol} ${d.pnl_pct >= 0 ? '+' : ''}${d.pnl_pct.toFixed(2)}% | WR=${wr}% (${d.wins}/${d.total}) | <span style="color:#888">${d.regime}</span></span>`);
   updateLoopStats(d);
 }
 
 function handleLoopModelUpdated(d) {
-  appendLoopLog(`<span style="color:#F5C518">🧠 Model retrained — accuracy: ${d.accuracy ? (d.accuracy*100).toFixed(1)+'%' : 'N/A'} | trades: ${d.total}</span>`);
+  appendLoopLog(`<span style="color:#A8FF53">🧠 Model retrained — accuracy: ${d.accuracy ? (d.accuracy*100).toFixed(1)+'%' : 'N/A'} | trades: ${d.total}</span>`);
   if (d.accuracy) document.getElementById('loopAccuracy').textContent = (d.accuracy * 100).toFixed(1) + '%';
 }
 
@@ -1604,7 +1659,7 @@ function handleLoopProgress(d) {
   if (d.log && d.log.length) {
     const log = document.getElementById('loopLog');
     log.innerHTML = d.log.map(l => {
-      const col = l.includes('✅') ? '#3fb950' : l.includes('❌') ? '#f85149' : l.includes('🧠') ? '#F5C518' : l.includes('🎯') ? '#f0883e' : '#8b949e';
+      const col = l.includes('✅') ? '#A8FF53' : l.includes('❌') ? '#ff6b35' : l.includes('🧠') ? '#A8FF53' : l.includes('🎯') ? '#f0883e' : '#555555';
       return `<div style="color:${col}">${l}</div>`;
     }).join('');
   }
@@ -1885,7 +1940,7 @@ async function loadSetChart(symbol) {
 
     const labels = history.map(h => h.date);
     const closes = history.map(h => h.close);
-    const gridColor = 'rgba(48,54,61,0.5)';
+    const gridColor = 'rgba(34,34,34,0.8)';
 
     if (!setChartObj) {
       setChartObj = new Chart(document.getElementById('setChart'), {
@@ -1899,8 +1954,8 @@ async function loadSetChart(symbol) {
           responsive: true, maintainAspectRatio: false,
           plugins: { legend: { display: false } },
           scales: {
-            x: { ticks: { color:'#8b949e', maxTicksLimit: 8, font:{size:10} }, grid:{color:gridColor} },
-            y: { ticks: { color:'#8b949e', font:{size:10} }, grid:{color:gridColor} },
+            x: { ticks: { color:'#555555', maxTicksLimit: 8, font:{size:10} }, grid:{color:gridColor} },
+            y: { ticks: { color:'#555555', font:{size:10} }, grid:{color:gridColor} },
           }
         }
       });
@@ -1914,7 +1969,7 @@ async function loadSetChart(symbol) {
     // Update analysis panel
     if (stock?.analysis) {
       const a = stock.analysis;
-      const sigColor = a.signal==='BUY'?'#3fb950':a.signal==='SELL'?'#f85149':'#8b949e';
+      const sigColor = a.signal==='BUY'?'#A8FF53':a.signal==='SELL'?'#ff6b35':'#555555';
       document.getElementById('setAnalysisPanel').innerHTML = `
         <div class="d-flex justify-content-between mb-2">
           <strong style="color:${sigColor}">${a.signal}</strong>
@@ -1922,7 +1977,7 @@ async function loadSetChart(symbol) {
         </div>
         <div class="small text-muted mb-3 p-2 rounded" style="background:rgba(48,54,61,0.4)">${a.reasoning}</div>
         <div class="indicator-row"><span>RSI(14)</span>
-          <span style="color:${a.rsi<35?'#3fb950':a.rsi>65?'#f85149':'#8b949e'}">${a.rsi} [${a.rsi_signal}]</span></div>
+          <span style="color:${a.rsi<35?'#A8FF53':a.rsi>65?'#ff6b35':'#555555'}">${a.rsi} [${a.rsi_signal}]</span></div>
         <div class="indicator-row"><span>MACD</span>
           <span class="${a.macd_trend==='BULLISH'?'price-up':a.macd_trend==='BEARISH'?'price-down':'text-muted'}">${a.macd_trend}</span></div>
         <div class="indicator-row"><span>EMA Trend</span>
@@ -2011,22 +2066,22 @@ async function loadFundChart(code) {
     if (!history.length) return;
     const labels = history.map(h => h.date);
     const navs   = history.map(h => h.nav);
-    const gridColor = 'rgba(48,54,61,0.5)';
+    const gridColor = 'rgba(34,34,34,0.8)';
 
     if (!fundChartObj) {
       fundChartObj = new Chart(document.getElementById('fundChart'), {
         type: 'line',
         data: { labels, datasets: [{
           label: 'NAV (฿)', data: navs,
-          borderColor: '#F5C518', backgroundColor: 'rgba(163,113,247,0.08)',
+          borderColor: '#A8FF53', backgroundColor: 'rgba(163,113,247,0.08)',
           fill: true, tension: 0.3, pointRadius: 0,
         }]},
         options: {
           responsive: true, maintainAspectRatio: false,
           plugins: { legend: { display: false } },
           scales: {
-            x: { ticks:{color:'#8b949e',maxTicksLimit:6,font:{size:10}},grid:{color:gridColor} },
-            y: { ticks:{color:'#8b949e',font:{size:10}},grid:{color:gridColor} },
+            x: { ticks:{color:'#555555',maxTicksLimit:6,font:{size:10}},grid:{color:gridColor} },
+            y: { ticks:{color:'#555555',font:{size:10}},grid:{color:gridColor} },
           }
         }
       });
@@ -2074,7 +2129,7 @@ async function loadMTF() {
   try {
     const r = await fetch(`/api/analysis/mtf?symbol=${encodeURIComponent(currentSymbol)}`);
     const d = await r.json();
-    const sigColor = s => s === 'BUY' ? '#3fb950' : s === 'SELL' ? '#f85149' : '#8b949e';
+    const sigColor = s => s === 'BUY' ? '#A8FF53' : s === 'SELL' ? '#ff6b35' : '#555555';
     const sigCls = s => s === 'BUY' ? 'signal-buy' : s === 'SELL' ? 'signal-sell' : 'signal-hold';
     const tfRows = Object.entries(d.timeframes).map(([tf, a]) => `
       <div class="indicator-row">
@@ -2112,7 +2167,7 @@ async function refreshAdvancedStats() {
     const sr = document.getElementById('sharpeRatio');
     if (sr) {
       sr.textContent = d.sharpe.toFixed(2);
-      sr.style.color = d.sharpe >= 1 ? '#3fb950' : d.sharpe >= 0 ? '#d29922' : '#f85149';
+      sr.style.color = d.sharpe >= 1 ? '#A8FF53' : d.sharpe >= 0 ? '#d29922' : '#ff6b35';
     }
 
     if (d.daily_pnl && d.daily_pnl.length) {
@@ -2140,7 +2195,7 @@ async function refreshPortfolio() {
     const pp = document.getElementById('pfTotalPnl');
     if (pp) {
       pp.textContent = (d.total_pnl >= 0 ? '+' : '') + d.total_pnl.toFixed(2) + ' USDT';
-      pp.style.color = d.total_pnl >= 0 ? '#3fb950' : '#f85149';
+      pp.style.color = d.total_pnl >= 0 ? '#A8FF53' : '#ff6b35';
     }
   } catch {}
 }
@@ -2173,7 +2228,7 @@ async function runBacktest() {
     const d = await r.json();
     if (!r.ok) { showToast('Error', d.detail || 'Backtest failed', 'danger'); return; }
 
-    const retColor = d.total_return_pct >= 0 ? '#3fb950' : '#f85149';
+    const retColor = d.total_return_pct >= 0 ? '#A8FF53' : '#ff6b35';
     document.getElementById('btReturn').textContent   = (d.total_return_pct >= 0 ? '+' : '') + d.total_return_pct.toFixed(2) + '%';
     document.getElementById('btReturn').style.color   = retColor;
     document.getElementById('btWinRate').textContent   = d.win_rate.toFixed(1) + '%';
@@ -2185,7 +2240,7 @@ async function runBacktest() {
     if (d.equity_curve && d.equity_curve.length) {
       const labels = d.equity_curve.map(p => p.i);
       const values = d.equity_curve.map(p => p.v);
-      const gridColor = 'rgba(48,54,61,0.5)';
+      const gridColor = 'rgba(34,34,34,0.8)';
       const equityEl = document.getElementById('btEquityChart');
       if (!btEquityChart) {
         btEquityChart = new Chart(equityEl, {
@@ -2198,7 +2253,7 @@ async function runBacktest() {
             plugins: { legend: { display: false } },
             scales: {
               x: { display: false },
-              y: { ticks: { color: '#8b949e', font: {size:10} }, grid: { color: gridColor } }
+              y: { ticks: { color: '#555555', font: {size:10} }, grid: { color: gridColor } }
             }
           }
         });
