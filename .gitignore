@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.env
+venv/
+.venv/
+
+# Runtime data (not committed — user-specific)
+crypto-ai-trader/data/
+crypto-ai-trader/models/
+crypto-ai-trader/config/settings.yml
