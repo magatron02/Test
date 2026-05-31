@@ -6,8 +6,8 @@
 <title>Aiterra v1.0.0</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.49.0/dist/apexcharts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/countup.js@2.8.3/dist/countUp.umd.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Finlandica:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -199,6 +199,69 @@ a:hover { color: #C6FF80; }
 ::-webkit-scrollbar-track { background: #000; }
 ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+/* ── Glassmorphism ── */
+.card {
+  background: rgba(12,12,12,0.6) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.05) !important;
+  position: relative; overflow: hidden;
+}
+.card::before {
+  content: '';
+  position: absolute; top: 0; left: 15%; right: 15%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(168,255,83,0.12), transparent);
+  pointer-events: none;
+}
+.stat-card {
+  background: rgba(12,12,12,0.55) !important;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255,255,255,0.05) !important;
+}
+.topnav {
+  background: rgba(0,0,0,0.80) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+}
+.topnav-pills {
+  background: rgba(255,255,255,0.04) !important;
+  border-color: rgba(255,255,255,0.07) !important;
+}
+
+/* ── Section animation ── */
+@keyframes sectionIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.section.active { animation: sectionIn 0.28s cubic-bezier(0.22,1,0.36,1) forwards; }
+
+/* ── Micro-interactions ── */
+.price-card {
+  transition: transform 0.2s cubic-bezier(.34,1.56,.64,1), border-color 0.15s, box-shadow 0.2s;
+}
+.price-card:hover {
+  transform: translateY(-3px) scale(1.015);
+  border-color: var(--accent) !important;
+  box-shadow: 0 6px 28px rgba(168,255,83,0.13);
+}
+.price-card.active {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 1px rgba(168,255,83,0.25), 0 6px 28px rgba(168,255,83,0.1);
+}
+.stat-card { transition: transform 0.18s, border-color 0.15s, box-shadow 0.2s; }
+.stat-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(168,255,83,0.18) !important;
+  box-shadow: 0 4px 20px rgba(168,255,83,0.07);
+}
+.btn { transition: transform 0.1s ease, box-shadow 0.15s ease !important; }
+.btn:active { transform: scale(0.96) !important; }
+.btn-primary:hover { box-shadow: 0 0 22px rgba(168,255,83,0.28) !important; }
+.pill-link { transition: all 0.18s ease !important; }
+.pill-link.active { box-shadow: 0 2px 12px rgba(0,0,0,0.4); }
+.tab-btn { transition: all 0.18s ease; }
+
 
 /* ── Typography helpers ── */
 h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
@@ -1113,6 +1176,17 @@ let currentSymbol = null;
 let allPrices = {};
 let allAnalyses = {};
 let charts = {};
+// CountUp helper
+function animateNum(elId, value, prefix='', suffix='', decimals=2) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (typeof CountUp !== 'undefined') {
+    const cu = new CountUp(el, value, {duration:0.8, prefix, suffix, decimalPlaces:decimals, separator:','});
+    if (!cu.error) { cu.start(); return; }
+  }
+  el.textContent = prefix + value.toFixed(decimals) + suffix;
+}
+
 
 // ============================================================
 // WebSocket
@@ -1186,81 +1260,87 @@ function showExTab(name, el) {
 // ============================================================
 // Charts init
 // ============================================================
+// ============================================================
+// Charts init (all ApexCharts)
+// ============================================================
+const _apex = {
+  chart: { background:'transparent', foreColor:'#444', toolbar:{show:false}, fontFamily:"'Space Mono',monospace", animations:{enabled:false} },
+  grid: { borderColor:'rgba(34,34,34,0.7)', strokeDashArray:3 },
+  tooltip: { theme:'dark', style:{fontFamily:"'Space Mono',monospace",fontSize:'11px'} },
+  theme: { mode:'dark' },
+};
 function initCharts() {
-  const gridColor = 'rgba(34,34,34,0.8)';
-  const monoFont = { family: "'Space Mono', monospace" };
-  const defaultOpts = {
-    responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { labels: { color: '#555555', font: {size:11, ...monoFont} } } },
-    scales: {
-      x: { ticks: { color: '#555555', font:{size:10,...monoFont} }, grid: { color: gridColor } },
-      y: { ticks: { color: '#555555', font:{size:10,...monoFont} }, grid: { color: gridColor } },
-    }
-  };
-
-  charts.portfolio = new Chart(document.getElementById('portfolioChart'), {
-    type: 'line',
-    data: { labels: [], datasets: [{ label: 'Portfolio Value (USDT)', data: [], borderColor: '#A8FF53', backgroundColor: 'rgba(168,255,83,0.08)', fill: true, tension: 0.4, pointRadius: 2 }] },
-    options: { ...defaultOpts, plugins: { ...defaultOpts.plugins, legend: { display: false } } }
+  // Portfolio area chart
+  charts.portfolio = new ApexCharts(document.getElementById('portfolioChart'), {
+    ..._apex,
+    chart: {..._apex.chart, type:'area', height:'100%'},
+    series: [{name:'Portfolio (USDT)', data:[]}],
+    xaxis: { categories:[], labels:{style:{colors:'#444',fontSize:'10px'}}, axisBorder:{show:false}, axisTicks:{show:false} },
+    yaxis: { labels:{style:{colors:'#444',fontSize:'10px'}, formatter:v=>'$'+v.toFixed(0)} },
+    stroke: { curve:'smooth', width:2 },
+    fill: { type:'gradient', gradient:{opacityFrom:0.22,opacityTo:0,stops:[0,100]} },
+    dataLabels: { enabled:false },
+    legend: { show:false },
+    colors: ['#A8FF53'],
+    markers: { size:0 },
   });
+  charts.portfolio.render();
 
+  // Candlestick (unchanged)
   charts.trading = new ApexCharts(document.getElementById('tradingChart'), {
-    chart: {
-      type: 'candlestick', height: 300,
-      background: 'transparent', foreColor: '#555555',
-      toolbar: { show: false }, animations: { enabled: false },
-      zoom: { enabled: false },
-    },
-    series: [{ data: [] }],
-    xaxis: {
-      type: 'datetime',
-      labels: { style: { colors: '#555555', fontSize: '10px' },
-        datetimeFormatter: { hour: 'HH:mm', day: 'dd MMM' } }
-    },
-    yaxis: {
-      tooltip: { enabled: true },
-      labels: { style: { colors: '#555555', fontSize: '10px' },
-        formatter: v => formatPrice(v) }
-    },
-    plotOptions: {
-      candlestick: {
-        colors: { upward: '#A8FF53', downward: '#ff6b35' },
-        wick: { useFillColor: true }
-      }
-    },
-    grid: { borderColor: 'rgba(34,34,34,0.8)' },
-    tooltip: { theme: 'dark' },
-    noData: { text: 'เลือก symbol เพื่อดู chart', style: { color: '#555555' } },
+    chart: { type:'candlestick', height:300, background:'transparent', foreColor:'#555555', toolbar:{show:false}, animations:{enabled:false}, zoom:{enabled:false} },
+    series: [{data:[]}],
+    xaxis: { type:'datetime', labels:{style:{colors:'#555555',fontSize:'10px'}, datetimeFormatter:{hour:'HH:mm',day:'dd MMM'}} },
+    yaxis: { tooltip:{enabled:true}, labels:{style:{colors:'#555555',fontSize:'10px'}, formatter:v=>formatPrice(v)} },
+    plotOptions: { candlestick:{ colors:{upward:'#A8FF53',downward:'#ff6b35'}, wick:{useFillColor:true} } },
+    grid: { borderColor:'rgba(34,34,34,0.8)' },
+    tooltip: { theme:'dark' },
+    noData: { text:'เลือก symbol เพื่อดู chart', style:{color:'#555555'} },
   });
   charts.trading.render();
 
-  charts.allocation = new Chart(document.getElementById('allocationChart'), {
-    type: 'doughnut',
-    data: { labels: ['USDT'], datasets: [{ data: [100], backgroundColor: ['#A8FF53'], borderColor: ['#111111'], borderWidth: 2 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#555555', font:{size:10} } } } }
+  // Allocation donut
+  charts.allocation = new ApexCharts(document.getElementById('allocationChart'), {
+    ..._apex,
+    chart: {..._apex.chart, type:'donut', height:220},
+    series: [100],
+    labels: ['USDT'],
+    colors: ['#A8FF53'],
+    plotOptions: { pie:{ donut:{ size:'68%', labels:{ show:true, name:{show:false}, total:{ show:true, showAlways:true, label:'Portfolio', color:'#555', fontSize:'11px' }, value:{ show:true, color:'#fff', fontSize:'1.3rem', fontWeight:700, fontFamily:"'Finlandica',sans-serif", formatter:v=>Number(v).toFixed(0) } } } } },
+    dataLabels: { enabled:false },
+    legend: { position:'bottom', labels:{colors:'#555'}, fontSize:'10px' },
+    stroke: { width:0 },
   });
+  charts.allocation.render();
 
-  charts.dailyPnl = new Chart(document.getElementById('dailyPnlChart'), {
-    type: 'bar',
-    data: { labels: [], datasets: [{ label: 'Daily PnL (USDT)', data: [], backgroundColor: [], borderRadius: 3 }] },
-    options: {
-      ...defaultOpts,
-      plugins: { ...defaultOpts.plugins, legend: { display: false } },
-    }
+  // Daily PnL bar
+  charts.dailyPnl = new ApexCharts(document.getElementById('dailyPnlChart'), {
+    ..._apex,
+    chart: {..._apex.chart, type:'bar', height:'100%'},
+    series: [{name:'Daily PnL', data:[]}],
+    xaxis: { categories:[], labels:{style:{colors:'#444',fontSize:'9px'}} },
+    yaxis: { labels:{style:{colors:'#444',fontSize:'10px'}, formatter:v=>v.toFixed(1)} },
+    plotOptions: { bar:{borderRadius:4, columnWidth:'65%'} },
+    dataLabels: { enabled:false },
+    legend: { show:false },
+    colors: ['#A8FF53'],
   });
+  charts.dailyPnl.render();
 
-  charts.features = new Chart(document.getElementById('featureChart'), {
-    type: 'bar',
-    data: {
-      labels: ['RSI', 'MACD', 'BB', 'ATR', 'Volume', 'VWAP', '24h chg', 'EMA'],
-      datasets: [{ label: 'Importance', data: [0,0,0,0,0,0,0,0], backgroundColor: 'rgba(168,255,83,0.7)', borderRadius: 4 }]
-    },
-    options: {
-      ...defaultOpts, indexAxis: 'y',
-      plugins: { ...defaultOpts.plugins, legend: { display: false } },
-      scales: { x: { ...defaultOpts.scales.x, max: 1 }, y: { ...defaultOpts.scales.y } }
-    }
+  // Feature importance horizontal bar
+  charts.features = new ApexCharts(document.getElementById('featureChart'), {
+    ..._apex,
+    chart: {..._apex.chart, type:'bar', height:260},
+    plotOptions: { bar:{horizontal:true, borderRadius:3, barHeight:'55%', distributed:true} },
+    series: [{name:'Importance', data:[0,0,0,0,0,0,0,0]}],
+    xaxis: { categories:['RSI','MACD','BB','ATR','Volume','VWAP','24h chg','EMA'], max:1, labels:{style:{colors:'#444',fontSize:'10px'}}, axisBorder:{show:false} },
+    yaxis: { labels:{style:{colors:'#555',fontSize:'10px'}} },
+    dataLabels: { enabled:false },
+    legend: { show:false },
+    colors: ['#A8FF53','#A8FF53','#A8FF53','#A8FF53','#A8FF53','#A8FF53','#A8FF53','#A8FF53'],
+    fill: { opacity:0.72 },
   });
+  charts.features.render();
 }
 
 // ============================================================
@@ -1291,8 +1371,8 @@ async function fetchPortfolioStats() {
     const r = await fetch('/api/portfolio');
     const d = await r.json();
     const initial = 10000;
-    document.getElementById('totalValue').textContent = '$' + d.total_value.toFixed(2);
-    document.getElementById('cashValue').textContent = '$' + d.cash_usdt.toFixed(2);
+    animateNum('totalValue', d.total_value, '$', '', 2);
+    animateNum('cashValue',  d.cash_usdt,   '$', '', 2);
     document.getElementById('positionCount').textContent = d.positions.length + ' positions';
     const pnl = d.total_value - initial;
     document.getElementById('totalPnl').textContent = (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + ' USDT';
@@ -1309,9 +1389,8 @@ async function fetchPortfolioStats() {
     if (portfolioData.labels.length > 60) { portfolioData.labels.shift(); portfolioData.values.shift(); }
     portfolioData.labels.push(now);
     portfolioData.values.push(d.total_value);
-    charts.portfolio.data.labels = portfolioData.labels;
-    charts.portfolio.data.datasets[0].data = portfolioData.values;
-    charts.portfolio.update('none');
+    charts.portfolio.updateOptions({xaxis:{categories:portfolioData.labels}},false,false);
+    charts.portfolio.updateSeries([{name:'Portfolio (USDT)',data:portfolioData.values}],false);
 
     updateOpenPositions(d.positions);
     updateHoldings(d.positions, d.cash_usdt, d.total_value);
@@ -1477,10 +1556,8 @@ function updateAllocationChart(positions, cash) {
     data.push(p.value);
     colors.push(palette[i % palette.length]);
   });
-  charts.allocation.data.labels = labels;
-  charts.allocation.data.datasets[0].data = data;
-  charts.allocation.data.datasets[0].backgroundColor = colors;
-  charts.allocation.update();
+  charts.allocation.updateOptions({labels:labels,colors:colors},false,false);
+  charts.allocation.updateSeries(data,false);
 }
 
 // ============================================================
@@ -1585,8 +1662,7 @@ async function refreshTraining() {
     // Mock feature importance if model ready
     if (d.model_ready) {
       const importance = [0.18, 0.15, 0.14, 0.12, 0.11, 0.10, 0.11, 0.09];
-      charts.features.data.datasets[0].data = importance;
-      charts.features.update();
+      charts.features.updateSeries([{name:'Importance',data:importance}]);
     }
   } catch {}
 }
@@ -2013,27 +2089,21 @@ async function loadSetChart(symbol) {
     const gridColor = 'rgba(34,34,34,0.8)';
 
     if (!setChartObj) {
-      setChartObj = new Chart(document.getElementById('setChart'), {
-        type: 'line',
-        data: { labels, datasets: [{
-          label: symbol, data: closes,
-          borderColor: '#d29922', backgroundColor: 'rgba(210,153,34,0.08)',
-          fill: true, tension: 0.2, pointRadius: 0,
-        }]},
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { ticks: { color:'#555555', maxTicksLimit: 8, font:{size:10} }, grid:{color:gridColor} },
-            y: { ticks: { color:'#555555', font:{size:10} }, grid:{color:gridColor} },
-          }
-        }
+      setChartObj = new ApexCharts(document.getElementById('setChart'), {
+        ..._apex,
+        chart: {..._apex.chart, type:'area', height:'100%'},
+        series: [{name: symbol, data: closes}],
+        xaxis: { categories: labels, tickAmount: 8, labels:{style:{colors:'#444',fontSize:'10px'},rotate:0} },
+        yaxis: { labels:{style:{colors:'#444',fontSize:'10px'}, formatter:v=>'฿'+v.toFixed(2)} },
+        stroke: { curve:'smooth', width:2 },
+        fill: { type:'gradient', gradient:{opacityFrom:0.2,opacityTo:0,stops:[0,100]} },
+        dataLabels: { enabled:false }, legend: { show:false },
+        colors: ['#d29922'],
+        markers: { size:0 },
       });
+      setChartObj.render();
     } else {
-      setChartObj.data.labels = labels;
-      setChartObj.data.datasets[0].data = closes;
-      setChartObj.data.datasets[0].label = symbol;
-      setChartObj.update();
+      setChartObj.updateOptions({xaxis:{categories:labels},series:[{name:symbol,data:closes}]});
     }
 
     // Update analysis panel
@@ -2139,27 +2209,21 @@ async function loadFundChart(code) {
     const gridColor = 'rgba(34,34,34,0.8)';
 
     if (!fundChartObj) {
-      fundChartObj = new Chart(document.getElementById('fundChart'), {
-        type: 'line',
-        data: { labels, datasets: [{
-          label: 'NAV (฿)', data: navs,
-          borderColor: '#A8FF53', backgroundColor: 'rgba(163,113,247,0.08)',
-          fill: true, tension: 0.3, pointRadius: 0,
-        }]},
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { ticks:{color:'#555555',maxTicksLimit:6,font:{size:10}},grid:{color:gridColor} },
-            y: { ticks:{color:'#555555',font:{size:10}},grid:{color:gridColor} },
-          }
-        }
+      fundChartObj = new ApexCharts(document.getElementById('fundChart'), {
+        ..._apex,
+        chart: {..._apex.chart, type:'area', height:'100%'},
+        series: [{name:'NAV (฿)', data: navs}],
+        xaxis: { categories: labels, tickAmount: 6, labels:{style:{colors:'#444',fontSize:'10px'},rotate:0} },
+        yaxis: { labels:{style:{colors:'#444',fontSize:'10px'}, formatter:v=>'฿'+v.toFixed(4)} },
+        stroke: { curve:'smooth', width:2 },
+        fill: { type:'gradient', gradient:{opacityFrom:0.2,opacityTo:0,stops:[0,100]} },
+        dataLabels: { enabled:false }, legend: { show:false },
+        colors: ['#A8FF53'],
+        markers: { size:0 },
       });
+      fundChartObj.render();
     } else {
-      fundChartObj.data.labels = labels;
-      fundChartObj.data.datasets[0].data = navs;
-      fundChartObj.data.datasets[0].label = `${fund.name} NAV`;
-      fundChartObj.update();
+      fundChartObj.updateOptions({xaxis:{categories:labels},series:[{name:`${fund.name} NAV`,data:navs}]});
     }
 
     const typeLabel = {
@@ -2244,10 +2308,9 @@ async function refreshAdvancedStats() {
       const labels = d.daily_pnl.map(x => x.date);
       const values = d.daily_pnl.map(x => x.pnl);
       const colors = values.map(v => v >= 0 ? 'rgba(46,160,67,0.7)' : 'rgba(248,81,73,0.7)');
-      charts.dailyPnl.data.labels = labels;
-      charts.dailyPnl.data.datasets[0].data = values;
-      charts.dailyPnl.data.datasets[0].backgroundColor = colors;
-      charts.dailyPnl.update('none');
+      const _pColors = values.map(v => v >= 0 ? '#A8FF53' : '#ff6b35');
+      charts.dailyPnl.updateOptions({xaxis:{categories:labels},colors:_pColors,plotOptions:{bar:{distributed:true,borderRadius:4,columnWidth:'65%'}}},false,false);
+      charts.dailyPnl.updateSeries([{name:'Daily PnL',data:values}],false);
     }
   } catch {}
 }
@@ -2313,25 +2376,22 @@ async function runBacktest() {
       const gridColor = 'rgba(34,34,34,0.8)';
       const equityEl = document.getElementById('btEquityChart');
       if (!btEquityChart) {
-        btEquityChart = new Chart(equityEl, {
-          type: 'line',
-          data: { labels, datasets: [{ label: 'Portfolio Value', data: values,
-            borderColor: retColor, backgroundColor: retColor.replace(')', ',0.1)').replace('rgb', 'rgba'),
-            fill: true, tension: 0.3, pointRadius: 0 }] },
-          options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-              x: { display: false },
-              y: { ticks: { color: '#555555', font: {size:10} }, grid: { color: gridColor } }
-            }
-          }
+        btEquityChart = new ApexCharts(equityEl, {
+          ..._apex,
+          chart: {..._apex.chart, type:'area', height:'100%'},
+          series: [{name:'Equity', data:values}],
+          xaxis: { categories:labels, labels:{show:false}, axisBorder:{show:false}, axisTicks:{show:false} },
+          yaxis: { labels:{style:{colors:'#444',fontSize:'10px'}, formatter:v=>'$'+v.toFixed(0)} },
+          stroke: { curve:'smooth', width:2 },
+          fill: { type:'gradient', gradient:{opacityFrom:0.22,opacityTo:0,stops:[0,100]} },
+          dataLabels: { enabled:false }, legend: { show:false },
+          colors: [retColor],
+          markers: { size:0 },
         });
+        btEquityChart.render();
       } else {
-        btEquityChart.data.labels = labels;
-        btEquityChart.data.datasets[0].data = values;
-        btEquityChart.data.datasets[0].borderColor = retColor;
-        btEquityChart.update();
+        btEquityChart.updateOptions({colors:[retColor],xaxis:{categories:labels}},false,false);
+        btEquityChart.updateSeries([{name:'Equity',data:values}],false);
       }
       document.getElementById('btChartCard').style.display = '';
     }
