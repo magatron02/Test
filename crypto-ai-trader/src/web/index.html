@@ -1335,14 +1335,16 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
         <div class="card-header"><i class="bi bi-toggles me-2"></i>Trading Mode</div>
         <div class="card-body">
           <div class="d-flex gap-2 mb-2">
-            <button class="btn btn-success btn-sm" id="btnDemo" onclick="setMode('demo')">
+            <button class="btn btn-success btn-sm" id="btnDemo" onclick="hotSwapMode('demo')">
               <i class="bi bi-play-circle me-1"></i>Demo Mode
             </button>
-            <button class="btn btn-outline-danger btn-sm" id="btnLive" onclick="setMode('live')">
+            <button class="btn btn-outline-danger btn-sm" id="btnLive" onclick="hotSwapMode('live')">
               <i class="bi bi-exclamation-triangle me-1"></i>Live Mode
             </button>
           </div>
-          <small class="text-muted">Demo Mode: เทรดด้วย virtual money ใช้ข้อมูลตลาดจริง</small>
+          <div id="modeSwapResult" class="small mt-2" style="display:none"></div>
+          <small class="text-muted d-block mt-1">สลับ Demo↔Live ได้ทันทีโดยไม่ต้อง restart</small>
+          <small class="text-muted">Demo Mode: virtual money · Live Mode: ต้องตั้งค่า API key ก่อน</small>
         </div>
       </div>
 
@@ -1516,13 +1518,25 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
       </div>
 
       <div class="card">
-        <div class="card-header"><i class="bi bi-bell me-2"></i>Notifications</div>
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-bell me-2"></i>Notifications</span>
+          <button class="btn btn-outline-secondary btn-sm" onclick="testNotifications()" id="btnTestNotif">
+            <i class="bi bi-send me-1"></i>Test
+          </button>
+        </div>
         <div class="card-body">
-          <label class="form-label small mb-1">LINE Notify Token</label>
+          <div id="notifTestResult" class="mb-3" style="display:none"></div>
+          <label class="form-label small mb-1">LINE Notify Token
+            <a href="https://notify-bot.line.me/my/" target="_blank" rel="noopener" class="ms-1 text-muted" style="font-size:0.65rem">(รับ token ที่นี่)</a>
+          </label>
           <input type="password" class="form-control form-control-sm mb-2" id="lineToken" placeholder="xxxxxxxxxxxxxxxx">
-          <label class="form-label small mb-1">Telegram Bot Token</label>
+          <label class="form-label small mb-1">Telegram Bot Token
+            <span class="text-muted ms-1" style="font-size:0.65rem">(@BotFather)</span>
+          </label>
           <input type="password" class="form-control form-control-sm mb-2" id="telegramToken" placeholder="123456789:AABBCCxxxxxxx">
-          <label class="form-label small mb-1">Telegram Chat ID</label>
+          <label class="form-label small mb-1">Telegram Chat ID
+            <span class="text-muted ms-1" style="font-size:0.65rem">(@userinfobot)</span>
+          </label>
           <input type="text" class="form-control form-control-sm mb-3" id="telegramChatId" placeholder="-1001234567890">
           <div class="p-2 rounded mb-3" style="background:var(--bg-card2)">
             <div class="small text-muted mb-2">แจ้งเตือนเมื่อ:</div>
@@ -1652,6 +1666,10 @@ function connectWS() {
     else if (msg.event === 'trade_executed' || msg.event === 'trade_closed' ||
              msg.event === 'hourly_train_done' || msg.event === 'training_completed') {
       _addNotifBadge();
+    }
+    else if (msg.event === 'mode_changed') {
+      _updateModeBadge(msg.data.mode);
+      showToast('Mode Changed', `สลับเป็น ${msg.data.mode.toUpperCase()} (${msg.data.exchange || 'demo'})`, msg.data.mode === 'demo' ? 'success' : 'warning');
     }
   };
   setInterval(() => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({type:'ping'})); }, 25000);
@@ -1799,8 +1817,7 @@ async function fetchStatus() {
   try {
     const r = await fetch('/api/status');
     const d = await r.json();
-    document.getElementById('modeTag').textContent = d.mode.toUpperCase();
-    document.getElementById('modeTag').className = 'mode-badge mode-' + d.mode;
+    _updateModeBadge(d.mode);
     document.getElementById('aiModelSelect').value = d.ai_model;
     document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('th');
   } catch {}
@@ -2328,13 +2345,55 @@ async function refreshLoopStatus() {
 // ============================================================
 // Settings
 // ============================================================
-async function setMode(mode) {
-  if (mode === 'live' && !confirm('Live mode ใช้เงินจริง! คุณแน่ใจหรือไม่?')) return;
+async function hotSwapMode(mode) {
+  if (mode === 'live' && !confirm(
+    'Live Mode ใช้เงินจริง!\n\n' +
+    '⚠️ ต้องตั้งค่า Exchange API key ใน Settings → Exchange API Keys ก่อน\n\n' +
+    'คุณแน่ใจหรือไม่?'
+  )) return;
+
+  const resultEl = document.getElementById('modeSwapResult');
+  resultEl.style.display = '';
+  resultEl.innerHTML = '<span class="text-muted"><span class="spinner-border spinner-border-sm me-1" style="width:10px;height:10px;border-width:1.5px"></span>กำลังสลับ mode…</span>';
+
+  const btnDemo = document.getElementById('btnDemo');
+  const btnLive = document.getElementById('btnLive');
+  if (btnDemo) btnDemo.disabled = true;
+  if (btnLive) btnLive.disabled = true;
+
   try {
-    await fetch('/api/mode', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({mode}) });
-    showToast('Mode', `Switched to ${mode.toUpperCase()} mode`, mode==='demo'?'success':'warning');
+    const r = await fetch('/api/mode/swap', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({mode}),
+    });
+    const d = await r.json();
+    if (!r.ok) {
+      resultEl.innerHTML = `<span style="color:var(--accent-red)">🔴 ${d.detail || 'เกิดข้อผิดพลาด'}</span>`;
+      showToast('Mode Error', d.detail || 'Swap failed', 'danger');
+      return;
+    }
+    const exLabel = d.exchange ? ` (${d.exchange})` : '';
+    resultEl.innerHTML = `<span style="color:var(--accent-buy)">🟢 สลับเป็น ${d.mode.toUpperCase()}${exLabel} สำเร็จ</span>`;
+    showToast('Mode', `Switched to ${d.mode.toUpperCase()}${exLabel}`, mode === 'demo' ? 'success' : 'warning');
+    _updateModeBadge(d.mode);
     await fetchStatus();
-  } catch(e) { showToast('Error', e.message, 'danger'); }
+  } catch(e) {
+    resultEl.innerHTML = `<span style="color:var(--accent-red)">🔴 ${e.message}</span>`;
+    showToast('Error', e.message, 'danger');
+  } finally {
+    if (btnDemo) btnDemo.disabled = false;
+    if (btnLive) btnLive.disabled = false;
+  }
+}
+
+function _updateModeBadge(mode) {
+  const tag = document.getElementById('modeTag');
+  if (tag) { tag.textContent = mode.toUpperCase(); tag.className = 'mode-badge mode-' + mode; }
+  const btnDemo = document.getElementById('btnDemo');
+  const btnLive = document.getElementById('btnLive');
+  if (btnDemo) btnDemo.className = mode === 'demo' ? 'btn btn-success btn-sm' : 'btn btn-outline-success btn-sm';
+  if (btnLive) btnLive.className = mode === 'live' ? 'btn btn-danger btn-sm'  : 'btn btn-outline-danger btn-sm';
 }
 
 async function saveAISettings() {
@@ -2466,6 +2525,33 @@ async function saveNotifications() {
     await fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
     showToast('Saved', 'Notification settings saved', 'success');
   } catch(e) { showToast('Error', e.message, 'danger'); }
+}
+
+async function testNotifications() {
+  const btn = document.getElementById('btnTestNotif');
+  const resultEl = document.getElementById('notifTestResult');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" style="width:10px;height:10px;border-width:1.5px"></span>ส่ง…'; }
+  resultEl.style.display = '';
+  resultEl.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-1" style="width:10px;height:10px;border-width:1.5px"></span>กำลังส่งข้อความทดสอบ…</div>';
+
+  // Save current values first so the test uses what's on screen
+  await saveNotifications();
+
+  try {
+    const r = await fetch('/api/notifications/test', {method:'POST'});
+    const d = await r.json();
+    const rows = Object.entries(d).map(([name, res]) => {
+      const label = name === 'line' ? 'LINE Notify' : 'Telegram';
+      if (res.ok === true)   return `<div>🟢 <b>${label}</b> — ส่งสำเร็จ ✓</div>`;
+      if (res.ok === false)  return `<div>🔴 <b>${label}</b> — ${res.error || 'Failed'}</div>`;
+      return `<div>⚪ <b>${label}</b> — ยังไม่ได้ตั้งค่า</div>`;
+    }).join('');
+    resultEl.innerHTML = `<div class="p-2 rounded small" style="background:var(--bg-card2)">${rows}</div>`;
+  } catch(e) {
+    resultEl.innerHTML = `<div class="text-danger small">🔴 ${e.message}</div>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-send me-1"></i>Test'; }
+  }
 }
 
 document.getElementById('aiModelSelect').addEventListener('change', async (e) => {

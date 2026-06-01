@@ -792,3 +792,128 @@ async def test_exchanges():
             results[name] = {"ok": False, "error": str(e)[:120]}
 
     return results
+
+
+# ─── Notification Test ─────────────────────────────────────────
+
+@router.post("/notifications/test")
+async def test_notifications(data: Dict[str, Any] = None):
+    """Send a test message to configured LINE / Telegram channels."""
+    msg = "🧪 Aiterra — การแจ้งเตือนทดสอบ / Test notification ✅"
+    results = {}
+
+    # LINE
+    line_token = settings.get("notifications", "line", "token", default="")
+    if line_token:
+        try:
+            import aiohttp
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    "https://notify-api.line.me/api/notify",
+                    headers={"Authorization": f"Bearer {line_token}"},
+                    data={"message": f"\n{msg}"},
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as resp:
+                    if resp.status == 200:
+                        results["line"] = {"ok": True}
+                    else:
+                        body = await resp.text()
+                        results["line"] = {"ok": False, "error": f"HTTP {resp.status}: {body[:80]}"}
+        except Exception as e:
+            results["line"] = {"ok": False, "error": str(e)[:120]}
+    else:
+        results["line"] = {"ok": None, "status": "not_configured"}
+
+    # Telegram
+    tg_token   = settings.get("notifications", "telegram", "bot_token", default="")
+    tg_chat_id = settings.get("notifications", "telegram", "chat_id", default="")
+    if tg_token and tg_chat_id:
+        try:
+            import aiohttp
+            url = f"https://api.telegram.org/bot{tg_token}/sendMessage"
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    url,
+                    json={"chat_id": tg_chat_id, "text": msg},
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as resp:
+                    body = await resp.json()
+                    if resp.status == 200 and body.get("ok"):
+                        results["telegram"] = {"ok": True}
+                    else:
+                        results["telegram"] = {"ok": False, "error": body.get("description", f"HTTP {resp.status}")[:120]}
+        except Exception as e:
+            results["telegram"] = {"ok": False, "error": str(e)[:120]}
+    else:
+        results["telegram"] = {"ok": None, "status": "not_configured"}
+
+    return results
+
+
+# ─── Live Mode Hot-Swap ────────────────────────────────────────
+
+@router.post("/mode/swap")
+async def hot_swap_mode(data: Dict[str, str]):
+    """POST /api/mode/swap — switch demo↔live without restarting the server.
+
+    For live mode the first *enabled* exchange with an api_key is used.
+    Returns the new mode and exchange name, or an error if no live exchange
+    is configured when switching to live.
+    """
+    mode = data.get("mode", "demo")
+    if mode not in ("demo", "live"):
+        raise HTTPException(400, "mode must be 'demo' or 'live'")
+
+    if not _trader:
+        raise HTTPException(503, "Trader not running")
+
+    from ..exchanges.demo_client import DemoExchange
+
+    if mode == "demo":
+        new_exchange = DemoExchange()
+        exchange_name = "demo"
+    else:
+        # Find first configured live exchange
+        new_exchange = None
+        exchange_name = None
+        exchange_map = {
+            "binance":    ("..exchanges.binance_client",    "BinanceExchange"),
+            "binance_th": ("..exchanges.binance_th_client", "BinanceTHExchange"),
+            "bitkub":     ("..exchanges.bitkub_client",     "BitkubExchange"),
+            "okx":        ("..exchanges.okx_client",        "OKXExchange"),
+        }
+        import importlib
+        for ex_name, (mod_path, cls_name) in exchange_map.items():
+            cfg = settings.get("exchanges", ex_name) or {}
+            if cfg.get("enabled") and cfg.get("api_key"):
+                try:
+                    mod = importlib.import_module(mod_path, package="src.api")
+                    cls = getattr(mod, cls_name)
+                    new_exchange = cls()
+                    exchange_name = ex_name
+                    break
+                except Exception as e:
+                    logger.warning(f"Could not load exchange {ex_name}: {e}")
+
+        if new_exchange is None:
+            raise HTTPException(400, "No live exchange configured. Enable an exchange and add API keys in Settings first.")
+
+    # Close old exchange if it has a close() method
+    old_exchange = _trader._exchange
+    try:
+        if hasattr(old_exchange, "close"):
+            await old_exchange.close()
+    except Exception:
+        pass
+
+    # Swap in the new exchange — hot-swap while trader loop continues
+    _trader._exchange = new_exchange
+    _trader._analyses.clear()   # stale prices from old exchange
+    settings.set(mode, "trading", "mode")
+    settings.save()
+
+    logger.info(f"Hot-swapped to {mode} mode (exchange: {exchange_name})")
+    await _trader._broadcast("mode_changed", {"mode": mode, "exchange": exchange_name})
+
+    return {"mode": mode, "exchange": exchange_name, "swapped": True}
+
