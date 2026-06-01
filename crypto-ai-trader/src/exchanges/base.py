@@ -49,6 +49,11 @@ class Order:
 class BaseExchange(ABC):
     name: str = "base"
     is_demo: bool = False
+    # Quote/settlement currency the account holds cash in. Global exchanges
+    # settle in USDT; Thai exchanges (Bitkub, Binance TH) settle in THB.
+    # Readers should use this instead of a global setting so cash lookups stay
+    # correct across a demo↔live or USDT↔THB hot-swap.
+    quote_currency: str = "USDT"
 
     @abstractmethod
     async def get_ticker(self, symbol: str) -> Ticker:

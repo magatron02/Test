@@ -14,10 +14,11 @@ from fastapi.staticfiles import StaticFiles
 
 from .core.config import settings
 from .core.database import init_db
-from .exchanges.demo_client import DemoExchange
+from .exchanges import create_exchange
 from .agent.ai_trader import AITrader
 from .agent.training_loop import TrainingLoop
-from .api.routes import router, set_trader, set_training_loop
+from .agent.hourly_trainer import HourlyTrainer
+from .api.routes import router, set_trader, set_training_loop, set_hourly_trainer
 from .api.websocket import broadcast, websocket_endpoint
 
 logging.basicConfig(
@@ -56,6 +57,7 @@ async def ws_endpoint(websocket: WebSocket):
 _trader: AITrader = None
 _trader_task = None
 _training_loop_inst: TrainingLoop = None
+_hourly_trainer_inst: HourlyTrainer = None
 
 
 async def _snapshot_loop():
@@ -67,7 +69,7 @@ async def _snapshot_loop():
             if _trader:
                 balances = await _trader._exchange.get_balance()
                 analyses = _trader.analyses
-                cash_bal = balances.get("USDT")
+                cash_bal = balances.get(_trader._exchange.quote_currency)
                 cash = float(cash_bal.free) if cash_bal else 0.0
                 total = cash
                 positions = {}
@@ -100,23 +102,32 @@ async def _snapshot_loop():
 
 @app.on_event("startup")
 async def startup():
-    global _trader, _trader_task, _training_loop_inst
+    global _trader, _trader_task, _training_loop_inst, _hourly_trainer_inst
 
     init_db()
     logger.info(f"Database initialized")
 
-    exchange = DemoExchange()
+    exchange, ex_name = create_exchange()
+    # If live was requested but unconfigured, create_exchange falls back to demo.
+    # Keep the in-memory mode honest so the dashboard badge matches reality.
+    if settings.trading_mode == "live" and getattr(exchange, "is_demo", False):
+        settings.set("demo", "trading", "mode")
+        logger.warning("Live mode requested but no exchange configured — running DEMO. "
+                       "Add API keys in Settings, then switch to Live Mode.")
     _trader = AITrader(exchange)
     _trader.set_broadcast(broadcast)
 
     _training_loop_inst = TrainingLoop(_trader, broadcast_fn=broadcast)
+    _hourly_trainer_inst = HourlyTrainer(_trader._trainer, broadcast_fn=broadcast)
 
     set_trader(_trader)
     set_training_loop(_training_loop_inst)
+    set_hourly_trainer(_hourly_trainer_inst)
 
     _trader_task = asyncio.create_task(_trader.start())
     asyncio.create_task(_snapshot_loop())
-    logger.info(f"AI Trader started in {settings.trading_mode} mode with model={settings.ai_model}")
+    _hourly_trainer_inst.start()
+    logger.info(f"AI Trader started in {settings.trading_mode} mode (exchange={ex_name}) with model={settings.ai_model}")
 
     if settings.get("app", "open_browser", default=True):
         def open_browser():
@@ -137,7 +148,7 @@ async def shutdown():
 def main():
     print(f"""
 ╔══════════════════════════════════════════╗
-║        AI Auto Trader - Starting...      ║
+║          Aiterra v1.0.0 - Starting...    ║
 ║  Mode: {settings.trading_mode.upper():<10} Model: {settings.ai_model:<12}║
 ║  Port: {settings.app_port:<10} URL: http://localhost:{settings.app_port} ║
 ╚══════════════════════════════════════════╝

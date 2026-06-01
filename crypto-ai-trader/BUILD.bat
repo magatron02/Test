@@ -1,9 +1,9 @@
 @echo off
-title AI Auto Trader - Build Executable
+title Aiterra v1.0.0 - Build Executable
 color 0B
 echo.
 echo  ============================================
-echo    AI Auto Trader - Building .exe
+echo    Aiterra v1.0.0 - Building .exe
 echo  ============================================
 echo.
 
@@ -37,8 +37,8 @@ if errorlevel 1 (
 echo.
 echo  ============================================
 echo    Build Complete!
-echo    Output folder: dist\AI_Auto_Trader\
-echo    Run: dist\AI_Auto_Trader\AI_Auto_Trader.exe
+echo    Output folder: dist\Aiterra\
+echo    Run: dist\Aiterra\Aiterra.exe
 echo  ============================================
 echo.
 pause

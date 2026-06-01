@@ -34,6 +34,18 @@ class AITrainer:
         self._load_model()
 
     def _load_model(self):
+        # First run: seed the active model from the bundled seed (if shipped),
+        # so a fresh install has predictions immediately. The active model is
+        # never shipped in the package, so user-trained models survive updates.
+        if not self._model_path.exists():
+            seed = self._model_path.with_name("signal_model.seed.pkl")
+            if seed.exists():
+                try:
+                    import shutil
+                    shutil.copy(seed, self._model_path)
+                    logger.info("Seeded ML model from bundled seed")
+                except Exception as e:
+                    logger.warning(f"Could not seed model: {e}")
         if self._model_path.exists():
             try:
                 with open(self._model_path, "rb") as f:

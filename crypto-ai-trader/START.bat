@@ -1,27 +1,39 @@
 @echo off
-title AI Auto Trader
+cd /d "%~dp0"
+title Aiterra v1.0.0 - Running
 color 0A
 
-REM Check if venv exists
+cls
+echo.
+echo  ============================================================
+echo   Aiterra v1.0.0  --  AI Crypto Trader
+echo  ============================================================
+echo.
+
 if not exist venv\Scripts\activate.bat (
-    echo [ERROR] Virtual environment not found!
-    echo Please run SETUP.bat first.
+    echo  ERROR: Not installed yet!
+    echo  Please double-click INSTALL.bat first.
+    echo.
     pause
     exit /b 1
 )
 
+call venv\Scripts\activate.bat
+
+echo  Starting Aiterra...
+echo  Browser will open at http://localhost:8888
 echo.
-echo  ============================================
-echo    AI Auto Trader - Starting...
-echo  ============================================
+echo  Close this window to stop the program.
+echo  ============================================================
 echo.
 
-call venv\Scripts\activate.bat
+REM Open browser after 4 seconds
+start /b cmd /c "timeout /t 4 /nobreak >nul && start http://localhost:8888"
+
 python -m src.main
 
-REM If crash, pause to show error
 if errorlevel 1 (
     echo.
-    echo [ERROR] Application crashed. See error above.
+    echo  ERROR: Aiterra crashed. See error above.
     pause
 )

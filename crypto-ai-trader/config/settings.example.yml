@@ -1,5 +1,5 @@
 app:
-  name: "AI Auto Trader"
+  name: "Aiterra v1.0.0"
   port: 8888
   open_browser: true
   log_level: "INFO"
@@ -9,15 +9,18 @@ ai:
   claude:
     api_key: ""             # ใส่ Claude API key ที่นี่
     model: "claude-sonnet-4-6"  # claude-opus-4-8 | claude-sonnet-4-6 | claude-haiku-4-5-20251001
-    max_tokens: 1024
+    max_tokens: 2048            # agentic loop: tool use + multi-step reasoning needs headroom
   rule_based:
     enabled: true
   ml:
     enabled: true
     min_training_samples: 30  # เริ่ม train เมื่อมี trade ครบจำนวนนี้
     retrain_interval: 50      # retrain ทุก N trades
+  hourly_train_interval: 3600  # ดึงข้อมูลจริงจาก Binance ทุก N วินาที (3600 = 1 ชั่วโมง)
 
 exchanges:
+  active: "binance"         # live exchange to trade on when mode=live
+                            # options: binance | binance_th | bitkub | okx
   binance:
     api_key: ""
     api_secret: ""
@@ -106,7 +109,9 @@ thai:
 
 notifications:
   line:
-    token: ""               # LINE Notify token
+    channel_id: ""          # LINE Messaging API — Channel ID (จาก LINE Developers Console)
+    channel_secret: ""      # Channel Secret (จาก LINE Developers Console)
+    user_id: ""             # LINE User ID (ไม่บังคับ — ว่าง = broadcast ทุกคนที่ follow bot)
     enabled: false
   telegram:
     bot_token: ""           # Telegram Bot token
