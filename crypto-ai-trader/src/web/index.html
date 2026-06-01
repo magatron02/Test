@@ -1342,9 +1342,17 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
               <i class="bi bi-exclamation-triangle me-1"></i>Live Mode
             </button>
           </div>
+          <label class="form-label small mb-1 mt-1">Live Exchange (เทรดเงินจริงผ่าน)</label>
+          <select class="form-select form-select-sm mb-1" id="activeExchange" onchange="setActiveExchange()">
+            <option value="binance">Binance</option>
+            <option value="binance_th">Binance TH</option>
+            <option value="bitkub">Bitkub</option>
+            <option value="okx">OKX</option>
+          </select>
+          <div id="liveReadiness" class="small mb-1"></div>
           <div id="modeSwapResult" class="small mt-2" style="display:none"></div>
           <small class="text-muted d-block mt-1">สลับ Demo↔Live ได้ทันทีโดยไม่ต้อง restart</small>
-          <small class="text-muted">Demo Mode: virtual money · Live Mode: ต้องตั้งค่า API key ก่อน</small>
+          <small class="text-muted">Demo Mode: virtual money · Live Mode: ต้องเปิด exchange + ใส่ API key ก่อน</small>
         </div>
       </div>
 
@@ -1839,19 +1847,37 @@ async function fetchPortfolioStats() {
   try {
     const r = await fetch('/api/portfolio');
     const d = await r.json();
-    const initial = 10000;
-    animateNum('totalValue', d.total_value, '$', '', 2);
-    animateNum('cashValue',  d.cash_usdt,   '$', '', 2);
+    // Live API/auth hiccup → soft payload with zeros + error. Don't render
+    // bogus -100% PnL; keep the last good values and surface the error.
+    if (d.error) {
+      const oc = document.getElementById('openPosCount');
+      if (oc) oc.title = 'ข้อมูล Live ไม่พร้อม: ' + d.error;
+      return;
+    }
+    const cur = d.quote_currency || 'USDT';
+    const sym = cur === 'USDT' ? '$' : '';
+    const initial = 10000;   // demo virtual baseline; PnL-vs-initial is meaningful in demo
+    animateNum('totalValue', d.total_value, sym, sym ? '' : ' ' + cur, 2);
+    animateNum('cashValue',  d.cash_usdt,   sym, sym ? '' : ' ' + cur, 2);
     document.getElementById('positionCount').textContent = d.positions.length + ' positions';
+    const isDemo = d.is_demo !== false;
     const pnl = d.total_value - initial;
-    document.getElementById('totalPnl').textContent = (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + ' USDT';
-    document.getElementById('totalPnl').className = 'small ' + (pnl >= 0 ? 'text-success' : 'text-danger');
-    const pnlPct = (d.total_value - initial) / initial * 100;
+    const pnlEl = document.getElementById('totalPnl');
     const pnlPctEl = document.getElementById('totalPnlPct');
-    if (pnlPctEl) { pnlPctEl.textContent = (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '%'; pnlPctEl.style.color = pnlPct >= 0 ? 'var(--accent)' : 'var(--accent-red)'; }
     const todayEl = document.getElementById('todayPnl');
-    if (todayEl) { todayEl.textContent = (pnl >= 0 ? '+$' : '-$') + Math.abs(pnl).toFixed(2); todayEl.className = 'stat-value ' + (pnl >= 0 ? 'text-success' : 'text-danger'); }
-    const oc = document.getElementById('openPosCount'); if (oc) oc.textContent = d.positions.length;
+    if (isDemo) {
+      pnlEl.textContent = (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + ' ' + cur;
+      pnlEl.className = 'small ' + (pnl >= 0 ? 'text-success' : 'text-danger');
+      const pnlPct = pnl / initial * 100;
+      if (pnlPctEl) { pnlPctEl.textContent = (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '%'; pnlPctEl.style.color = pnlPct >= 0 ? 'var(--accent)' : 'var(--accent-red)'; }
+      if (todayEl) { todayEl.textContent = (pnl >= 0 ? '+' : '-') + sym + Math.abs(pnl).toFixed(2) + (sym ? '' : ' ' + cur); todayEl.className = 'stat-value ' + (pnl >= 0 ? 'text-success' : 'text-danger'); }
+    } else {
+      // Live: no fixed baseline — show holdings value, not a fabricated PnL.
+      pnlEl.textContent = 'LIVE'; pnlEl.className = 'small text-info';
+      if (pnlPctEl) { pnlPctEl.textContent = ''; }
+      if (todayEl) { todayEl.textContent = sym + d.total_value.toFixed(2) + (sym ? '' : ' ' + cur); todayEl.className = 'stat-value text-info'; }
+    }
+    const oc = document.getElementById('openPosCount'); if (oc) { oc.textContent = d.positions.length; oc.title = ''; }
 
     // Update portfolio chart
     const now = new Date().toLocaleTimeString('th', {hour:'2-digit', minute:'2-digit'});
@@ -1859,11 +1885,11 @@ async function fetchPortfolioStats() {
     portfolioData.labels.push(now);
     portfolioData.values.push(d.total_value);
     charts.portfolio.updateOptions({xaxis:{categories:portfolioData.labels}},false,false);
-    charts.portfolio.updateSeries([{name:'Portfolio (USDT)',data:portfolioData.values}],false);
+    charts.portfolio.updateSeries([{name:'Portfolio (' + cur + ')',data:portfolioData.values}],false);
 
     updateOpenPositions(d.positions);
-    updateHoldings(d.positions, d.cash_usdt, d.total_value);
-    updateAllocationChart(d.positions, d.cash_usdt);
+    updateHoldings(d.positions, d.cash_usdt, d.total_value, cur);
+    updateAllocationChart(d.positions, d.cash_usdt, cur);
   } catch {}
 }
 
@@ -2002,11 +2028,12 @@ function updateOpenPositions(positions) {
     </tbody></table>`;
 }
 
-function updateHoldings(positions, cash, total) {
+function updateHoldings(positions, cash, total, cur) {
+  cur = cur || 'USDT';
   const body = document.getElementById('holdingsBody');
   if (!positions.length && cash <= 0) { body.innerHTML = '<tr><td colspan="6" class="text-center text-muted">ไม่มีข้อมูล</td></tr>'; return; }
   let rows = '';
-  if (cash > 0) rows += `<tr><td>USDT</td><td>${cash.toFixed(2)}</td><td>$1.00</td><td>$${cash.toFixed(2)}</td><td>—</td><td>—</td></tr>`;
+  if (cash > 0) rows += `<tr><td>${cur}</td><td>${cash.toFixed(2)}</td><td>1.00 ${cur}</td><td>${cash.toFixed(2)} ${cur}</td><td>—</td><td>—</td></tr>`;
   for (const p of positions) {
     rows += `<tr>
       <td>${p.symbol.split('/')[0]}</td>
@@ -2020,8 +2047,8 @@ function updateHoldings(positions, cash, total) {
   body.innerHTML = rows;
 }
 
-function updateAllocationChart(positions, cash) {
-  const labels = ['USDT'];
+function updateAllocationChart(positions, cash, cur) {
+  const labels = [cur || 'USDT'];
   const data = [cash];
   const colors = ['#A8FF53'];
   const palette = ['#39d98a','#ff6b35','#d29922','#A8FF53','#A8FF53','#A8FF53'];
@@ -2380,6 +2407,7 @@ async function hotSwapMode(mode) {
     resultEl.innerHTML = `<span style="color:var(--accent-buy)">🟢 สลับเป็น ${d.mode.toUpperCase()}${exLabel} สำเร็จ</span>`;
     showToast('Mode', `Switched to ${d.mode.toUpperCase()}${exLabel}`, mode === 'demo' ? 'success' : 'warning');
     _updateModeBadge(d.mode);
+    refreshLiveReadiness();
     await fetchStatus();
   } catch(e) {
     resultEl.innerHTML = `<span style="color:var(--accent-red)">🔴 ${e.message}</span>`;
@@ -2397,6 +2425,35 @@ function _updateModeBadge(mode) {
   const btnLive = document.getElementById('btnLive');
   if (btnDemo) btnDemo.className = mode === 'demo' ? 'btn btn-success btn-sm' : 'btn btn-outline-success btn-sm';
   if (btnLive) btnLive.className = mode === 'live' ? 'btn btn-danger btn-sm'  : 'btn btn-outline-danger btn-sm';
+}
+
+async function setActiveExchange() {
+  const ex = document.getElementById('activeExchange').value;
+  try {
+    await fetch('/api/exchange/active', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({exchange: ex}),
+    });
+    showToast('Live Exchange', `เลือก ${ex} สำหรับ Live Mode`, 'info');
+    refreshLiveReadiness();
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+}
+
+async function refreshLiveReadiness() {
+  const el = document.getElementById('liveReadiness');
+  if (!el) return;
+  try {
+    const d = await (await fetch('/api/exchange/active')).json();
+    const sel = document.getElementById('activeExchange');
+    if (sel && d.active) sel.value = d.active;
+    const ready = d.resolved;
+    if (ready) {
+      el.innerHTML = `<span style="color:var(--accent-buy)">✓ พร้อมเทรดจริงผ่าน <b>${ready}</b></span>`;
+    } else {
+      el.innerHTML = `<span style="color:var(--accent-red)">✗ ยังไม่พร้อม — เปิด exchange + ใส่ API key ในการ์ด Exchange API Keys</span>`;
+    }
+  } catch(e) { el.innerHTML = ''; }
 }
 
 async function saveAISettings() {
@@ -2476,6 +2533,12 @@ async function loadSettings() {
       const tb = document.getElementById(`${ex}_testnet`);
       if (tb && d.exchanges?.[ex]) tb.checked = !!d.exchanges[ex].testnet;
     });
+    // Active live exchange + readiness
+    if (d.exchanges?.active) {
+      const sel = document.getElementById('activeExchange');
+      if (sel) sel.value = d.exchanges.active;
+    }
+    refreshLiveReadiness();
     // Notification events
     const notif = d.notifications?.notify_on || {};
     const safe = (id, def) => { const el = document.getElementById(id); if (el) el.checked = notif[def] !== false; };

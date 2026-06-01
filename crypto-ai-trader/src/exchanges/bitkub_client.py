@@ -26,6 +26,7 @@ SYMBOL_MAP = {
 
 class BitkubExchange(BaseExchange):
     name = "bitkub"
+    quote_currency = "THB"
 
     def __init__(self):
         cfg = settings.get("exchanges", "bitkub") or {}

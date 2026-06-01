@@ -47,13 +47,25 @@ class BinanceExchange(BaseExchange):
 
     async def get_balance(self) -> Dict[str, Balance]:
         data = await self._client.fetch_balance()
+        free  = data.get("free", {})  or {}
+        used  = data.get("used", {})  or {}
+        total = data.get("total", {}) or {}
         return {
-            cur: Balance(cur, float(v["free"]), float(v["used"]), float(v["total"]))
-            for cur, v in data["total"].items()
-            if float(v) > 0
+            cur: Balance(cur, float(free.get(cur, 0) or 0), float(used.get(cur, 0) or 0), float(amt or 0))
+            for cur, amt in total.items()
+            if float(amt or 0) > 0
         }
 
     async def create_order(self, symbol: str, side: str, amount: float, price: Optional[float] = None) -> Order:
+        # Round to the exchange's lot-size precision so live orders aren't rejected.
+        try:
+            if not self._client.markets:
+                await self._client.load_markets()
+            amount = float(self._client.amount_to_precision(symbol, amount))
+        except Exception as e:
+            logger.warning(f"amount_to_precision failed for {symbol}: {e}")
+        if amount <= 0:
+            raise ValueError(f"Order amount rounds to 0 for {symbol} (below min lot size)")
         fn = self._client.create_market_buy_order if side == "buy" else self._client.create_market_sell_order
         data = await fn(symbol, amount)
         return Order(

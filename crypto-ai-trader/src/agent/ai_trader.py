@@ -133,23 +133,25 @@ class AITrader:
             return None
 
     async def _get_portfolio_summary(self) -> dict:
+        quote = self._exchange.quote_currency
         try:
             balances = await self._exchange.get_balance()
-            cash = balances.get("USDT")
-            prices = {sym: a.price for sym, a in self._analyses.items()}
-            total = float(cash.free) if cash else 0
+            cash = balances.get(quote)
+            avail = float(cash.free) if cash else 0
+            total = avail
             for sym, analysis in self._analyses.items():
                 base = sym.split("/")[0]
                 bal = balances.get(base)
                 if bal:
                     total += bal.total * analysis.price
             return {
-                "cash_usdt": float(cash.free) if cash else 0,
+                "cash_usdt": avail,          # holds `quote` balance (name kept for back-compat)
+                "available_usdt": avail,
                 "total_value": total,
                 "open_positions": len(self._open_trades),
             }
         except Exception:
-            return {"cash_usdt": 0, "total_value": 0, "open_positions": 0}
+            return {"cash_usdt": 0, "available_usdt": 0, "total_value": 0, "open_positions": 0}
 
     async def _check_risk_limits(self) -> Tuple[bool, str]:
         """Check daily loss limit and max open trades. Returns (allowed, reason)."""
@@ -220,8 +222,9 @@ class AITrader:
                 return False
 
         try:
+            quote = self._exchange.quote_currency
             balances = await self._exchange.get_balance()
-            cash = balances.get("USDT")
+            cash = balances.get(quote)
 
             if signal.action == "BUY":
                 avail = float(cash.free) if cash else 0

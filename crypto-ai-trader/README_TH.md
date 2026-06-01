@@ -40,7 +40,23 @@
 | โหมด | คำอธิบาย |
 |------|-----------|
 | **Demo Mode** | เทรดด้วย virtual money ใช้ข้อมูลตลาดจริง — เพื่อเทรน AI |
-| **Live Mode** | เทรดด้วยเงินจริง (ต้องใส่ API key ก่อน) |
+| **Live Mode** | เทรดด้วยเงินจริง (ต้องตั้งค่า Exchange + API key ก่อน) |
+
+---
+
+## วิธีเปิด Live Mode (เทรดเงินจริง)
+
+> ⚠️ Live Mode ใช้เงินจริง — แนะนำให้รัน Demo จนกว่า AI จะเทรนพอแล้วค่อยเปิด
+
+1. ไปที่ **Settings → Exchange API Keys** เลือก exchange ที่ใช้ (Binance / Binance TH / Bitkub / OKX)
+2. ใส่ **API Key + API Secret** (OKX ต้องมี Passphrase ด้วย) แล้วติ๊ก **Enable** → กด **Save & Test**
+3. ที่การ์ด **Trading Mode** เลือก exchange ใน **Live Exchange** ให้ตรงกัน
+   - แถบ "พร้อมเทรดจริงผ่าน …" จะเป็นสีเขียวเมื่อตั้งค่าครบ
+4. กดปุ่ม **Live Mode** → ยืนยัน → ระบบสลับเป็นเงินจริงทันที (ไม่ต้อง restart)
+5. กลับมา Demo เมื่อไหร่ก็กดปุ่ม **Demo Mode** ได้เลย
+
+> - Binance / OKX เทรดคู่ **USDT** · Bitkub / Binance TH เทรดคู่ **THB** (ระบบจะอ่านยอดเงินตามสกุลของ exchange ให้อัตโนมัติ)
+> - ต้องปิด position ที่เปิดค้างใน Live ก่อน ถึงจะสลับ mode ได้ (กันลืม position เงินจริง)
 
 ---
 

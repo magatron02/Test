@@ -51,6 +51,7 @@ class BinanceTHExchange(BaseExchange):
     """Binance TH (Thailand) exchange — trades THB pairs via /api/v1/ endpoints."""
 
     name = "binance_th"
+    quote_currency = "THB"
 
     def __init__(self):
         cfg = settings.get("exchanges", "binance_th") or {}

@@ -184,15 +184,18 @@ class ClaudeAnalyzer:
     async def _tool_portfolio_state(self) -> str:
         if not self._exchange:
             return json.dumps({"error": "exchange unavailable"})
+        quote = self._exchange.quote_currency
         balances = await self._exchange.get_balance()
-        cash = balances.get("USDT")
+        cash = balances.get(quote)
         holdings = {
             asset: {"free": round(b.free, 6), "total": round(b.total, 6)}
             for asset, b in balances.items()
             if b.total and b.total > 0
         }
         return json.dumps({
-            "cash_usdt": round(float(cash.free), 2) if cash else 0.0,
+            "quote_currency": quote,
+            "cash": round(float(cash.free), 2) if cash else 0.0,
+            "cash_usdt": round(float(cash.free), 2) if cash else 0.0,  # back-compat
             "holdings": holdings,
         })
 

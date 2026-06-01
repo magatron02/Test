@@ -71,13 +71,15 @@ async def get_prices():
 async def get_portfolio():
     if not _trader:
         raise HTTPException(503, "Trader not running")
+    # Quote currency (USDT for global exchanges, THB for Bitkub / Binance TH)
+    quote = _trader._exchange.quote_currency
     try:
         balances = await _trader._exchange.get_balance()
         analyses = _trader.analyses
         positions = []
         total_value = 0.0
 
-        cash_bal = balances.get("USDT")
+        cash_bal = balances.get(quote)
         cash = float(cash_bal.free) if cash_bal else 0.0
         total_value += cash
 
@@ -98,13 +100,23 @@ async def get_portfolio():
                 })
 
         return {
-            "cash_usdt": cash,
+            "cash_usdt": cash,        # kept for UI back-compat; holds `quote` balance
+            "quote_currency": quote,
             "total_value": total_value,
             "positions": positions,
             "is_demo": _trader._exchange.is_demo,
         }
     except Exception as e:
-        raise HTTPException(500, str(e))
+        # In live mode a transient API/auth error shouldn't blank the dashboard.
+        logger.warning(f"Portfolio fetch failed ({_trader._exchange.name}): {e}")
+        return {
+            "cash_usdt": 0.0,
+            "quote_currency": quote,
+            "total_value": 0.0,
+            "positions": [],
+            "is_demo": _trader._exchange.is_demo,
+            "error": str(e)[:160],
+        }
 
 
 @router.get("/trades")
@@ -726,8 +738,9 @@ class ChatHandler:
         if not self._trader:
             return {"type": "error", "reply": "Trader ไม่พร้อมใช้งาน"}
         try:
+            quote = self._trader._exchange.quote_currency
             balances = await self._trader._exchange.get_balance()
-            cash_bal = balances.get("USDT")
+            cash_bal = balances.get(quote)
             cash = float(cash_bal.free) if cash_bal else 0.0
             total = cash
             lines = []
@@ -737,9 +750,9 @@ class ChatHandler:
                 if bal and bal.total > 0:
                     value = bal.total * analysis.price
                     total += value
-                    lines.append(f"  {base}: {bal.total:.6f} (${value:.2f})")
+                    lines.append(f"  {base}: {bal.total:.6f} ({value:.2f} {quote})")
             pos_text = "\n".join(lines) if lines else "  ไม่มี open position"
-            reply = f"พอร์ตโฟลิโอ\nCash: ${cash:.2f} USDT\nTotal: ${total:.2f} USDT\n\nPositions:\n{pos_text}"
+            reply = f"พอร์ตโฟลิโอ\nCash: {cash:.2f} {quote}\nTotal: {total:.2f} {quote}\n\nPositions:\n{pos_text}"
             return {"type": "portfolio", "reply": reply}
         except Exception as e:
             return {"type": "error", "reply": f"ดึงข้อมูลพอร์ตไม่ได้: {e}"}
@@ -827,27 +840,29 @@ async def test_exchanges():
         except Exception as e:
             results["demo"] = {"ok": False, "error": str(e)}
 
-    # Test each configured live exchange
-    exchange_map = {
-        "binance": ("..exchanges.binance_client", "BinanceExchange"),
-        "okx":     ("..exchanges.okx_client",     "OKXExchange"),
-        "bitkub":  ("..exchanges.bitkub_client",   "BitkubExchange"),
-    }
-    for name, (module_path, class_name) in exchange_map.items():
+    # Test each configured live exchange (single source of truth = factory)
+    from ..exchanges import LIVE_EXCHANGES, has_credentials
+    from ..exchanges.factory import _load
+    for name in LIVE_EXCHANGES:
         cfg = settings.get("exchanges", name) or {}
-        if not cfg.get("enabled") or not cfg.get("api_key"):
+        if not cfg.get("enabled") or not has_credentials(name):
             results[name] = {"ok": None, "status": "not_configured"}
             continue
+        # THB venues quote against THB, not USDT — probe a symbol they list.
+        probe = "BTC/THB" if name in ("bitkub", "binance_th") else "BTC/USDT"
+        client = None
         try:
-            import importlib
-            mod = importlib.import_module(module_path, package="src.api")
-            cls = getattr(mod, class_name)
-            client = cls()
-            ticker = await client.get_ticker("BTC/USDT")
-            await client.close()
+            client = _load(name)
+            ticker = await client.get_ticker(probe)
             results[name] = {"ok": True, "price": ticker.price}
         except Exception as e:
             results[name] = {"ok": False, "error": str(e)[:120]}
+        finally:
+            if client is not None and hasattr(client, "close"):
+                try:
+                    await client.close()
+                except Exception:
+                    pass
 
     return results
 
@@ -939,36 +954,23 @@ async def hot_swap_mode(data: Dict[str, str]):
     if not _trader:
         raise HTTPException(503, "Trader not running")
 
-    from ..exchanges.demo_client import DemoExchange
+    from ..exchanges import DemoExchange, create_live_exchange_strict, LiveExchangeError
 
     if mode == "demo":
         new_exchange = DemoExchange()
         exchange_name = "demo"
     else:
-        # Find first configured live exchange
-        new_exchange = None
-        exchange_name = None
-        exchange_map = {
-            "binance":    ("..exchanges.binance_client",    "BinanceExchange"),
-            "binance_th": ("..exchanges.binance_th_client", "BinanceTHExchange"),
-            "bitkub":     ("..exchanges.bitkub_client",     "BitkubExchange"),
-            "okx":        ("..exchanges.okx_client",        "OKXExchange"),
-        }
-        import importlib
-        for ex_name, (mod_path, cls_name) in exchange_map.items():
-            cfg = settings.get("exchanges", ex_name) or {}
-            if cfg.get("enabled") and cfg.get("api_key"):
-                try:
-                    mod = importlib.import_module(mod_path, package="src.api")
-                    cls = getattr(mod, cls_name)
-                    new_exchange = cls()
-                    exchange_name = ex_name
-                    break
-                except Exception as e:
-                    logger.warning(f"Could not load exchange {ex_name}: {e}")
+        try:
+            new_exchange, exchange_name = create_live_exchange_strict()
+        except LiveExchangeError as e:
+            raise HTTPException(400, str(e))
 
-        if new_exchange is None:
-            raise HTTPException(400, "No live exchange configured. Enable an exchange and add API keys in Settings first.")
+    # Refuse to abandon real open positions on a live→demo (or live→live) switch.
+    if not _trader._exchange.is_demo and _trader._open_trades:
+        raise HTTPException(
+            409,
+            f"Close your {len(_trader._open_trades)} open live position(s) before switching modes."
+        )
 
     # Close old exchange if it has a close() method
     old_exchange = _trader._exchange
@@ -978,9 +980,12 @@ async def hot_swap_mode(data: Dict[str, str]):
     except Exception:
         pass
 
-    # Swap in the new exchange — hot-swap while trader loop continues
+    # Swap in the new exchange — hot-swap while the trader loop keeps running.
     _trader._exchange = new_exchange
-    _trader._analyses.clear()   # stale prices from old exchange
+    _trader._claude.set_exchange(new_exchange)   # Claude tool-calls must hit the new exchange
+    _trader._analyses.clear()                    # stale prices from the old exchange
+    _trader._open_trades.clear()                 # positions belong to the previous exchange/mode
+    _trader._daily_pnl = 0.0                      # realized PnL is per-exchange
     settings.set(mode, "trading", "mode")
     settings.save()
 
@@ -988,4 +993,41 @@ async def hot_swap_mode(data: Dict[str, str]):
     await _trader._broadcast("mode_changed", {"mode": mode, "exchange": exchange_name})
 
     return {"mode": mode, "exchange": exchange_name, "swapped": True}
+
+
+@router.get("/exchange/active")
+async def get_active_exchange():
+    """GET /api/exchange/active — which live exchange is selected and which would
+    actually be used (resolved), plus the live-readiness of each exchange."""
+    from ..exchanges import LIVE_EXCHANGES, has_credentials, resolve_live_exchange
+    status = {}
+    for name in LIVE_EXCHANGES:
+        cfg = settings.get("exchanges", name) or {}
+        status[name] = {
+            "enabled": bool(cfg.get("enabled")),
+            "has_keys": has_credentials(name),
+            "ready": bool(cfg.get("enabled")) and has_credentials(name),
+        }
+    return {
+        "active": settings.get("exchanges", "active", default=""),
+        "resolved": resolve_live_exchange(),   # what live mode would actually use
+        "current": _trader._exchange.name if _trader else None,
+        "mode": settings.trading_mode,
+        "exchanges": status,
+    }
+
+
+@router.post("/exchange/active")
+async def set_active_exchange(data: Dict[str, str]):
+    """POST /api/exchange/active — choose which live exchange to trade on.
+    Body: {"exchange": "binance"|"binance_th"|"bitkub"|"okx"}
+    Does not switch mode; call /api/mode/swap to go live.
+    """
+    from ..exchanges import LIVE_EXCHANGES
+    name = (data.get("exchange") or "").strip()
+    if name not in LIVE_EXCHANGES:
+        raise HTTPException(400, f"exchange must be one of {list(LIVE_EXCHANGES)}")
+    settings.set(name, "exchanges", "active")
+    settings.save()
+    return {"active": name}
 

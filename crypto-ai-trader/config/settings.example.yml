@@ -19,6 +19,8 @@ ai:
   hourly_train_interval: 3600  # ดึงข้อมูลจริงจาก Binance ทุก N วินาที (3600 = 1 ชั่วโมง)
 
 exchanges:
+  active: "binance"         # live exchange to trade on when mode=live
+                            # options: binance | binance_th | bitkub | okx
   binance:
     api_key: ""
     api_secret: ""
