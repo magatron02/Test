@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from ..core.config import settings
-from ..core.database import Portfolio, Trade, TrainingRecord, get_db, SessionLocal
+from ..core.database import ModelVersion, Portfolio, Trade, TrainingRecord, get_db, SessionLocal
 from .websocket import get_notifications, clear_notifications
 from ..notifications import line_notify, telegram_notify
 
@@ -191,6 +191,13 @@ async def trigger_training():
         raise HTTPException(503, "Trader not running")
     success = _trader._trainer.train()
     return {"success": success, "stats": _trader.trainer_stats}
+
+
+@router.get("/ai/model/history")
+async def get_model_history(limit: int = 30):
+    if not _trader:
+        raise HTTPException(503, "Trader not running")
+    return _trader._trainer.model_history(limit=limit)
 
 
 @router.get("/settings")

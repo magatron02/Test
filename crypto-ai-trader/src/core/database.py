@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from sqlalchemy import (
-    Column, DateTime, Float, Integer, JSON, String, Text, create_engine
+    Boolean, Column, DateTime, Float, Integer, JSON, String, Text, create_engine
 )
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -76,6 +76,22 @@ class PriceCache(Base):
     high_24h = Column(Float)
     low_24h = Column(Float)
     updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ModelVersion(Base):
+    __tablename__ = "model_versions"
+    id = Column(Integer, primary_key=True, index=True)
+    version = Column(Integer, index=True)
+    cv_accuracy = Column(Float)           # cross-val accuracy (train set)
+    val_accuracy = Column(Float)          # held-out validation accuracy
+    training_samples = Column(Integer)
+    val_samples = Column(Integer)
+    win_rate = Column(Float, nullable=True)
+    feature_importances = Column(JSON, nullable=True)
+    is_active = Column(Boolean, default=True)
+    kept = Column(Boolean, default=True)  # False = rejected (worse than prev best)
+    notes = Column(String(300), nullable=True)
+    saved_at = Column(DateTime, default=datetime.utcnow, index=True)
 
 
 def init_db():

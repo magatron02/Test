@@ -949,6 +949,41 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
     </div>
   </div>
 
+  <!-- Model Evolution card -->
+  <div class="card mb-3" style="border-color:rgba(168,255,83,0.2)">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-graph-up-arrow me-2"></i>Model Evolution
+        <span class="badge ms-2" style="background:rgba(168,255,83,0.12);color:var(--accent);font-size:0.6rem" id="modelVersionBadge">v0</span>
+      </span>
+      <div class="d-flex gap-3 align-items-center">
+        <span class="small text-muted">Val Acc: <b id="modelValAcc" style="color:var(--accent)">—</b></span>
+        <span class="small text-muted">Best: <b id="modelBestAcc" style="color:var(--accent-green)">—</b></span>
+        <span class="small text-muted">Samples: <b id="modelTrainSamples">—</b></span>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      <div style="overflow-x:auto">
+        <table class="table table-sm mb-0" style="font-size:0.75rem;font-family:var(--font-mono)">
+          <thead style="background:var(--bg-card2)">
+            <tr>
+              <th class="ps-3">Version</th>
+              <th>CV Acc</th>
+              <th>Val Acc</th>
+              <th>Train N</th>
+              <th>Val N</th>
+              <th>Status</th>
+              <th>Saved At</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody id="modelHistoryBody">
+            <tr><td colspan="8" class="text-center text-muted p-3">No version history yet — train to start</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- Manual training card (existing) -->
   <div class="row g-3">
     <div class="col-md-7">
@@ -979,7 +1014,7 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
               <li>เทรด paper trade ด้วย TP=4% / SL=2% ให้ได้ 40+ trades</li>
               <li>ทุก 25 trades → retrain RandomForest model อัตโนมัติ</li>
               <li>Loop หยุดอัตโนมัติเมื่อ Win Rate ≥ 80%</li>
-              <li>Model ที่ผ่านการ train แล้วจะถูกใช้ใน live trading ทันที</li>
+              <li>Model บันทึกทุก version — ใช้เฉพาะ version ที่ดีกว่าเดิม</li>
             </ol>
           </div>
           <div class="mt-3" id="trainResultBox" style="display:none">
@@ -2160,11 +2195,56 @@ async function refreshTraining() {
     document.getElementById('trainProgress').textContent = `${d.total_records % interval} / ${interval}`;
     document.getElementById('trainProgressBar').style.width = pct + '%';
 
-    // Mock feature importance if model ready
-    if (d.model_ready) {
+    // Update model version header stats
+    if (d.model_version) document.getElementById('modelVersionBadge').textContent = 'v' + d.model_version;
+    if (d.val_accuracy)  document.getElementById('modelValAcc').textContent = (d.val_accuracy * 100).toFixed(1) + '%';
+    if (d.best_val_accuracy) document.getElementById('modelBestAcc').textContent = (d.best_val_accuracy * 100).toFixed(1) + '%';
+    if (d.training_trades)   document.getElementById('modelTrainSamples').textContent = d.training_trades;
+
+    // Real feature importances from model stats
+    if (d.feature_importances && Object.keys(d.feature_importances).length) {
+      const fi = d.feature_importances;
+      const keys = ['rsi','macd_hist','bb_position','atr_pct','volume_ratio','price_vs_vwap','change_24h','ema_9_vs_21'];
+      const vals = keys.map(k => parseFloat((fi[k] || 0).toFixed(4)));
+      charts.features.updateSeries([{name:'Importance',data:vals}]);
+    } else if (d.model_ready) {
+      // Fallback until a trained model provides importances
       const importance = [0.18, 0.15, 0.14, 0.12, 0.11, 0.10, 0.11, 0.09];
       charts.features.updateSeries([{name:'Importance',data:importance}]);
     }
+  } catch {}
+  await refreshModelHistory();
+}
+
+async function refreshModelHistory() {
+  try {
+    const r = await fetch('/api/ai/model/history?limit=20');
+    if (!r.ok) return;
+    const rows = await r.json();
+    const tbody = document.getElementById('modelHistoryBody');
+    if (!rows || !rows.length) return;
+    const fmt = iso => iso ? new Date(iso).toLocaleString('th', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+    tbody.innerHTML = rows.map(v => {
+      const keptBadge = v.kept
+        ? `<span class="badge" style="background:rgba(57,217,138,0.15);color:var(--accent-green)">kept</span>`
+        : `<span class="badge" style="background:rgba(255,107,53,0.15);color:var(--accent-red)">rejected</span>`;
+      const activeBadge = v.is_active
+        ? ` <span class="badge" style="background:rgba(168,255,83,0.2);color:var(--accent);font-size:0.55rem">ACTIVE</span>`
+        : '';
+      const cvPct = v.cv_accuracy != null ? (v.cv_accuracy * 100).toFixed(1) + '%' : '—';
+      const valPct = v.val_accuracy != null ? (v.val_accuracy * 100).toFixed(1) + '%' : '—';
+      const valColor = v.val_accuracy != null ? (v.val_accuracy >= 0.65 ? 'var(--accent-green)' : v.val_accuracy >= 0.55 ? 'var(--accent)' : 'var(--accent-red)') : '';
+      return `<tr>
+        <td class="ps-3"><b>v${v.version}</b>${activeBadge}</td>
+        <td>${cvPct}</td>
+        <td style="color:${valColor}">${valPct}</td>
+        <td>${v.training_samples ?? '—'}</td>
+        <td>${v.val_samples ?? '—'}</td>
+        <td>${keptBadge}</td>
+        <td class="text-muted">${fmt(v.saved_at)}</td>
+        <td class="text-muted" style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${v.notes||''}">${v.notes||'—'}</td>
+      </tr>`;
+    }).join('');
   } catch {}
 }
 
@@ -2217,7 +2297,8 @@ async function triggerTraining() {
     box.style.display = '';
     if (d.success) {
       msg.className = 'alert alert-success mb-0 small';
-      msg.textContent = `Training complete! Accuracy: ${(d.stats.accuracy * 100).toFixed(1)}% on ${d.stats.training_trades} trades`;
+      const val = d.stats.val_accuracy ? ` | val=${(d.stats.val_accuracy*100).toFixed(1)}%` : '';
+      msg.textContent = `Training complete! v${d.stats.model_version||'?'} · CV=${(d.stats.accuracy*100).toFixed(1)}%${val} · ${d.stats.training_trades} samples`;
     } else {
       msg.className = 'alert alert-warning mb-0 small';
       msg.textContent = `Not enough data yet (${d.stats.labelled_records || 0} labelled trades, need ${d.stats.min_samples || 30})`;
@@ -2339,6 +2420,7 @@ function handleLoopTradeClosed(d) {
 function handleLoopModelUpdated(d) {
   appendLoopLog(`<span style="color:#A8FF53">🧠 Model retrained — accuracy: ${d.accuracy ? (d.accuracy*100).toFixed(1)+'%' : 'N/A'} | trades: ${d.total}</span>`);
   if (d.accuracy) document.getElementById('loopAccuracy').textContent = (d.accuracy * 100).toFixed(1) + '%';
+  refreshModelHistory();
 }
 
 function handleLoopProgress(d) {
