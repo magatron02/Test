@@ -370,12 +370,102 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
 }
 #chatInput:focus { border-color:rgba(168,255,83,0.5); }
 [data-theme="light"] #chatInput { background:#fff; border-color:var(--border); color:#0d0d0d; }
+
+/* ── Pixel Art Sprites ── */
+.pixel-sprite {
+  width: 3px; height: 3px;
+  flex-shrink: 0;
+  image-rendering: pixelated;
+  border-radius: 0;
+}
+.pixel-sprite-wrap {
+  width: 24px; height: 24px; /* 8×8 at 3px per pixel */
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ── Mobile Responsive ── */
+.topnav-hamburger {
+  display: none;
+  background: none; border: 1px solid var(--border2); color: var(--text-muted);
+  padding: 5px 9px; border-radius: 4px; cursor: pointer; font-size: 1.1rem;
+  line-height: 1; transition: border-color 0.15s, color 0.15s;
+}
+.topnav-hamburger:hover { border-color: var(--accent); color: var(--accent); }
+
+.mobile-menu {
+  display: none;
+  position: fixed; top: 62px; left: 0; right: 0; z-index: 190;
+  background: rgba(0,0,0,0.97);
+  backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 20px 18px;
+  flex-direction: column; gap: 4px;
+  animation: sectionIn 0.18s ease forwards;
+}
+.mobile-menu.open { display: flex; }
+.mobile-menu .pill-link {
+  width: 100%; text-align: left;
+  border-radius: 6px; padding: 10px 14px;
+  font-size: 0.92rem;
+  border-bottom: 1px solid var(--border);
+}
+.mobile-menu .pill-link:last-child { border-bottom: none; }
+
+@media (max-width: 767px) {
+  .topnav { padding: 0 16px; gap: 10px; }
+  .topnav-pills  { display: none !important; }
+  .topnav-hamburger { display: block; }
+  .topnav-right .brand-name small { display: none; }
+  /* hide less-critical topnav-right items on very small screens */
+  #aiModelSelect, #lastUpdate { display: none !important; }
+
+  .main-content { padding: 18px 14px; }
+
+  /* hero value smaller on mobile */
+  #totalValue { font-size: 2rem !important; }
+  .hero-actions { flex-direction: column; gap: 8px; }
+
+  /* chat panel full width on mobile */
+  #chatPanel {
+    width: calc(100vw - 24px) !important;
+    right: 12px !important;
+    left: 12px !important;
+    max-height: calc(100vh - 100px) !important;
+  }
+
+  /* notification toasts narrower */
+  .notification { right: 10px; left: 10px; min-width: unset; }
+
+  /* tables scroll horizontally */
+  .table-responsive-force { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+
+  /* reduce chart height on mobile */
+  .chart-container { height: 200px !important; }
+
+  /* stat cards: keep 2-per-row layout (already using col-6) */
+  .stat-value { font-size: 1.35rem; }
+}
+
+@media (max-width: 480px) {
+  .main-content { padding: 12px 10px; }
+  .topnav { height: 54px; }
+  .main-content { min-height: calc(100vh - 54px); }
+  .brand-name { font-size: 1rem; }
+  .stat-value { font-size: 1.15rem; }
+}
 </style>
 </head>
 <body>
 
+<!-- Mobile Nav Drawer (hidden on desktop) -->
+<div id="mobileMenu" class="mobile-menu"></div>
+
 <!-- Top Nav -->
 <nav class="topnav">
+  <button class="topnav-hamburger" id="hamburgerBtn" onclick="toggleMobileMenu()" aria-label="Menu">
+    <i class="bi bi-list"></i>
+  </button>
   <a class="brand-wrap" href="#">
     <div class="brand-icon">AT</div>
     <span class="brand-name">Aiterra <small>v1.0.0</small></span>
@@ -965,7 +1055,7 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
       <i class="bi bi-inbox" style="font-size:2rem;display:block;margin-bottom:8px"></i>
       ไม่มี position เปิดอยู่
     </div>
-    <div id="posTabTable" style="display:none;overflow-x:auto">
+    <div id="posTabTable" style="display:none;overflow-x:auto" class="table-responsive-force">
       <table class="table table-dark table-sm mb-0" style="font-size:0.78rem">
         <thead>
           <tr>
@@ -1358,7 +1448,11 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
               <label class="form-check-label small" for="binance_enabled">Enable Binance</label>
             </div>
             <div class="form-check mt-1 mb-2"><input class="form-check-input" type="checkbox" id="binance_testnet"><label class="form-check-label small" for="binance_testnet">ใช้ Testnet (testnet.binance.vision)</label></div>
-            <button class="btn btn-primary btn-sm" onclick="saveExchangeKey('binance')"><i class="bi bi-save me-1"></i>Save</button>
+            <div class="d-flex gap-2">
+              <button class="btn btn-primary btn-sm" onclick="saveExchangeKey('binance')"><i class="bi bi-save me-1"></i>Save</button>
+              <button class="btn btn-outline-secondary btn-sm" onclick="saveAndTest('binance')"><i class="bi bi-wifi me-1"></i>Save & Test</button>
+            </div>
+            <div id="extest-binance" class="mt-2" style="display:none;font-size:0.78rem"></div>
           </div>
           <div id="ex-binance_th" class="ex-tab" style="display:none">
             <label class="form-label small mb-1">API Key</label>
@@ -1369,7 +1463,11 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
               <input class="form-check-input" type="checkbox" id="binance_th_enabled">
               <label class="form-check-label small" for="binance_th_enabled">Enable Binance TH</label>
             </div>
-            <button class="btn btn-primary btn-sm" onclick="saveExchangeKey('binance_th')"><i class="bi bi-save me-1"></i>Save</button>
+            <div class="d-flex gap-2">
+              <button class="btn btn-primary btn-sm" onclick="saveExchangeKey('binance_th')"><i class="bi bi-save me-1"></i>Save</button>
+              <button class="btn btn-outline-secondary btn-sm" onclick="saveAndTest('binance_th')"><i class="bi bi-wifi me-1"></i>Save & Test</button>
+            </div>
+            <div id="extest-binance_th" class="mt-2" style="display:none;font-size:0.78rem"></div>
           </div>
           <div id="ex-bitkub" class="ex-tab" style="display:none">
             <label class="form-label small mb-1">API Key</label>
@@ -1380,7 +1478,11 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
               <input class="form-check-input" type="checkbox" id="bitkub_enabled">
               <label class="form-check-label small" for="bitkub_enabled">Enable Bitkub</label>
             </div>
-            <button class="btn btn-primary btn-sm" onclick="saveExchangeKey('bitkub')"><i class="bi bi-save me-1"></i>Save</button>
+            <div class="d-flex gap-2">
+              <button class="btn btn-primary btn-sm" onclick="saveExchangeKey('bitkub')"><i class="bi bi-save me-1"></i>Save</button>
+              <button class="btn btn-outline-secondary btn-sm" onclick="saveAndTest('bitkub')"><i class="bi bi-wifi me-1"></i>Save & Test</button>
+            </div>
+            <div id="extest-bitkub" class="mt-2" style="display:none;font-size:0.78rem"></div>
           </div>
           <div id="ex-okx" class="ex-tab" style="display:none">
             <label class="form-label small mb-1">API Key</label>
@@ -1394,7 +1496,11 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
               <label class="form-check-label small" for="okx_enabled">Enable OKX</label>
             </div>
             <div class="form-check mt-1 mb-2"><input class="form-check-input" type="checkbox" id="okx_testnet"><label class="form-check-label small" for="okx_testnet">ใช้ Testnet (Sandbox)</label></div>
-            <button class="btn btn-primary btn-sm" onclick="saveExchangeKey('okx')"><i class="bi bi-save me-1"></i>Save</button>
+            <div class="d-flex gap-2">
+              <button class="btn btn-primary btn-sm" onclick="saveExchangeKey('okx')"><i class="bi bi-save me-1"></i>Save</button>
+              <button class="btn btn-outline-secondary btn-sm" onclick="saveAndTest('okx')"><i class="bi bi-wifi me-1"></i>Save & Test</button>
+            </div>
+            <div id="extest-okx" class="mt-2" style="display:none;font-size:0.78rem"></div>
           </div>
         </div>
       </div>
@@ -1555,6 +1661,8 @@ function connectWS() {
 // Navigation
 // ============================================================
 function showSection(name, el) {
+  closeMobileMenu();
+  _syncMobileMenuActive(name);
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
   const target = document.getElementById('sec-' + name);
@@ -2878,13 +2986,19 @@ function renderAgents(agents) {
   const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const dotColor = s => s === 'active' ? 'var(--accent)' : s === 'ready' ? 'var(--accent-buy)' : 'var(--text-muted)';
   const rows = AGENT_ORDER.filter(k => agents[k]).map(k => {
-    const a = agents[k], meta = AGENT_META[k];
+    const a = agents[k];
     const pulse = a.status === 'active' ? 'animation:pulse 1.5s infinite' : '';
+    const sprite = AGENT_SPRITES[k];
+    const spriteStyle = sprite
+      ? `box-shadow:${makePixelSprite(sprite.rows, a.status === 'idle' ? 'rgba(255,255,255,0.2)' : sprite.color)}`
+      : '';
     return `
       <div class="d-flex align-items-center gap-2 px-2 py-2" style="border-bottom:1px solid var(--border)">
-        <i class="bi ${meta.icon}" style="color:${dotColor(a.status)};font-size:0.95rem;width:18px"></i>
+        <div class="pixel-sprite-wrap">
+          <div class="pixel-sprite" style="${spriteStyle}"></div>
+        </div>
         <div class="flex-fill" style="min-width:0">
-          <div style="font-family:var(--font-headline);font-weight:600;font-size:0.8rem">${meta.label}</div>
+          <div style="font-family:var(--font-headline);font-weight:600;font-size:0.8rem">${AGENT_META[k].label}</div>
           <div class="text-muted text-truncate" style="font-size:0.7rem">${esc(a.detail || '')}</div>
         </div>
         <span class="ws-dot" style="background:${dotColor(a.status)};${pulse}"></span>
@@ -3100,6 +3214,142 @@ function _addNotifBadge() {
   const navEl = document.getElementById('navNotifications');
   if (navEl && !document.getElementById('sec-notifications').classList.contains('active')) {
     navEl.innerHTML = `Notifications <span class="badge rounded-pill" style="background:var(--accent-red);color:#fff;font-size:0.6rem;vertical-align:middle;padding:2px 5px">${_notifUnread}</span>`;
+  }
+}
+
+// ============================================================
+// Mobile Nav
+// ============================================================
+let _mobileMenuOpen = false;
+
+function toggleMobileMenu() {
+  _mobileMenuOpen = !_mobileMenuOpen;
+  const menu = document.getElementById('mobileMenu');
+  const btn  = document.getElementById('hamburgerBtn');
+  if (_mobileMenuOpen) {
+    // Build the mobile menu from the desktop pills
+    const pills = document.querySelectorAll('.topnav-pills .pill-link');
+    menu.innerHTML = [...pills].map(p =>
+      `<a class="pill-link ${p.classList.contains('active') ? 'active' : ''}"
+          onclick="${p.getAttribute('onclick')};closeMobileMenu()">${p.textContent.trim()}</a>`
+    ).join('');
+    menu.classList.add('open');
+    btn.innerHTML = '<i class="bi bi-x-lg"></i>';
+  } else {
+    closeMobileMenu();
+  }
+}
+
+function closeMobileMenu() {
+  _mobileMenuOpen = false;
+  document.getElementById('mobileMenu').classList.remove('open');
+  const btn = document.getElementById('hamburgerBtn');
+  if (btn) btn.innerHTML = '<i class="bi bi-list"></i>';
+}
+
+// Keep mobile menu active state in sync when navigating
+function _syncMobileMenuActive(name) {
+  document.querySelectorAll('#mobileMenu .pill-link').forEach(l => {
+    l.classList.toggle('active', (l.getAttribute('onclick') || '').includes("'" + name + "'"));
+  });
+}
+
+// ============================================================
+// Pixel Art Agent Sprites
+// ============================================================
+const AGENT_SPRITES = {
+  analyzer: {
+    color: '#A8FF53',
+    rows: [
+      '..####..',
+      '.######.',
+      '########',
+      '##.##.##',
+      '##.##.##',
+      '########',
+      '.#.##.#.',
+      '..####..',
+    ]
+  },
+  strategist: {
+    color: '#d29922',
+    rows: [
+      '...##...',
+      '.######.',
+      '########',
+      '##....##',
+      '##.##.##',
+      '########',
+      '.#.##.#.',
+      '..####..',
+    ]
+  },
+  executor: {
+    color: '#ff6b35',
+    rows: [
+      '..####..',
+      '.######.',
+      '########',
+      '####.###',
+      '###.####',
+      '########',
+      '.##..##.',
+      '..####..',
+    ]
+  },
+  trainer: {
+    color: '#39d98a',
+    rows: [
+      '########',
+      '.######.',
+      '..####..',
+      '########',
+      '##.##.##',
+      '########',
+      '.#.##.#.',
+      '..####..',
+    ]
+  },
+};
+
+function makePixelSprite(rows, color, px=3) {
+  const shadows = [];
+  rows.forEach((row, r) => {
+    [...row].forEach((ch, c) => {
+      if (ch === '#') shadows.push(`${c*px}px ${r*px}px 0 0 ${color}`);
+    });
+  });
+  return shadows.join(',');
+}
+
+// ============================================================
+// Exchange: Save & Test per-tab
+// ============================================================
+async function saveAndTest(exchange) {
+  await saveExchangeKey(exchange);
+  const resultEl = document.getElementById(`extest-${exchange}`);
+  if (!resultEl) return;
+  resultEl.style.display = '';
+  resultEl.innerHTML = '<span class="text-muted"><span class="spinner-border spinner-border-sm me-1" style="width:10px;height:10px;border-width:1.5px"></span>Testing…</span>';
+  try {
+    const r = await fetch('/api/exchanges/test');
+    const d = await r.json();
+    // Map exchange alias (binance_th → demo fallback etc.)
+    const key = exchange === 'binance_th' ? 'binance_th' : exchange;
+    const res = d[key] || d['demo'];
+    if (!res) {
+      resultEl.innerHTML = '<span class="text-muted">ยังไม่ได้ตั้งค่า API key</span>';
+      return;
+    }
+    if (res.ok === true) {
+      resultEl.innerHTML = `<span style="color:var(--accent-buy)">🟢 Connected — BTC: $${(res.price||0).toLocaleString('en',{maximumFractionDigits:2})} <span class="text-muted">(${res.source||'live'})</span></span>`;
+    } else if (res.ok === false) {
+      resultEl.innerHTML = `<span style="color:var(--accent-red)">🔴 Failed — ${res.error || 'Connection error'}</span>`;
+    } else {
+      resultEl.innerHTML = `<span class="text-muted">⚪ Not configured — enable the exchange and add API keys first</span>`;
+    }
+  } catch(e) {
+    resultEl.innerHTML = `<span style="color:var(--accent-red)">🔴 ${e.message}</span>`;
   }
 }
 
