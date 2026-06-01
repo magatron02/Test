@@ -811,7 +811,7 @@ async def test_notifications(data: Dict[str, Any] = None):
             # 1. Get channel access token
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    "https://api.line.me/oauth2/v3/token",
+                    "https://api.line.me/v2/oauth/accessToken",
                     data={"grant_type": "client_credentials",
                           "client_id": line_id, "client_secret": line_secret},
                     timeout=aiohttp.ClientTimeout(total=10),

@@ -4,7 +4,7 @@ from ..core.config import settings
 
 logger = logging.getLogger(__name__)
 
-LINE_TOKEN_URL     = "https://api.line.me/oauth2/v3/token"
+LINE_TOKEN_URL     = "https://api.line.me/v2/oauth/accessToken"
 LINE_BROADCAST_URL = "https://api.line.me/v2/bot/message/broadcast"
 LINE_PUSH_URL      = "https://api.line.me/v2/bot/message/push"
 
