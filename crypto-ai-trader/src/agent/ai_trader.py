@@ -33,7 +33,7 @@ class AITrader:
         self._exchange = exchange
         self._strategy = StrategyManager()
         self._trainer = AITrainer()
-        self._claude = ClaudeAnalyzer()
+        self._claude = ClaudeAnalyzer(exchange=exchange)
         self._running = False
         self._analyses: Dict[str, MarketAnalysis] = {}
         self._open_trades: Dict[str, dict] = {}   # symbol -> trade info
@@ -107,7 +107,7 @@ class AITrader:
 
         return True, ""
 
-    def _get_final_signal(self, analysis: MarketAnalysis, portfolio: dict) -> TradingSignal:
+    async def _get_final_signal(self, analysis: MarketAnalysis, portfolio: dict) -> TradingSignal:
         ai_model = settings.ai_model
         ml_signal = None
 
@@ -115,7 +115,7 @@ class AITrader:
             ml_signal = self._trainer.predict(analysis.features)
 
         if ai_model == "claude":
-            sig = self._claude.analyze(analysis, portfolio)
+            sig = await self._claude.analyze(analysis, portfolio)
         elif ai_model == "rule_based":
             sig = self._strategy.get_signal(analysis)
         elif ai_model == "ml" and ml_signal:
@@ -124,7 +124,7 @@ class AITrader:
             rule_sig = self._strategy.get_signal(analysis, ml_signal)
             if settings.claude_api_key and ai_model in ("claude", "hybrid"):
                 try:
-                    claude_sig = self._claude.analyze(analysis, portfolio)
+                    claude_sig = await self._claude.analyze(analysis, portfolio)
                     # blend: take higher confidence signal
                     if claude_sig.confidence > rule_sig.confidence:
                         sig = claude_sig
@@ -305,7 +305,7 @@ class AITrader:
             await self._check_exit_conditions(symbol)
 
             portfolio = await self._get_portfolio_summary()
-            signal = self._get_final_signal(analysis, portfolio)
+            signal = await self._get_final_signal(analysis, portfolio)
 
             await self._broadcast("analysis_update", {
                 "symbol": symbol,

@@ -9,7 +9,7 @@ ai:
   claude:
     api_key: ""             # ใส่ Claude API key ที่นี่
     model: "claude-sonnet-4-6"  # claude-opus-4-8 | claude-sonnet-4-6 | claude-haiku-4-5-20251001
-    max_tokens: 1024
+    max_tokens: 2048            # agentic loop: tool use + multi-step reasoning needs headroom
   rule_based:
     enabled: true
   ml:
