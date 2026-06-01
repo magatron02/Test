@@ -9,6 +9,7 @@ interface AppState {
   addTransaction: (t: Omit<Transaction, "id" | "createdAt">) => void;
   updateTransaction: (id: string, t: Partial<Omit<Transaction, "id" | "createdAt">>) => void;
   deleteTransaction: (id: string) => void;
+  clearAll: () => void;
   setActivePage: (p: Page) => void;
   setCurrency: (c: string) => void;
 }
@@ -43,6 +44,8 @@ export const useStore = create<AppState>()(
         set((s) => ({
           transactions: s.transactions.filter((tx) => tx.id !== id),
         })),
+
+      clearAll: () => set({ transactions: [] }),
 
       setActivePage: (p) => set({ activePage: p }),
       setCurrency: (c) => set({ currency: c }),

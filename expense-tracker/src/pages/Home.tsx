@@ -10,7 +10,7 @@ import {
 import { th } from "date-fns/locale";
 
 export default function Home() {
-  const { transactions, currency } = useStore();
+  const { transactions, currency, setActivePage } = useStore();
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing]     = useState<Transaction | null>(null);
   const [activeTab, setActiveTab] = useState<"income" | "expense">("income");
@@ -96,7 +96,7 @@ export default function Home() {
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm font-semibold">Budget Overview</p>
           <button
-            onClick={() => useStore.getState().setActivePage("analytics")}
+            onClick={() => setActivePage("analytics")}
             className="text-xs text-sub flex items-center gap-0.5"
           >
             See all <ChevronRight size={12} />
@@ -138,7 +138,7 @@ export default function Home() {
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm font-semibold">Transactions</p>
           <button
-            onClick={() => useStore.getState().setActivePage("transactions")}
+            onClick={() => setActivePage("transactions")}
             className="text-xs text-sub flex items-center gap-0.5"
           >
             See all <ChevronRight size={12} />

@@ -10,7 +10,7 @@ const CURRENCIES = [
 ];
 
 export default function Settings() {
-  const { currency, setCurrency, transactions, deleteTransaction } = useStore();
+  const { currency, setCurrency, transactions, clearAll } = useStore();
   const [confirmClear, setConfirmClear] = useState(false);
 
   const handleExport = () => {
@@ -31,7 +31,7 @@ export default function Settings() {
 
   const handleClearAll = () => {
     if (confirmClear) {
-      [...transactions].forEach((t) => deleteTransaction(t.id));
+      clearAll();
       setConfirmClear(false);
     } else {
       setConfirmClear(true);

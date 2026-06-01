@@ -15,9 +15,9 @@ import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 export default function Analytics() {
   const { transactions, currency } = useStore();
   const [tab, setTab] = useState<"expense" | "income">("expense");
-  const now = new Date();
 
   const barData = useMemo(() => {
+    const now = new Date();
     return Array.from({ length: 6 }, (_, i) => {
       const d = subMonths(now, 5 - i);
       const start = startOfMonth(d);
@@ -34,6 +34,7 @@ export default function Analytics() {
   }, [transactions]);
 
   const monthTx = useMemo(() => {
+    const now   = new Date();
     const start = startOfMonth(now);
     const end   = endOfMonth(now);
     return transactions.filter((t) =>

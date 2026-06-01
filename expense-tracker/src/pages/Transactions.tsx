@@ -21,7 +21,7 @@ export default function Transactions() {
       if (filter !== "all" && t.type !== filter) return false;
       if (search) {
         const q = search.toLowerCase();
-        return t.note.toLowerCase().includes(q) || t.category.includes(q);
+        return (t.note ?? "").toLowerCase().includes(q) || t.category.includes(q);
       }
       return true;
     });
