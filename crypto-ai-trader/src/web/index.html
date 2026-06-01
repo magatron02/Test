@@ -1526,10 +1526,13 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
         </div>
         <div class="card-body">
           <div id="notifTestResult" class="mb-3" style="display:none"></div>
-          <label class="form-label small mb-1">LINE Notify Token
-            <a href="https://notify-bot.line.me/my/" target="_blank" rel="noopener" class="ms-1 text-muted" style="font-size:0.65rem">(รับ token ที่นี่)</a>
-          </label>
-          <input type="password" class="form-control form-control-sm mb-2" id="lineToken" placeholder="xxxxxxxxxxxxxxxx">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="form-label small mb-0">LINE Messaging API</span>
+            <a href="https://developers.line.biz/console/" target="_blank" rel="noopener" class="text-muted" style="font-size:0.65rem">LINE Developers Console ↗</a>
+          </div>
+          <input type="text"     class="form-control form-control-sm mb-1" id="lineChannelId"     placeholder="Channel ID  (เช่น 2010257812)">
+          <input type="password" class="form-control form-control-sm mb-1" id="lineChannelSecret" placeholder="Channel Secret  (32 ตัวอักษร)">
+          <input type="text"     class="form-control form-control-sm mb-2" id="lineUserId"        placeholder="User ID  (ไม่บังคับ — ว่าง = broadcast ทุกคนที่ follow bot)">
           <label class="form-label small mb-1">Telegram Bot Token
             <span class="text-muted ms-1" style="font-size:0.65rem">(@BotFather)</span>
           </label>
@@ -2482,6 +2485,15 @@ async function loadSettings() {
     safe('notifyTakeProfit',  'take_profit');
     const trainEl = document.getElementById('notifyTrainDone');
     if (trainEl) trainEl.checked = notif.training_complete === true;
+    // LINE Messaging API fields
+    const ln = d.notifications?.line || {};
+    if (ln.channel_id)     document.getElementById('lineChannelId').value     = ln.channel_id;
+    if (ln.channel_secret) document.getElementById('lineChannelSecret').value = ln.channel_secret;
+    if (ln.user_id)        document.getElementById('lineUserId').value        = ln.user_id;
+    // Telegram fields
+    const tg = d.notifications?.telegram || {};
+    if (tg.bot_token) document.getElementById('telegramToken').value  = tg.bot_token;
+    if (tg.chat_id)   document.getElementById('telegramChatId').value = tg.chat_id;
   } catch {}
 }
 
@@ -2506,7 +2518,12 @@ async function saveTradingParams() {
 async function saveNotifications() {
   const data = {
     notifications: {
-      line: { token: document.getElementById('lineToken').value, enabled: !!document.getElementById('lineToken').value },
+      line: {
+        channel_id:     document.getElementById('lineChannelId').value.trim(),
+        channel_secret: document.getElementById('lineChannelSecret').value.trim(),
+        user_id:        document.getElementById('lineUserId').value.trim(),
+        enabled: !!(document.getElementById('lineChannelId').value.trim() && document.getElementById('lineChannelSecret').value.trim()),
+      },
       telegram: {
         bot_token: document.getElementById('telegramToken').value,
         chat_id: document.getElementById('telegramChatId').value,
@@ -2541,7 +2558,7 @@ async function testNotifications() {
     const r = await fetch('/api/notifications/test', {method:'POST'});
     const d = await r.json();
     const rows = Object.entries(d).map(([name, res]) => {
-      const label = name === 'line' ? 'LINE Notify' : 'Telegram';
+      const label = name === 'line' ? 'LINE' : 'Telegram';
       if (res.ok === true)   return `<div>🟢 <b>${label}</b> — ส่งสำเร็จ ✓</div>`;
       if (res.ok === false)  return `<div>🔴 <b>${label}</b> — ${res.error || 'Failed'}</div>`;
       return `<div>⚪ <b>${label}</b> — ยังไม่ได้ตั้งค่า</div>`;

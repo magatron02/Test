@@ -802,23 +802,37 @@ async def test_notifications(data: Dict[str, Any] = None):
     msg = "🧪 Aiterra — การแจ้งเตือนทดสอบ / Test notification ✅"
     results = {}
 
-    # LINE
-    line_token = settings.get("notifications", "line", "token", default="")
-    if line_token:
+    # LINE Messaging API
+    line_id     = settings.get("notifications", "line", "channel_id",     default="")
+    line_secret = settings.get("notifications", "line", "channel_secret", default="")
+    if line_id and line_secret:
         try:
             import aiohttp
+            # 1. Get channel access token
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    "https://notify-api.line.me/api/notify",
-                    headers={"Authorization": f"Bearer {line_token}"},
-                    data={"message": f"\n{msg}"},
+                    "https://api.line.me/oauth2/v3/token",
+                    data={"grant_type": "client_credentials",
+                          "client_id": line_id, "client_secret": line_secret},
                     timeout=aiohttp.ClientTimeout(total=10),
-                ) as resp:
-                    if resp.status == 200:
+                ) as tr:
+                    tr.raise_for_status()
+                    access_token = (await tr.json())["access_token"]
+            # 2. Send message (push if user_id set, broadcast otherwise)
+            user_id = settings.get("notifications", "line", "user_id", default="")
+            headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
+            body = {"messages": [{"type": "text", "text": msg}]}
+            url = "https://api.line.me/v2/bot/message/push" if user_id else "https://api.line.me/v2/bot/message/broadcast"
+            if user_id:
+                body["to"] = user_id
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, headers=headers, json=body,
+                                        timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                    if resp.status in (200, 201):
                         results["line"] = {"ok": True}
                     else:
-                        body = await resp.text()
-                        results["line"] = {"ok": False, "error": f"HTTP {resp.status}: {body[:80]}"}
+                        body_text = await resp.text()
+                        results["line"] = {"ok": False, "error": f"HTTP {resp.status}: {body_text[:120]}"}
         except Exception as e:
             results["line"] = {"ok": False, "error": str(e)[:120]}
     else:

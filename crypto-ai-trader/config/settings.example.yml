@@ -107,7 +107,9 @@ thai:
 
 notifications:
   line:
-    token: ""               # LINE Notify token
+    channel_id: ""          # LINE Messaging API — Channel ID (จาก LINE Developers Console)
+    channel_secret: ""      # Channel Secret (จาก LINE Developers Console)
+    user_id: ""             # LINE User ID (ไม่บังคับ — ว่าง = broadcast ทุกคนที่ follow bot)
     enabled: false
   telegram:
     bot_token: ""           # Telegram Bot token
