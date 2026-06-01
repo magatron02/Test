@@ -565,6 +565,64 @@ async def get_open_positions():
     return rows
 
 
+@router.post("/trade/manual")
+async def manual_trade(data: Dict[str, Any]):
+    """POST /api/trade/manual — manually open or close a position (demo-safe override).
+    Body: {"action":"BUY"|"SELL"|"CLOSE", "symbol":"BTC/USDT", "amount_usdt": 200}
+    Bypasses the AI signal so users can test the full trade pipeline.
+    """
+    if not _trader:
+        raise HTTPException(503, "Trader not running")
+    action  = (data.get("action") or "").upper()
+    symbol  = data.get("symbol") or "BTC/USDT"
+    amt_usdt = float(data.get("amount_usdt") or 0)
+    if action not in ("BUY", "SELL", "CLOSE"):
+        raise HTTPException(400, "action must be BUY, SELL, or CLOSE")
+
+    analysis = await _trader.analyze_symbol(symbol)
+    if not analysis:
+        raise HTTPException(503, f"Cannot fetch data for {symbol}")
+
+    if action == "CLOSE":
+        if symbol not in _trader.open_trades:
+            raise HTTPException(400, f"No open trade for {symbol}")
+        trade = _trader.open_trades[symbol]
+        side  = trade["side"]
+        price = analysis.price
+        amount = trade.get("amount", 0)
+        pnl   = (price - trade["price"]) * amount if side == "BUY" else (trade["price"] - price) * amount
+        pnl_pct = pnl / (trade["price"] * amount) * 100 if trade["price"] and amount else 0
+        result = await _trader._close_trade(symbol, price, "manual_close")
+        if not result:
+            raise HTTPException(500, "Close failed: position may have already been liquidated")
+        return {"ok": True, "action": "CLOSE", "symbol": symbol,
+                "price": round(result.get("price", price), 6),
+                "pnl": round(result.get("pnl", pnl), 4),
+                "pnl_pct": round(result.get("pnl_pct", pnl_pct), 2)}
+
+    # BUY / SELL
+    from ..agent.strategy_manager import TradingSignal
+    portfolio = await _trader._get_portfolio_summary()
+    avail = portfolio.get("available_usdt", 0)
+    if amt_usdt <= 0:
+        # default: 10% of portfolio, capped at available
+        amt_usdt = min(avail * 0.10, avail * 0.95)
+    if amt_usdt <= 0:
+        raise HTTPException(400, "Insufficient funds for manual trade")
+    amount = amt_usdt / analysis.price
+    signal = TradingSignal(action=action, confidence=1.0,
+                           reasoning="manual override",
+                           strategy="manual",
+                           stop_loss_pct=0.02,
+                           take_profit_pct=0.04)
+    executed = await _trader._execute_trade(symbol, signal, analysis, force=True)
+    if executed:
+        return {"ok": True, "action": action, "symbol": symbol,
+                "price": round(analysis.price, 6), "amount": round(amount, 6),
+                "amount_usdt": round(amt_usdt, 2)}
+    return {"ok": False, "reason": "execute returned False (risk limit / existing position / demo error)"}
+
+
 @router.post("/training/loop/stop")
 async def stop_training_loop():
     if not _training_loop:

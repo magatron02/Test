@@ -199,16 +199,21 @@ class AITrader:
 
         return sig
 
-    async def _execute_trade(self, symbol: str, signal: TradingSignal, analysis: MarketAnalysis) -> bool:
+    async def _execute_trade(self, symbol: str, signal: TradingSignal, analysis: MarketAnalysis, force: bool = False) -> bool:
         """Execute a BUY/SELL. Returns True only when an order is actually placed."""
         if symbol in self._open_trades and signal.action == "BUY":
             return False  # Already have position
 
+        # If we hold a BUY position and get a SELL signal, close it properly
+        if symbol in self._open_trades and signal.action == "SELL":
+            await self._close_trade(symbol, analysis.price, "signal_reversal")
+            return True
+
         if signal.action not in ("BUY", "SELL"):
             return False
 
-        # Check risk limits before executing any trade
-        if signal.action == "BUY":
+        # Check risk limits before executing any trade (skipped for manual/forced trades)
+        if signal.action == "BUY" and not force:
             allowed, reason = await self._check_risk_limits()
             if not allowed:
                 logger.info(f"Skip BUY {symbol}: {reason}")
@@ -298,6 +303,51 @@ class AITrader:
             logger.error(f"Trade execution failed for {symbol}: {e}")
             return False
 
+    async def _close_trade(self, symbol: str, price: float, reason: str) -> dict:
+        """Close an open position at the given price. Returns PnL dict on success."""
+        if symbol not in self._open_trades:
+            return {}
+        trade = self._open_trades[symbol]
+        entry = trade["price"]
+        try:
+            base = symbol.split("/")[0]
+            balances = await self._exchange.get_balance()
+            bal = balances.get(base)
+            if not bal or bal.free <= 0:
+                return {}
+            order = await self._exchange.create_order(symbol, "sell", bal.free)
+            pnl = (order.price - entry) * order.amount
+            pnl_pct = (order.price - entry) / entry * 100
+
+            db = SessionLocal()
+            try:
+                db_trade = db.query(Trade).filter_by(id=trade["trade_id"]).first()
+                if db_trade:
+                    db_trade.status = "closed"
+                    db_trade.close_price = order.price
+                    db_trade.pnl = pnl
+                    db_trade.pnl_pct = pnl_pct
+                    db_trade.closed_at = datetime.utcnow()
+                    db.commit()
+            finally:
+                db.close()
+
+            self._trainer.update_outcome(trade["trade_id"], pnl_pct)
+            self._daily_pnl += pnl
+            del self._open_trades[symbol]
+
+            await self._broadcast("trade_closed", {
+                "symbol": symbol, "reason": reason,
+                "entry_price": entry, "close_price": order.price,
+                "pnl": pnl, "pnl_pct": pnl_pct,
+            })
+            logger.info(f"Closed {symbol}: {reason} | PnL: {pnl_pct:+.2f}%")
+            await _notify_trade("SELL", symbol, order.price, pnl_pct)
+            return {"price": order.price, "pnl": pnl, "pnl_pct": pnl_pct}
+        except Exception as e:
+            logger.error(f"Close failed for {symbol}: {e}")
+            return {}
+
     async def _check_exit_conditions(self, symbol: str):
         if symbol not in self._open_trades:
             return
@@ -305,61 +355,12 @@ class AITrader:
         analysis = self._analyses.get(symbol)
         if not analysis:
             return
-
         price = analysis.price
-        sl = trade["stop_loss_price"]
-        tp = trade["take_profit_price"]
-        entry = trade["price"]
-
-        should_close = False
-        close_reason = ""
-
+        sl, tp, entry = trade["stop_loss_price"], trade["take_profit_price"], trade["price"]
         if price <= sl:
-            should_close = True
-            close_reason = f"Stop loss hit ({price:.4f} <= {sl:.4f})"
+            await self._close_trade(symbol, price, f"Stop loss hit ({price:.4f} <= {sl:.4f})")
         elif price >= tp:
-            should_close = True
-            close_reason = f"Take profit hit ({price:.4f} >= {tp:.4f})"
-
-        if should_close:
-            try:
-                base = symbol.split("/")[0]
-                balances = await self._exchange.get_balance()
-                bal = balances.get(base)
-                if bal and bal.free > 0:
-                    order = await self._exchange.create_order(symbol, "sell", bal.free)
-                    pnl = (order.price - entry) * order.amount
-                    pnl_pct = (order.price - entry) / entry * 100
-
-                    db = SessionLocal()
-                    try:
-                        db_trade = db.query(Trade).filter_by(id=trade["trade_id"]).first()
-                        if db_trade:
-                            db_trade.status = "closed"
-                            db_trade.close_price = order.price
-                            db_trade.pnl = pnl
-                            db_trade.pnl_pct = pnl_pct
-                            db_trade.closed_at = datetime.utcnow()
-                            db.commit()
-                    finally:
-                        db.close()
-
-                    self._trainer.update_outcome(trade["trade_id"], pnl_pct)
-                    self._daily_pnl += pnl
-                    del self._open_trades[symbol]
-
-                    await self._broadcast("trade_closed", {
-                        "symbol": symbol,
-                        "reason": close_reason,
-                        "entry_price": entry,
-                        "close_price": order.price,
-                        "pnl": pnl,
-                        "pnl_pct": pnl_pct,
-                    })
-                    logger.info(f"Closed {symbol}: {close_reason} | PnL: {pnl_pct:+.2f}%")
-                    await _notify_trade("SELL", symbol, order.price, pnl_pct)
-            except Exception as e:
-                logger.error(f"Exit failed for {symbol}: {e}")
+            await self._close_trade(symbol, price, f"Take profit hit ({price:.4f} >= {tp:.4f})")
 
     async def run_cycle(self):
         self._ensure_today()
