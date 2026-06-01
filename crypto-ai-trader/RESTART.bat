@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0"
 title Aiterra - Restart
 color 0E
 

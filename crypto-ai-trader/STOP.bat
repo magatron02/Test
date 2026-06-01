@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0"
 title Aiterra - Stop
 color 0C
 

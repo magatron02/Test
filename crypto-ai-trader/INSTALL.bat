@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0"
 setlocal enabledelayedexpansion
 title Aiterra v1.0.0 - Install
 color 0A

@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0"
 title Aiterra v1.0.0 - Running
 color 0A
 

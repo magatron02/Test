@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0"
 title Aiterra - Build Standalone EXE
 color 0B
 
