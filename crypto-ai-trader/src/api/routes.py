@@ -4,7 +4,7 @@ import io
 import logging
 import math
 from datetime import datetime, timedelta
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from ..core.config import settings
-from ..core.database import Portfolio, Trade, TrainingRecord, get_db
+from ..core.database import Portfolio, Trade, TrainingRecord, get_db, SessionLocal
 from ..notifications import line_notify, telegram_notify
 
 logger = logging.getLogger(__name__)
@@ -527,6 +527,170 @@ async def hourly_train_run():
         raise HTTPException(503, "Hourly trainer not available")
     result = await _hourly_trainer.run_now()
     return result
+
+
+# ─── Chat Bot ──────────────────────────────────────────────────
+
+class ChatHandler:
+    _SYMBOLS = {
+        "btc": "BTC/USDT", "eth": "ETH/USDT", "bnb": "BNB/USDT",
+        "sol": "SOL/USDT", "xrp": "XRP/USDT",
+    }
+    _TRAIN_KW    = ["train", "เทรน", "retrain", "ฝึก", "เรียน", "improve", "learn", "อัพเดต", "update model"]
+    _REPORT_KW   = ["report", "รายงาน", "stats", "สถิติ", "ผล", "performance", "สรุป", "win rate", "กำไร", "ขาดทุน", "pnl"]
+    _PORTFOLIO_KW= ["portfolio", "พอร์ต", "balance", "ยอด", "เงิน", "holdings", "position", "wallet"]
+    _BUY_KW      = ["buy", "ซื้อ", "long", "เปิด"]
+    _SELL_KW     = ["sell", "ขาย", "short", "ปิด"]
+    _ANALYZE_KW  = ["analyze", "วิเคราะห์", "analysis", "check", "ดู", "how is", "สัญญาณ"]
+
+    def __init__(self, trader, hourly_trainer):
+        self._trader = trader
+        self._hourly_trainer = hourly_trainer
+
+    async def handle(self, message: str) -> dict:
+        m = message.lower().strip()
+        symbol = next((v for k, v in self._SYMBOLS.items() if k in m), None)
+
+        if any(kw in m for kw in self._TRAIN_KW):
+            return await self._handle_train()
+        if any(kw in m for kw in self._REPORT_KW):
+            return await self._handle_report()
+        if any(kw in m for kw in self._PORTFOLIO_KW):
+            return await self._handle_portfolio()
+        if any(kw in m for kw in self._ANALYZE_KW):
+            return await self._handle_analyze(symbol or "BTC/USDT")
+        if any(kw in m for kw in self._BUY_KW):
+            return await self._handle_trade("BUY", symbol, message)
+        if any(kw in m for kw in self._SELL_KW):
+            return await self._handle_trade("SELL", symbol, message)
+        return await self._handle_general(message)
+
+    async def _handle_train(self) -> dict:
+        if not self._hourly_trainer:
+            if self._trader:
+                ok = self._trader._trainer.train()
+                return {"type": "train", "reply": f"เทรน ML model {'สำเร็จ' if ok else 'ไม่สำเร็จ — ต้องการข้อมูลเพิ่ม'}"}
+            return {"type": "error", "reply": "Trainer ไม่พร้อมใช้งาน"}
+        try:
+            result = await self._hourly_trainer.run_now()
+            added = result.get("samples_added", 0)
+            return {"type": "train", "reply": f"เทรน AI สำเร็จ ✓\nเพิ่มข้อมูล {added} samples\n{result.get('message', '')}"}
+        except Exception as e:
+            return {"type": "error", "reply": f"เทรนไม่สำเร็จ: {e}"}
+
+    async def _handle_report(self) -> dict:
+        db = SessionLocal()
+        try:
+            closed = db.query(Trade).filter(Trade.status == "closed").all()
+            if not closed:
+                return {"type": "report", "reply": "ยังไม่มีการเทรดที่ปิดแล้ว"}
+            wins = [t for t in closed if (t.pnl or 0) > 0]
+            total_pnl = sum(t.pnl or 0 for t in closed)
+            win_rate = len(wins) / len(closed) * 100
+            avg_pnl = sum(t.pnl_pct or 0 for t in closed) / len(closed)
+            recent = sorted(closed, key=lambda t: t.closed_at or datetime.min, reverse=True)[:5]
+            recent_lines = "\n".join(
+                f"  {'✅' if (t.pnl or 0) > 0 else '❌'} {t.symbol} {t.side} {t.pnl_pct:+.2f}%"
+                for t in recent if t.pnl_pct is not None
+            )
+            reply = (
+                f"สรุปผลการเทรด\n"
+                f"ทั้งหมด: {len(closed)} trades | Win: {win_rate:.1f}%\n"
+                f"PnL รวม: {total_pnl:+.2f} USDT | เฉลี่ย: {avg_pnl:+.2f}%\n\n"
+                f"5 ล่าสุด:\n{recent_lines or '  (ไม่มี)'}"
+            )
+            return {"type": "report", "reply": reply}
+        finally:
+            db.close()
+
+    async def _handle_portfolio(self) -> dict:
+        if not self._trader:
+            return {"type": "error", "reply": "Trader ไม่พร้อมใช้งาน"}
+        try:
+            balances = await self._trader._exchange.get_balance()
+            cash_bal = balances.get("USDT")
+            cash = float(cash_bal.free) if cash_bal else 0.0
+            total = cash
+            lines = []
+            for sym, analysis in self._trader.analyses.items():
+                base = sym.split("/")[0]
+                bal = balances.get(base)
+                if bal and bal.total > 0:
+                    value = bal.total * analysis.price
+                    total += value
+                    lines.append(f"  {base}: {bal.total:.6f} (${value:.2f})")
+            pos_text = "\n".join(lines) if lines else "  ไม่มี open position"
+            reply = f"พอร์ตโฟลิโอ\nCash: ${cash:.2f} USDT\nTotal: ${total:.2f} USDT\n\nPositions:\n{pos_text}"
+            return {"type": "portfolio", "reply": reply}
+        except Exception as e:
+            return {"type": "error", "reply": f"ดึงข้อมูลพอร์ตไม่ได้: {e}"}
+
+    async def _handle_analyze(self, symbol: str) -> dict:
+        if not self._trader:
+            return {"type": "error", "reply": "Trader ไม่พร้อมใช้งาน"}
+        analysis = await self._trader.analyze_symbol(symbol)
+        if not analysis:
+            return {"type": "error", "reply": f"วิเคราะห์ {symbol} ไม่ได้"}
+        portfolio = await self._trader._get_portfolio_summary()
+        signal = await self._trader._get_final_signal(analysis, portfolio)
+        reply = (
+            f"วิเคราะห์ {symbol}\n"
+            f"ราคา: ${analysis.price:.4f} ({analysis.change_24h:+.2f}%)\n"
+            f"RSI: {analysis.rsi:.1f} | EMA: {analysis.ema_trend} | MACD: {analysis.macd_trend}\n"
+            f"Bollinger: {analysis.bb_signal} | Volatility: {analysis.volatility}\n"
+            f"สัญญาณ: {signal.action} (conf {signal.confidence:.0%})\n"
+            f"เหตุผล: {signal.reasoning[:220]}"
+        )
+        return {"type": "analysis", "reply": reply, "signal": signal.action}
+
+    async def _handle_trade(self, action: str, symbol: Optional[str], message: str) -> dict:
+        if not self._trader:
+            return {"type": "error", "reply": "Trader ไม่พร้อมใช้งาน"}
+        if not symbol:
+            return {"type": "info", "reply": f"กรุณาระบุ symbol เช่น '{action.lower()} BTC'"}
+        analysis = await self._trader.analyze_symbol(symbol)
+        if not analysis:
+            return {"type": "error", "reply": f"ดึงข้อมูล {symbol} ไม่ได้"}
+        portfolio = await self._trader._get_portfolio_summary()
+        signal = await self._trader._get_final_signal(analysis, portfolio)
+        if signal.action == action:
+            await self._trader._execute_trade(symbol, signal, analysis)
+            return {"type": "trade", "reply": f"ส่งคำสั่ง {action} {symbol} @ ${analysis.price:.4f} (conf {signal.confidence:.0%})\n{signal.reasoning[:180]}"}
+        return {"type": "info", "reply": f"AI แนะนำ {signal.action} สำหรับ {symbol} (conf {signal.confidence:.0%})\nไม่ตรงกับคำสั่ง {action} จึงไม่ execute\nเหตุผล: {signal.reasoning[:180]}"}
+
+    async def _handle_general(self, message: str) -> dict:
+        api_key = settings.claude_api_key
+        if not api_key:
+            return {"type": "info", "reply": "คำสั่งที่รองรับ:\n• ซื้อ/ขาย BTC ETH SOL XRP BNB\n• วิเคราะห์ BTC\n• รายงานผล / สรุปผล\n• พอร์ตฉัน\n• เทรนตัวเอง"}
+        try:
+            import anthropic
+            client = anthropic.AsyncAnthropic(api_key=api_key)
+            db = SessionLocal()
+            try:
+                recent = db.query(Trade).filter(Trade.status == "closed").order_by(Trade.opened_at.desc()).limit(5).all()
+                trade_ctx = ", ".join(f"{t.symbol} {t.side} {t.pnl_pct:+.2f}%" for t in recent if t.pnl_pct is not None) or "ยังไม่มี"
+            finally:
+                db.close()
+            sys_prompt = f"คุณคือ AI trading assistant ของ Aiterra ตอบสั้น กระชับ เป็นภาษาไทย recent trades: {trade_ctx}"
+            resp = await client.messages.create(
+                model=settings.claude_model, max_tokens=512,
+                system=sys_prompt,
+                messages=[{"role": "user", "content": message}],
+            )
+            reply = resp.content[0].text if resp.content else "ไม่มีคำตอบ"
+            return {"type": "ai", "reply": reply}
+        except Exception:
+            return {"type": "info", "reply": "คำสั่งที่รองรับ:\n• ซื้อ/ขาย BTC ETH SOL XRP BNB\n• วิเคราะห์ BTC\n• รายงานผล\n• พอร์ตฉัน\n• เทรนตัวเอง"}
+
+
+@router.post("/chat")
+async def chat_endpoint(data: Dict[str, Any]):
+    """POST /api/chat — Natural language command interface for the AI trading agent."""
+    message = (data.get("message") or "").strip()
+    if not message:
+        raise HTTPException(400, "message required")
+    handler = ChatHandler(_trader, _hourly_trainer)
+    return await handler.handle(message)
 
 
 @router.get("/exchanges/test")
