@@ -1,10 +1,18 @@
-"""Backtesting engine using regime-simulated historical data."""
+"""Backtesting engine.
+
+Runs on REAL Binance hourly klines when reachable (no API key needed),
+and transparently falls back to regime-simulated data when offline."""
+import logging
 import math
 import random
-from datetime import datetime, timedelta
-from typing import List
+from datetime import datetime, timedelta, timezone
+from typing import List, Optional
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
+
+BINANCE_KLINES = "https://api.binance.com/api/v3/klines"
 
 
 REGIMES = {
@@ -49,6 +57,48 @@ def _simulate_ohlcv(days: int, base_price: float, tf_minutes: int = 60) -> List[
         p = c
         remaining -= 1
     return candles
+
+
+async def _fetch_real_ohlcv(symbol: str, days: int, tf_minutes: int = 60) -> List[dict]:
+    """Fetch real hourly klines from Binance public API, paginating backwards.
+    Returns candles oldest→newest. Raises on network/HTTP error so the caller
+    can fall back to simulation."""
+    import aiohttp
+
+    needed      = days * 24 * 60 // tf_minutes
+    binance_sym = symbol.replace("/", "")
+    interval    = "1h"
+    out: List[dict] = []
+    end_time: Optional[int] = None
+
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+        while len(out) < needed:
+            limit = min(1000, needed - len(out))
+            params = {"symbol": binance_sym, "interval": interval, "limit": limit}
+            if end_time is not None:
+                params["endTime"] = end_time
+            async with session.get(BINANCE_KLINES, params=params) as resp:
+                resp.raise_for_status()
+                raw = await resp.json()
+            if not raw:
+                break
+            chunk = [{
+                "ts":     datetime.fromtimestamp(row[0] / 1000, tz=timezone.utc).replace(tzinfo=None),
+                "open":   float(row[1]),
+                "high":   float(row[2]),
+                "low":    float(row[3]),
+                "close":  float(row[4]),
+                "volume": float(row[5]),
+                "regime": "LIVE",
+            } for row in raw]
+            out = chunk + out                 # prepend older candles
+            end_time = raw[0][0] - 1          # ms just before earliest fetched
+            if len(raw) < limit:              # exchange has no more history
+                break
+
+    if not out:
+        raise ValueError("Binance returned no candles")
+    return out
 
 
 def _ema(series: np.ndarray, period: int) -> np.ndarray:
@@ -100,10 +150,32 @@ def _signal(window: List[dict]) -> tuple:
 def run_backtest(symbol: str, days: int = 30,
                  tp_pct: float = 0.04, sl_pct: float = 0.02,
                  initial_capital: float = 10000.0) -> dict:
+    """Synchronous simulated backtest (offline fallback)."""
     from ..exchanges.demo_client import _SEED_PRICES
     base_price = _SEED_PRICES.get(symbol, 100.0)
     candles = _simulate_ohlcv(days, base_price)
+    result = _run_on_candles(symbol, candles, days, tp_pct, sl_pct, initial_capital)
+    result["data_source"] = "simulated"
+    return result
 
+
+async def run_backtest_real(symbol: str, days: int = 30,
+                            tp_pct: float = 0.04, sl_pct: float = 0.02,
+                            initial_capital: float = 10000.0) -> dict:
+    """Backtest on REAL Binance klines; fall back to simulation if offline."""
+    try:
+        candles = await _fetch_real_ohlcv(symbol, days)
+        result = _run_on_candles(symbol, candles, days, tp_pct, sl_pct, initial_capital)
+        result["data_source"] = "binance"
+        return result
+    except Exception as e:
+        logger.warning(f"Real backtest data unavailable for {symbol} ({e}); using simulation")
+        return run_backtest(symbol, days, tp_pct, sl_pct, initial_capital)
+
+
+def _run_on_candles(symbol: str, candles: List[dict], days: int,
+                    tp_pct: float, sl_pct: float,
+                    initial_capital: float) -> dict:
     capital = initial_capital
     equity  = [capital]
     trades  = []

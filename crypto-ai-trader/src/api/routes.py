@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from ..core.config import settings
 from ..core.database import Portfolio, Trade, TrainingRecord, get_db, SessionLocal
+from .websocket import get_notifications, clear_notifications
 from ..notifications import line_notify, telegram_notify
 
 logger = logging.getLogger(__name__)
@@ -481,8 +482,8 @@ async def get_mtf_analysis(symbol: str = "BTC/USDT"):
 
 @router.post("/backtest")
 async def run_backtest(data: Dict[str, Any]):
-    """POST /api/backtest — Run backtest on simulated historical data."""
-    from ..agent.backtest import run_backtest as _run
+    """POST /api/backtest — Run backtest on real Binance klines (simulated fallback)."""
+    from ..agent.backtest import run_backtest_real as _run
     symbol  = data.get("symbol", "BTC/USDT")
     days    = int(data.get("days", 30))
     tp_pct  = float(data.get("tp_pct", 0.04))
@@ -490,7 +491,7 @@ async def run_backtest(data: Dict[str, Any]):
     if days < 7 or days > 365:
         raise HTTPException(400, "days must be 7-365")
     try:
-        result = _run(symbol, days=days, tp_pct=tp_pct, sl_pct=sl_pct)
+        result = await _run(symbol, days=days, tp_pct=tp_pct, sl_pct=sl_pct)
         return result
     except Exception as e:
         raise HTTPException(500, str(e))
@@ -514,6 +515,54 @@ async def get_training_loop_status():
     if not _training_loop:
         return {"running": False, "completed": False, "total_trades": 0, "win_rate": 0.0}
     return _training_loop.status
+
+
+# ─── Notification History ──────────────────────────────────────
+
+@router.get("/notifications")
+async def get_notification_history():
+    """GET /api/notifications — recent trade/training events (newest first)."""
+    return get_notifications()
+
+
+@router.delete("/notifications")
+async def clear_notification_history():
+    """DELETE /api/notifications — clear the notification log."""
+    clear_notifications()
+    return {"cleared": True}
+
+
+# ─── Live Positions (enriched open trades) ────────────────────
+
+@router.get("/positions")
+async def get_open_positions():
+    """GET /api/positions — open trades enriched with current price and floating PnL."""
+    if not _trader:
+        return []
+    rows = []
+    for sym, trade in list(_trader.open_trades.items()):
+        analysis = _trader.analyses.get(sym)
+        cur_price = analysis.price if analysis else trade["price"]
+        entry     = trade["price"]
+        amount    = trade.get("amount", 0)
+        floating  = (cur_price - entry) * amount
+        pnl_pct   = (cur_price - entry) / entry * 100 if entry > 0 else 0.0
+        rows.append({
+            "symbol":         sym,
+            "side":           trade.get("side", "BUY"),
+            "entry_price":    round(entry, 6),
+            "current_price":  round(cur_price, 6),
+            "amount":         round(amount, 6),
+            "cost":           round(trade.get("cost", 0), 2),
+            "floating_pnl":   round(floating, 4),
+            "pnl_pct":        round(pnl_pct, 2),
+            "stop_loss":      round(trade.get("stop_loss_price", 0), 6),
+            "take_profit":    round(trade.get("take_profit_price", 0), 6),
+            "strategy":       trade.get("strategy", ""),
+            "confidence":     round(trade.get("confidence", 0), 2),
+            "opened_at":      trade["opened_at"].isoformat() if isinstance(trade.get("opened_at"), datetime) else trade.get("opened_at"),
+        })
+    return rows
 
 
 @router.post("/training/loop/stop")

@@ -387,6 +387,8 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
     <a class="pill-link nav-link" onclick="showSection('portfolio',this)">Portfolio</a>
     <a class="pill-link nav-link" onclick="showSection('analytics',this)">Analytics</a>
     <a class="pill-link nav-link" onclick="showSection('trade-history',this)">History</a>
+    <a class="pill-link nav-link" onclick="showSection('positions',this)">Positions</a>
+    <a class="pill-link nav-link" onclick="showSection('notifications',this)" id="navNotifications">Notifications</a>
     <a class="pill-link nav-link" onclick="showSection('thai-market',this)">ตลาดไทย</a>
     <a class="pill-link nav-link" onclick="showSection('settings',this)">Settings</a>
   </div>
@@ -947,6 +949,94 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
   </div>
 </section>
 
+<!-- LIVE POSITIONS -->
+<section id="sec-positions" class="section">
+  <div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-layers me-2"></i>Live Open Positions</span>
+      <div class="d-flex align-items-center gap-2">
+        <span class="text-muted small" id="posTabCount">0 positions</span>
+        <button class="btn btn-outline-secondary btn-sm" onclick="refreshPositions()">
+          <i class="bi bi-arrow-clockwise"></i>
+        </button>
+      </div>
+    </div>
+    <div id="posTabEmpty" class="card-body text-center text-muted py-5">
+      <i class="bi bi-inbox" style="font-size:2rem;display:block;margin-bottom:8px"></i>
+      ไม่มี position เปิดอยู่
+    </div>
+    <div id="posTabTable" style="display:none;overflow-x:auto">
+      <table class="table table-dark table-sm mb-0" style="font-size:0.78rem">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Side</th>
+            <th>Entry</th>
+            <th>Current</th>
+            <th>Amount</th>
+            <th>Cost</th>
+            <th>Float PnL</th>
+            <th>PnL %</th>
+            <th>Stop Loss</th>
+            <th>Take Profit</th>
+            <th>Strategy</th>
+            <th>Conf</th>
+            <th>Opened</th>
+          </tr>
+        </thead>
+        <tbody id="posTabBody"></tbody>
+      </table>
+    </div>
+  </div>
+  <!-- Summary bar -->
+  <div class="row g-2" id="posSummaryRow" style="display:none">
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="stat-label">Open Positions</div>
+        <div class="stat-value" id="posSumCount">0</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="stat-label">Total Cost</div>
+        <div class="stat-value" style="font-size:1.1rem" id="posSumCost">$0.00</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="stat-label">Floating PnL</div>
+        <div class="stat-value" style="font-size:1.1rem" id="posSumFloat">+0.00</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="stat-label">Avg Confidence</div>
+        <div class="stat-value" style="font-size:1.1rem;color:var(--accent)" id="posSumConf">—</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- NOTIFICATIONS -->
+<section id="sec-notifications" class="section">
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-bell me-2"></i>Notification History</span>
+      <div class="d-flex align-items-center gap-2">
+        <span class="text-muted small" id="notifCount">0</span>
+        <button class="btn btn-outline-secondary btn-sm" onclick="clearNotifications()" title="Clear all">
+          <i class="bi bi-trash"></i>
+        </button>
+      </div>
+    </div>
+    <div id="notifEmpty" class="card-body text-center text-muted py-5">
+      <i class="bi bi-bell-slash" style="font-size:2rem;display:block;margin-bottom:8px"></i>
+      ยังไม่มี notification
+    </div>
+    <div id="notifList" style="display:none"></div>
+  </div>
+</section>
+
 <!-- THAI MARKET -->
 <section id="sec-thai-market" class="section">
 
@@ -1114,7 +1204,10 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
         </div>
       </div>
       <div class="card mb-3" id="btChartCard" style="display:none">
-        <div class="card-header"><i class="bi bi-graph-up me-2"></i>Equity Curve</div>
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-graph-up me-2"></i>Equity Curve</span>
+          <span id="btSource" class="badge" style="font-size:0.62rem;font-family:var(--font-mono)"></span>
+        </div>
         <div class="card-body p-2">
           <div class="chart-container"><canvas id="btEquityChart"></canvas></div>
         </div>
@@ -1446,6 +1539,14 @@ function connectWS() {
       showToast('Hourly Training', `Added ${msg.data.last_samples} samples · Acc: ${msg.data.model_accuracy ? (msg.data.model_accuracy*100).toFixed(1)+'%' : 'N/A'}`, 'success');
     }
     else if (msg.event === 'dashboard_update') renderDashboardState(msg.data);
+    else if (msg.event === 'positions_update') {
+      renderPositionsTab(msg.data.positions || []);
+      updateOpenPositions(msg.data.positions || []);  // keep Trading tab in sync
+    }
+    else if (msg.event === 'trade_executed' || msg.event === 'trade_closed' ||
+             msg.event === 'hourly_train_done' || msg.event === 'training_completed') {
+      _addNotifBadge();
+    }
   };
   setInterval(() => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({type:'ping'})); }, 25000);
 }
@@ -1471,6 +1572,13 @@ function showSection(name, el) {
   if (name === 'thai-market') loadThaiStocks();
   if (name === 'settings') loadSettings();
   if (name === 'trading' && currentSymbol) loadMTF();
+  if (name === 'positions') refreshPositions();
+  if (name === 'notifications') {
+    _notifUnread = 0;
+    const navEl = document.getElementById('navNotifications');
+    if (navEl) navEl.textContent = 'Notifications';
+    refreshNotifications();
+  }
 }
 
 function anlTab(tab, el) {
@@ -1749,15 +1857,20 @@ function updateAIPanel(sym) {
 function updateOpenPositions(positions) {
   const el = document.getElementById('openPositionsTable');
   if (!positions.length) { el.innerHTML = '<div class="p-3 text-muted small text-center">ไม่มี position เปิดอยู่</div>'; return; }
-  el.innerHTML = `<table class="table table-dark table-sm mb-0">
-    <thead><tr><th>Symbol</th><th>Entry</th><th>Now</th><th>PnL</th></tr></thead>
-    <tbody>${positions.map(p => `
-      <tr>
-        <td>${p.symbol}</td>
-        <td>$${formatPrice(p.entry_price)}</td>
-        <td>$${formatPrice(p.price)}</td>
+  el.innerHTML = `<table class="table table-dark table-sm mb-0" style="font-size:0.76rem">
+    <thead><tr><th>Symbol</th><th>Entry</th><th>Now</th><th>PnL %</th><th>SL</th><th>TP</th></tr></thead>
+    <tbody>${positions.map(p => {
+      const sl = p.stop_loss || p.stop_loss_price;
+      const tp = p.take_profit || p.take_profit_price;
+      return `<tr>
+        <td class="fw-bold">${p.symbol}</td>
+        <td class="font-monospace">$${formatPrice(p.entry_price)}</td>
+        <td class="font-monospace">$${formatPrice(p.current_price || p.price)}</td>
         <td class="${p.pnl_pct>=0?'text-success':'text-danger'}">${p.pnl_pct>=0?'+':''}${p.pnl_pct.toFixed(2)}%</td>
-      </tr>`).join('')}
+        <td class="text-danger" style="font-size:0.7rem">${sl?'$'+formatPrice(sl):'—'}</td>
+        <td class="text-success" style="font-size:0.7rem">${tp?'$'+formatPrice(tp):'—'}</td>
+      </tr>`;
+    }).join('')}
     </tbody></table>`;
 }
 
@@ -2666,6 +2779,13 @@ async function runBacktest() {
         btEquityChart.updateOptions({colors:[retColor],xaxis:{categories:labels}},false,false);
         btEquityChart.updateSeries([{name:'Equity',data:values}],false);
       }
+      const srcEl = document.getElementById('btSource');
+      if (srcEl) {
+        const real = d.data_source === 'binance';
+        srcEl.textContent = real ? '● Binance real data' : '● simulated data';
+        srcEl.style.background = real ? 'rgba(57,217,138,0.15)' : 'rgba(210,153,34,0.15)';
+        srcEl.style.color = real ? 'var(--accent-buy)' : 'var(--accent-yellow)';
+      }
       document.getElementById('btChartCard').style.display = '';
     }
 
@@ -2683,7 +2803,8 @@ async function runBacktest() {
       document.getElementById('btTradesCard').style.display = '';
     }
 
-    showToast('Backtest Complete', `${d.symbol} ${d.days}d | Return: ${d.total_return_pct.toFixed(2)}% | Sharpe: ${d.sharpe.toFixed(2)}`, d.total_return_pct >= 0 ? 'success' : 'warning');
+    const srcLabel = d.data_source === 'binance' ? 'Binance' : 'simulated';
+    showToast('Backtest Complete', `${d.symbol} ${d.days}d (${srcLabel}) | Return: ${d.total_return_pct.toFixed(2)}% | Sharpe: ${d.sharpe.toFixed(2)}`, d.total_return_pct >= 0 ? 'success' : 'warning');
   } catch(e) { showToast('Error', e.message, 'danger'); }
   finally {
     btn.disabled = false;
@@ -2847,6 +2968,142 @@ async function sendChat(preset) {
 }
 
 // ============================================================
+// Live Positions Tab
+// ============================================================
+async function refreshPositions() {
+  try {
+    const r = await fetch('/api/positions');
+    const rows = await r.json();
+    renderPositionsTab(rows);
+  } catch {}
+}
+
+function renderPositionsTab(rows) {
+  const empty   = document.getElementById('posTabEmpty');
+  const table   = document.getElementById('posTabTable');
+  const tbody   = document.getElementById('posTabBody');
+  const summary = document.getElementById('posSummaryRow');
+  const countEl = document.getElementById('posTabCount');
+
+  if (!rows || !rows.length) {
+    if (empty)   empty.style.display = '';
+    if (table)   table.style.display = 'none';
+    if (summary) summary.style.display = 'none';
+    if (countEl) countEl.textContent = '0 positions';
+    return;
+  }
+
+  if (empty)   empty.style.display = 'none';
+  if (table)   table.style.display = '';
+  if (summary) summary.style.display = '';
+  if (countEl) countEl.textContent = rows.length + ' position' + (rows.length !== 1 ? 's' : '');
+
+  const pnlColor = v => v > 0 ? 'var(--accent-buy)' : v < 0 ? 'var(--accent-red)' : '';
+  const fmt      = (v, d=4) => v != null ? '$' + Number(v).toLocaleString('en', {minimumFractionDigits:d,maximumFractionDigits:d}) : '—';
+  const fmtPct   = v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
+
+  tbody.innerHTML = rows.map(p => {
+    const ts = p.opened_at ? new Date(p.opened_at + (p.opened_at.endsWith('Z') ? '' : 'Z')).toLocaleString('th') : '—';
+    return `<tr>
+      <td class="fw-bold" style="font-family:var(--font-mono)">${p.symbol}</td>
+      <td class="${p.side==='BUY'?'text-success':'text-danger'}">${p.side}</td>
+      <td>${fmt(p.entry_price)}</td>
+      <td style="color:${pnlColor(p.pnl_pct)}">${fmt(p.current_price)}</td>
+      <td>${Number(p.amount).toFixed(5)}</td>
+      <td>$${Number(p.cost||0).toFixed(2)}</td>
+      <td style="color:${pnlColor(p.floating_pnl)};font-family:var(--font-mono)">${p.floating_pnl>=0?'+':''}${Number(p.floating_pnl).toFixed(4)}</td>
+      <td style="color:${pnlColor(p.pnl_pct)};font-family:var(--font-mono)">${fmtPct(p.pnl_pct)}</td>
+      <td class="text-danger" style="font-size:0.7rem">${p.stop_loss?fmt(p.stop_loss):'—'}</td>
+      <td class="text-success" style="font-size:0.7rem">${p.take_profit?fmt(p.take_profit):'—'}</td>
+      <td style="font-size:0.72rem">${p.strategy||'—'}</td>
+      <td style="font-size:0.72rem">${((p.confidence||0)*100).toFixed(0)}%</td>
+      <td class="text-muted" style="font-size:0.7rem">${ts}</td>
+    </tr>`;
+  }).join('');
+
+  // Summary bar
+  const totalCost  = rows.reduce((s, p) => s + (p.cost || 0), 0);
+  const totalFloat = rows.reduce((s, p) => s + (p.floating_pnl || 0), 0);
+  const avgConf    = rows.reduce((s, p) => s + (p.confidence || 0), 0) / rows.length;
+  const setEl = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setEl('posSumCount', rows.length);
+  setEl('posSumCost', '$' + totalCost.toFixed(2));
+  const floatEl = document.getElementById('posSumFloat');
+  if (floatEl) { floatEl.textContent = (totalFloat >= 0 ? '+' : '') + totalFloat.toFixed(4); floatEl.style.color = pnlColor(totalFloat); }
+  setEl('posSumConf', (avgConf * 100).toFixed(0) + '%');
+}
+
+// ============================================================
+// Notification History
+// ============================================================
+let _notifUnread = 0;
+
+async function refreshNotifications() {
+  try {
+    const r = await fetch('/api/notifications');
+    const items = await r.json();
+    renderNotifications(items);
+  } catch {}
+}
+
+function renderNotifications(items) {
+  const list    = document.getElementById('notifList');
+  const empty   = document.getElementById('notifEmpty');
+  const countEl = document.getElementById('notifCount');
+
+  if (countEl) countEl.textContent = items.length;
+
+  // Update badge on nav link
+  const navEl = document.getElementById('navNotifications');
+  if (navEl && _notifUnread > 0) {
+    navEl.innerHTML = `Notifications <span class="badge rounded-pill" style="background:var(--accent-red);color:#fff;font-size:0.6rem;vertical-align:middle;padding:2px 5px">${_notifUnread}</span>`;
+  }
+
+  if (!items || !items.length) {
+    if (empty) empty.style.display = '';
+    if (list)  list.style.display = 'none';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+  if (list)  list.style.display = '';
+
+  const typeStyle = { success:'rgba(57,217,138,0.1)', danger:'rgba(248,81,73,0.1)', warning:'rgba(210,153,34,0.1)', info:'rgba(100,120,200,0.1)' };
+  const typeBorder= { success:'rgba(57,217,138,0.25)', danger:'rgba(248,81,73,0.25)', warning:'rgba(210,153,34,0.25)', info:'rgba(100,120,200,0.25)' };
+
+  list.innerHTML = items.map(n => {
+    const ts = n.ts ? new Date(n.ts + 'Z').toLocaleString('th') : '';
+    const bg  = typeStyle[n.type] || 'rgba(100,100,100,0.08)';
+    const bdr = typeBorder[n.type] || 'rgba(100,100,100,0.2)';
+    return `<div class="d-flex align-items-start gap-3 px-3 py-2" style="border-bottom:1px solid var(--border);background:${bg};border-left:3px solid ${bdr}">
+      <span style="font-size:1.1rem;flex-shrink:0;line-height:1.5">${n.icon||'🔔'}</span>
+      <div class="flex-fill" style="min-width:0">
+        <div style="font-weight:600;font-size:0.82rem;font-family:var(--font-headline)">${n.title||''}</div>
+        <div class="text-muted" style="font-size:0.75rem">${n.body||''}</div>
+      </div>
+      <span class="text-muted flex-shrink-0" style="font-size:0.65rem;font-family:var(--font-mono);white-space:nowrap">${ts}</span>
+    </div>`;
+  }).join('');
+}
+
+async function clearNotifications() {
+  try {
+    await fetch('/api/notifications', {method:'DELETE'});
+    _notifUnread = 0;
+    const navEl = document.getElementById('navNotifications');
+    if (navEl) navEl.textContent = 'Notifications';
+    renderNotifications([]);
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+}
+
+function _addNotifBadge() {
+  _notifUnread++;
+  const navEl = document.getElementById('navNotifications');
+  if (navEl && !document.getElementById('sec-notifications').classList.contains('active')) {
+    navEl.innerHTML = `Notifications <span class="badge rounded-pill" style="background:var(--accent-red);color:#fff;font-size:0.6rem;vertical-align:middle;padding:2px 5px">${_notifUnread}</span>`;
+  }
+}
+
+// ============================================================
 // Init & Poll
 // ============================================================
 async function init() {
@@ -2857,6 +3114,8 @@ async function init() {
   await fetchPortfolioStats();
   await fetchStats();
   await refreshDashboardState();
+  await refreshPositions();
+  await refreshNotifications();
   setInterval(fetchPrices, 5000);
   setInterval(fetchPortfolioStats, 10000);
   setInterval(fetchStats, 30000);
@@ -2864,6 +3123,8 @@ async function init() {
   setInterval(refreshHourlyTrainer, 30000);
   setInterval(refreshDashboardState, 8000);
   setInterval(refreshLoopStatus, 3000);
+  setInterval(refreshPositions, 15000);    // fallback poll (WS pushes too)
+  setInterval(refreshNotifications, 30000);
   // E: Chart auto-refresh every 15 minutes
   setInterval(updateTradingChart, 15 * 60 * 1000);
 }

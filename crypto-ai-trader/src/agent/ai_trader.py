@@ -408,7 +408,29 @@ class AITrader:
             await asyncio.sleep(0.5)
 
         self._set_agent("analyzer", "idle", "วิเคราะห์ครบทุก symbol แล้ว")
-        await self._broadcast("dashboard_update", await self.get_dashboard_state())
+        state = await self.get_dashboard_state()
+        await self._broadcast("dashboard_update", state)
+        # Also push open positions so the positions table auto-refreshes
+        if self._open_trades:
+            positions = []
+            for sym, trade in list(self._open_trades.items()):
+                a = self._analyses.get(sym)
+                cur = a.price if a else trade["price"]
+                entry = trade["price"]
+                amount = trade.get("amount", 0)
+                positions.append({
+                    "symbol":        sym,
+                    "entry_price":   round(entry, 6),
+                    "current_price": round(cur, 6),
+                    "amount":        round(amount, 6),
+                    "floating_pnl":  round((cur - entry) * amount, 4),
+                    "pnl_pct":       round((cur - entry) / entry * 100 if entry > 0 else 0, 2),
+                    "stop_loss":     round(trade.get("stop_loss_price", 0), 6),
+                    "take_profit":   round(trade.get("take_profit_price", 0), 6),
+                    "strategy":      trade.get("strategy", ""),
+                    "confidence":    round(trade.get("confidence", 0), 2),
+                })
+            await self._broadcast("positions_update", {"positions": positions})
 
     async def start(self):
         self._running = True
