@@ -40,4 +40,6 @@ async def broadcast(event: str, data: dict):
             await ws.send_text(payload)
         except Exception:
             dead.add(ws)
-    _connections -= dead
+    # mutate in place — rebinding (`-=`) would shadow the module global and
+    # raise UnboundLocalError on the read above.
+    _connections.difference_update(dead)

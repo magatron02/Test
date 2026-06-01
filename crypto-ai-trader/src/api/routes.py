@@ -153,6 +153,18 @@ async def get_stats(db: Session = Depends(get_db)):
     }
 
 
+@router.get("/dashboard/state")
+async def get_dashboard_state():
+    """GET /api/dashboard/state — signal funnel, today's PnL, and AI agent activity."""
+    if not _trader:
+        return {
+            "funnel": {"analyzed": 0, "signals": 0, "approved": 0, "rejected": 0},
+            "pnl_today": {"realized": 0, "floating": 0, "total": 0},
+            "agents": {}, "last_signal": None, "open_positions": 0,
+        }
+    return await _trader.get_dashboard_state()
+
+
 @router.get("/training")
 async def get_training_stats():
     if not _trader:
@@ -654,8 +666,10 @@ class ChatHandler:
         portfolio = await self._trader._get_portfolio_summary()
         signal = await self._trader._get_final_signal(analysis, portfolio)
         if signal.action == action:
-            await self._trader._execute_trade(symbol, signal, analysis)
-            return {"type": "trade", "reply": f"ส่งคำสั่ง {action} {symbol} @ ${analysis.price:.4f} (conf {signal.confidence:.0%})\n{signal.reasoning[:180]}"}
+            executed = await self._trader._execute_trade(symbol, signal, analysis)
+            if executed:
+                return {"type": "trade", "reply": f"✓ ส่งคำสั่ง {action} {symbol} @ ${analysis.price:.4f} (conf {signal.confidence:.0%})\n{signal.reasoning[:180]}"}
+            return {"type": "info", "reply": f"AI เห็นด้วยกับ {action} {symbol} แต่ไม่ execute (ติด risk limit / เงินไม่พอ / มี position อยู่แล้ว)"}
         return {"type": "info", "reply": f"AI แนะนำ {signal.action} สำหรับ {symbol} (conf {signal.confidence:.0%})\nไม่ตรงกับคำสั่ง {action} จึงไม่ execute\nเหตุผล: {signal.reasoning[:180]}"}
 
     async def _handle_general(self, message: str) -> dict:

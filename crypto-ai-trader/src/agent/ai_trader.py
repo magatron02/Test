@@ -40,9 +40,74 @@ class AITrader:
         self._broadcast_fn = None                  # injected by websocket handler
         self._daily_pnl: float = 0.0
         self._daily_reset_date: str = ""
+        # Signal funnel + agent activity (dashboard)
+        self._signal_stats: Dict[str, object] = {"date": "", "analyzed": 0, "signals": 0, "approved": 0, "rejected": 0}
+        self._last_signal_info: Optional[dict] = None
+        self._agent_activity: Dict[str, dict] = {
+            "analyzer":   {"status": "idle", "detail": "พร้อมทำงาน", "ts": None},
+            "strategist": {"status": "idle", "detail": "พร้อมทำงาน", "ts": None},
+            "executor":   {"status": "idle", "detail": "พร้อมทำงาน", "ts": None},
+            "trainer":    {"status": "idle", "detail": "พร้อมทำงาน", "ts": None},
+        }
 
     def set_broadcast(self, fn):
         self._broadcast_fn = fn
+
+    def _ensure_today(self):
+        """Reset the daily signal funnel AND realized PnL when the date rolls over.
+        Single source of truth so the dashboard never shows yesterday's realized PnL."""
+        today = date.today().isoformat()
+        if self._daily_reset_date != today:
+            self._signal_stats = {"date": today, "analyzed": 0, "signals": 0, "approved": 0, "rejected": 0}
+            self._daily_pnl = 0.0
+            self._daily_reset_date = today
+
+    def _set_agent(self, name: str, status: str, detail: str):
+        if name in self._agent_activity:
+            self._agent_activity[name] = {"status": status, "detail": detail, "ts": datetime.utcnow().isoformat()}
+
+    async def get_dashboard_state(self) -> dict:
+        """Signal funnel, today's PnL (realized + floating), and agent activity."""
+        self._ensure_today()
+
+        floating = 0.0
+        for sym, trade in list(self._open_trades.items()):
+            a = self._analyses.get(sym)
+            if a:
+                floating += (a.price - trade["price"]) * trade.get("amount", 0)
+
+        # Reflect live trainer state into the trainer agent card
+        try:
+            ts = self._trainer.stats or {}
+            samples = ts.get("labelled_records", 0)
+            if ts.get("model_ready"):
+                acc = ts.get("accuracy")
+                self._agent_activity["trainer"]["detail"] = (
+                    f"Accuracy {acc:.0%} | {samples} samples"
+                    if acc is not None else f"{samples} samples"
+                )
+                self._agent_activity["trainer"]["status"] = "ready"
+            else:
+                self._agent_activity["trainer"]["detail"] = f"รอข้อมูล ({samples} samples)"
+        except Exception:
+            pass
+
+        return {
+            "funnel": {
+                "analyzed": self._signal_stats["analyzed"],
+                "signals":  self._signal_stats["signals"],
+                "approved": self._signal_stats["approved"],
+                "rejected": self._signal_stats["rejected"],
+            },
+            "pnl_today": {
+                "realized": round(self._daily_pnl, 2),
+                "floating": round(floating, 2),
+                "total":    round(self._daily_pnl + floating, 2),
+            },
+            "agents": self._agent_activity,
+            "last_signal": self._last_signal_info,
+            "open_positions": len(self._open_trades),
+        }
 
     async def _broadcast(self, event: str, data: dict):
         if self._broadcast_fn:
@@ -88,10 +153,7 @@ class AITrader:
 
     async def _check_risk_limits(self) -> Tuple[bool, str]:
         """Check daily loss limit and max open trades. Returns (allowed, reason)."""
-        today = date.today().isoformat()
-        if self._daily_reset_date != today:
-            self._daily_pnl = 0.0
-            self._daily_reset_date = today
+        self._ensure_today()
 
         max_daily_loss_pct = float(settings.get("trading", "max_daily_loss_pct", default=0.05))
         max_open_trades = int(settings.get("trading", "max_open_trades", default=3))
@@ -137,19 +199,20 @@ class AITrader:
 
         return sig
 
-    async def _execute_trade(self, symbol: str, signal: TradingSignal, analysis: MarketAnalysis):
+    async def _execute_trade(self, symbol: str, signal: TradingSignal, analysis: MarketAnalysis) -> bool:
+        """Execute a BUY/SELL. Returns True only when an order is actually placed."""
         if symbol in self._open_trades and signal.action == "BUY":
-            return  # Already have position
+            return False  # Already have position
 
         if signal.action not in ("BUY", "SELL"):
-            return
+            return False
 
         # Check risk limits before executing any trade
         if signal.action == "BUY":
             allowed, reason = await self._check_risk_limits()
             if not allowed:
                 logger.info(f"Skip BUY {symbol}: {reason}")
-                return
+                return False
 
         try:
             balances = await self._exchange.get_balance()
@@ -163,13 +226,13 @@ class AITrader:
                 amount_usdt = min(portfolio_value * risk_pct, avail * 0.95)
                 if amount_usdt < 10:
                     logger.info(f"Skip BUY {symbol}: insufficient cash ({amount_usdt:.2f} USDT)")
-                    return
+                    return False
                 amount = amount_usdt / analysis.price
             else:
                 base = symbol.split("/")[0]
                 pos_bal = balances.get(base)
                 if not pos_bal or pos_bal.free <= 0:
-                    return
+                    return False
                 amount = pos_bal.free
 
             order = await self._exchange.create_order(symbol, signal.action.lower(), amount)
@@ -227,10 +290,13 @@ class AITrader:
                 "mode": settings.trading_mode,
             })
             logger.info(f"Trade executed: {signal.action} {symbol} @ {order.price:.4f} (conf={signal.confidence:.2f})")
+            self._set_agent("executor", "active", f"{signal.action} {symbol} @ {order.price:.2f}")
             await _notify_trade(signal.action, symbol, order.price)
+            return True
 
         except Exception as e:
             logger.error(f"Trade execution failed for {symbol}: {e}")
+            return False
 
     async def _check_exit_conditions(self, symbol: str):
         if symbol not in self._open_trades:
@@ -296,16 +362,26 @@ class AITrader:
                 logger.error(f"Exit failed for {symbol}: {e}")
 
     async def run_cycle(self):
+        self._ensure_today()
         symbols = settings.symbols
         for symbol in symbols:
+            self._set_agent("analyzer", "active", f"กำลังวิเคราะห์ {symbol}")
             analysis = await self.analyze_symbol(symbol)
             if not analysis:
                 continue
+            self._signal_stats["analyzed"] += 1
 
             await self._check_exit_conditions(symbol)
 
             portfolio = await self._get_portfolio_summary()
+            self._set_agent("strategist", "active", f"ประเมินสัญญาณ {symbol}")
             signal = await self._get_final_signal(analysis, portfolio)
+            self._set_agent("strategist", "idle", f"{symbol}: {signal.action} ({signal.confidence:.0%})")
+            self._last_signal_info = {
+                "symbol": symbol, "action": signal.action,
+                "confidence": round(signal.confidence, 2),
+                "ts": datetime.utcnow().isoformat(),
+            }
 
             await self._broadcast("analysis_update", {
                 "symbol": symbol,
@@ -322,9 +398,17 @@ class AITrader:
             })
 
             if signal.action != "HOLD":
-                await self._execute_trade(symbol, signal, analysis)
+                self._signal_stats["signals"] += 1
+                executed = await self._execute_trade(symbol, signal, analysis)
+                if executed:
+                    self._signal_stats["approved"] += 1
+                else:
+                    self._signal_stats["rejected"] += 1
 
             await asyncio.sleep(0.5)
+
+        self._set_agent("analyzer", "idle", "วิเคราะห์ครบทุก symbol แล้ว")
+        await self._broadcast("dashboard_update", await self.get_dashboard_state())
 
     async def start(self):
         self._running = True

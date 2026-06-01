@@ -447,6 +447,84 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
   <!-- Price ticker row -->
   <div class="row g-2 mb-4" id="priceCardsRow"></div>
 
+  <!-- Signal Funnel + PNL Today + Agent Status -->
+  <div class="row g-3 mb-3">
+    <!-- Signal Funnel -->
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-funnel me-2"></i>Signal Funnel</span>
+          <span class="text-muted" style="font-size:0.65rem">วันนี้</span>
+        </div>
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="text-center flex-fill">
+              <div class="stat-value" style="font-size:1.5rem" id="funAnalyzed">0</div>
+              <div class="stat-label">Analyzed</div>
+            </div>
+            <i class="bi bi-arrow-right text-muted mx-1"></i>
+            <div class="text-center flex-fill">
+              <div class="stat-value" style="font-size:1.5rem;color:var(--accent)" id="funSignals">0</div>
+              <div class="stat-label">Signals</div>
+            </div>
+          </div>
+          <div class="d-flex gap-2">
+            <div class="flex-fill p-2 text-center" style="background:rgba(57,217,138,0.08);border:1px solid rgba(57,217,138,0.2);border-radius:6px">
+              <div class="fw-bold" style="color:var(--accent-buy);font-family:var(--font-mono);font-size:1.15rem" id="funApproved">0</div>
+              <div class="stat-label" style="margin:0">Approved ✓</div>
+            </div>
+            <div class="flex-fill p-2 text-center" style="background:rgba(255,107,53,0.08);border:1px solid rgba(255,107,53,0.2);border-radius:6px">
+              <div class="fw-bold" style="color:var(--accent-red);font-family:var(--font-mono);font-size:1.15rem" id="funRejected">0</div>
+              <div class="stat-label" style="margin:0">Rejected ✕</div>
+            </div>
+          </div>
+          <div class="text-muted mt-2 text-center" style="font-size:0.7rem;font-family:var(--font-mono)" id="funLastSignal">รอสัญญาณ...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PNL Today -->
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-cash-stack me-2"></i>PnL Today</span>
+          <span class="text-muted" style="font-size:0.65rem">Realized + Floating</span>
+        </div>
+        <div class="card-body">
+          <div class="text-center mb-3">
+            <div class="stat-label">Total Today</div>
+            <div class="stat-value" style="font-size:2rem;color:var(--accent)" id="pnlTotal">+0.00</div>
+            <div class="text-muted" style="font-size:0.7rem">USDT</div>
+          </div>
+          <div class="d-flex gap-2">
+            <div class="flex-fill p-2 text-center" style="background:var(--bg-card2);border:1px solid var(--border);border-radius:6px">
+              <div class="fw-bold" style="font-family:var(--font-mono);font-size:1.1rem" id="pnlRealized">+0.00</div>
+              <div class="stat-label" style="margin:0">Realized</div>
+            </div>
+            <div class="flex-fill p-2 text-center" style="background:var(--bg-card2);border:1px solid var(--border);border-radius:6px">
+              <div class="fw-bold" style="font-family:var(--font-mono);font-size:1.1rem" id="pnlFloating">+0.00</div>
+              <div class="stat-label" style="margin:0">Floating</div>
+            </div>
+          </div>
+          <div class="text-muted mt-2 text-center" style="font-size:0.7rem"><span id="pnlOpenPos">0</span> open positions</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Agent Status -->
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-robot me-2"></i>AI Agents</span>
+          <span class="ws-dot ws-connected" title="live"></span>
+        </div>
+        <div class="card-body p-2" id="agentPanel">
+          <div class="text-muted text-center small py-3">กำลังโหลด agents...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Chart + Activity row -->
   <div class="row g-3">
     <div class="col-md-8">
@@ -1367,6 +1445,7 @@ function connectWS() {
       refreshHourlyTrainer();
       showToast('Hourly Training', `Added ${msg.data.last_samples} samples · Acc: ${msg.data.model_accuracy ? (msg.data.model_accuracy*100).toFixed(1)+'%' : 'N/A'}`, 'success');
     }
+    else if (msg.event === 'dashboard_update') renderDashboardState(msg.data);
   };
   setInterval(() => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({type:'ping'})); }, 25000);
 }
@@ -2624,6 +2703,83 @@ async function saveThaiSettings() {
 }
 
 // ============================================================
+// Dashboard State (Signal Funnel + PnL Today + Agent Status)
+// ============================================================
+const AGENT_META = {
+  analyzer:   {icon: 'bi-search',      label: 'Analyzer'},
+  strategist: {icon: 'bi-diagram-3',   label: 'Strategist'},
+  executor:   {icon: 'bi-lightning-charge', label: 'Executor'},
+  trainer:    {icon: 'bi-mortarboard', label: 'Trainer'},
+};
+const AGENT_ORDER = ['analyzer', 'strategist', 'executor', 'trainer'];
+
+function _pnlColor(v) { return v > 0 ? 'var(--accent-buy)' : v < 0 ? 'var(--accent-red)' : 'var(--text-muted)'; }
+function _pnlFmt(v) { return (v >= 0 ? '+' : '') + v.toFixed(2); }
+
+function renderDashboardState(d) {
+  if (!d) return;
+  // Funnel
+  if (d.funnel) {
+    const f = d.funnel;
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('funAnalyzed', f.analyzed);
+    set('funSignals',  f.signals);
+    set('funApproved', f.approved);
+    set('funRejected', f.rejected);
+  }
+  if (d.last_signal) {
+    const ls = d.last_signal;
+    const el = document.getElementById('funLastSignal');
+    if (el) {
+      const t = ls.ts ? new Date(ls.ts + 'Z').toLocaleTimeString('th-TH', {hour:'2-digit',minute:'2-digit'}) : '';
+      el.textContent = `ล่าสุด: ${ls.symbol} ${ls.action} ${(ls.confidence*100).toFixed(0)}% · ${t}`;
+    }
+  }
+  // PnL Today
+  if (d.pnl_today) {
+    const p = d.pnl_today;
+    const tt = document.getElementById('pnlTotal');
+    if (tt) { tt.textContent = _pnlFmt(p.total); tt.style.color = _pnlColor(p.total); }
+    const rl = document.getElementById('pnlRealized');
+    if (rl) { rl.textContent = _pnlFmt(p.realized); rl.style.color = _pnlColor(p.realized); }
+    const fl = document.getElementById('pnlFloating');
+    if (fl) { fl.textContent = _pnlFmt(p.floating); fl.style.color = _pnlColor(p.floating); }
+  }
+  const op = document.getElementById('pnlOpenPos');
+  if (op && d.open_positions != null) op.textContent = d.open_positions;
+  // Agents
+  if (d.agents) renderAgents(d.agents);
+}
+
+function renderAgents(agents) {
+  const panel = document.getElementById('agentPanel');
+  if (!panel) return;
+  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const dotColor = s => s === 'active' ? 'var(--accent)' : s === 'ready' ? 'var(--accent-buy)' : 'var(--text-muted)';
+  const rows = AGENT_ORDER.filter(k => agents[k]).map(k => {
+    const a = agents[k], meta = AGENT_META[k];
+    const pulse = a.status === 'active' ? 'animation:pulse 1.5s infinite' : '';
+    return `
+      <div class="d-flex align-items-center gap-2 px-2 py-2" style="border-bottom:1px solid var(--border)">
+        <i class="bi ${meta.icon}" style="color:${dotColor(a.status)};font-size:0.95rem;width:18px"></i>
+        <div class="flex-fill" style="min-width:0">
+          <div style="font-family:var(--font-headline);font-weight:600;font-size:0.8rem">${meta.label}</div>
+          <div class="text-muted text-truncate" style="font-size:0.7rem">${esc(a.detail || '')}</div>
+        </div>
+        <span class="ws-dot" style="background:${dotColor(a.status)};${pulse}"></span>
+      </div>`;
+  }).join('');
+  panel.innerHTML = rows || '<div class="text-muted text-center small py-3">ไม่มี agent</div>';
+}
+
+async function refreshDashboardState() {
+  try {
+    const r = await fetch('/api/dashboard/state');
+    renderDashboardState(await r.json());
+  } catch {}
+}
+
+// ============================================================
 // Chat Bot
 // ============================================================
 let _chatOpen = false;
@@ -2700,11 +2856,13 @@ async function init() {
   await fetchPrices();
   await fetchPortfolioStats();
   await fetchStats();
+  await refreshDashboardState();
   setInterval(fetchPrices, 5000);
   setInterval(fetchPortfolioStats, 10000);
   setInterval(fetchStats, 30000);
   setInterval(fetchStatus, 60000);
   setInterval(refreshHourlyTrainer, 30000);
+  setInterval(refreshDashboardState, 8000);
   setInterval(refreshLoopStatus, 3000);
   // E: Chart auto-refresh every 15 minutes
   setInterval(updateTradingChart, 15 * 60 * 1000);
