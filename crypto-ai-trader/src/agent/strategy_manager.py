@@ -194,8 +194,10 @@ class StrategyManager:
             ml_weight = 0.30
             if ml_signal.action == "BUY":
                 buy_score = buy_score * 0.7 + ml_signal.confidence * ml_weight
+                sell_score *= 0.7    # ML contradicts any bearish rule lean → dampen it
             else:
                 sell_score = sell_score * 0.7 + ml_signal.confidence * ml_weight
+                buy_score *= 0.7     # ML contradicts any bullish rule lean → dampen it
             all_reasons.append(f"[ml] {ml_signal.reasoning}")
 
         # ── External signal adjustments ────────────────────────────────
@@ -237,7 +239,7 @@ class StrategyManager:
         # Only amplifies when spike direction aligns with the leading score.
         # A spike against VWAP is ambiguous — no boost applied.
         if analysis.volume_spike:
-            spike_boost = min(0.12, (analysis.volume_ratio - 3.0) / 10 + 0.06)
+            spike_boost = max(0.0, min(0.12, (analysis.volume_ratio - 3.0) / 10 + 0.06))
             vwap = analysis.price_vs_vwap
             if buy_score > sell_score and vwap == "ABOVE":
                 buy_score  = min(1.0, buy_score  + spike_boost)

@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import datetime, date
+from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 from .claude_analyzer import ClaudeAnalyzer
@@ -58,7 +58,7 @@ class AITrader:
     def _ensure_today(self):
         """Reset the daily signal funnel AND realized PnL when the date rolls over.
         Single source of truth so the dashboard never shows yesterday's realized PnL."""
-        today = date.today().isoformat()
+        today = datetime.utcnow().date().isoformat()   # UTC to match trade timestamps
         if self._daily_reset_date != today:
             self._signal_stats = {"date": today, "analyzed": 0, "signals": 0, "approved": 0, "rejected": 0}
             self._daily_pnl = 0.0
@@ -376,7 +376,15 @@ class AITrader:
         analysis = self._analyses.get(symbol)
         if not analysis:
             return
-        price  = analysis.price
+        # Use a fresh ticker for exit decisions — the cached analysis price can be
+        # up to one full cycle stale, which widens slippage on stop/target fills.
+        price = analysis.price
+        try:
+            ticker = await self._exchange.get_ticker(symbol)
+            if ticker and ticker.price > 0:
+                price = ticker.price
+        except Exception:
+            pass
         entry  = trade["price"]
         sl     = trade["stop_loss_price"]
         tp     = trade["take_profit_price"]

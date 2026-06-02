@@ -629,10 +629,11 @@ async def manual_trade(data: Dict[str, Any]):
         if symbol not in _trader.open_trades:
             raise HTTPException(400, f"No open trade for {symbol}")
         trade = _trader.open_trades[symbol]
-        side  = trade["side"]
         price = analysis.price
         amount = trade.get("amount", 0)
-        pnl   = (price - trade["price"]) * amount if side == "BUY" else (trade["price"] - price) * amount
+        # The bot only opens long (BUY) positions and _close_trade always sells
+        # the base balance, so PnL is always computed long-close.
+        pnl   = (price - trade["price"]) * amount
         pnl_pct = pnl / (trade["price"] * amount) * 100 if trade["price"] and amount else 0
         result = await _trader._close_trade(symbol, price, "manual_close")
         if not result:

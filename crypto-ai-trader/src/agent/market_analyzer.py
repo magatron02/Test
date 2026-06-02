@@ -69,7 +69,8 @@ def _rsi(closes: np.ndarray, period: int = 14) -> float:
     avg_gain = gains.mean()
     avg_loss = losses.mean()
     if avg_loss == 0:
-        return 100.0
+        # Flat market (no gains and no losses) is neutral, not overbought.
+        return 50.0 if avg_gain == 0 else 100.0
     rs = avg_gain / avg_loss
     return 100 - (100 / (1 + rs))
 
@@ -145,7 +146,9 @@ def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
     # EMA
     result.ema_9  = float(_ema(closes, 9)[-1])
     result.ema_21 = float(_ema(closes, 21)[-1])
-    result.ema_50 = float(_ema(closes, min(50, len(closes) - 1))[-1])
+    # Only treat ema_50 as a true 50-period EMA when there is enough data;
+    # otherwise fall back to ema_21 so the stack comparison stays consistent.
+    result.ema_50 = float(_ema(closes, 50)[-1]) if len(closes) >= 51 else result.ema_21
     if result.ema_9 > result.ema_21 > result.ema_50:
         result.ema_trend = "BULLISH"
     elif result.ema_9 < result.ema_21 < result.ema_50:
@@ -169,9 +172,24 @@ def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
     elif result.atr_pct > 3.0:
         result.volatility = "HIGH"
 
-    # VWAP (cumulative)
+    # VWAP — anchored to the current session (UTC day). A cumulative VWAP over
+    # the whole 100-candle window is too slow-moving to be a meaningful
+    # intraday reference, so we reset it at each day boundary.
     typical = (highs + lows + closes) / 3
-    vwap_series = np.cumsum(typical * vols) / np.cumsum(vols)
+    try:
+        last_day = candles[-1].timestamp.date()
+        start = 0
+        for i in range(len(candles) - 1, -1, -1):
+            if candles[i].timestamp.date() != last_day:
+                start = i + 1
+                break
+        if len(candles) - start < 10:    # too few candles → use a rolling window
+            start = max(0, len(candles) - 32)
+    except Exception:
+        start = max(0, len(candles) - 32)
+    seg_typ, seg_vol = typical[start:], vols[start:]
+    cum_vol = np.cumsum(seg_vol)
+    vwap_series = np.cumsum(seg_typ * seg_vol) / np.where(cum_vol == 0, 1.0, cum_vol)
     result.vwap = float(vwap_series[-1])
     result.price_vs_vwap = "ABOVE" if price > result.vwap else "BELOW"
 
