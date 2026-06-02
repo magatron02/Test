@@ -178,6 +178,20 @@ async def get_dashboard_state():
     return await _trader.get_dashboard_state()
 
 
+@router.get("/signals/market")
+async def get_market_signals():
+    """GET /api/signals/market — Fear & Greed index + funding rates (cached 1 h)."""
+    from ..agent.market_signals import get_fear_greed, get_funding_rates, cache_status
+    symbols = settings.symbols
+    fg, fr = await get_fear_greed(), await get_funding_rates(symbols)
+    return {
+        "fear_greed": fg,
+        "funding_rates": fr,
+        "cache": cache_status(),
+        "ext_signals": _trader._ext_signals if _trader else {},
+    }
+
+
 @router.get("/training")
 async def get_training_stats():
     if not _trader:

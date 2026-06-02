@@ -617,6 +617,42 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
     </div>
   </div>
 
+  <!-- Sentiment row: Fear & Greed + Funding Rates -->
+  <div class="row g-3 mb-0" id="sentimentRow" style="margin-top:0">
+    <div class="col-md-4">
+      <div class="card" style="border-color:rgba(168,255,83,0.15)">
+        <div class="card-header d-flex justify-content-between">
+          <span><i class="bi bi-emoji-expressionless me-1"></i>Fear & Greed</span>
+          <span class="text-muted" style="font-size:0.65rem">alternative.me</span>
+        </div>
+        <div class="card-body py-2 d-flex align-items-center gap-3">
+          <div id="fgGauge" style="font-size:2.2rem;font-weight:900;font-family:var(--font-mono);min-width:54px;text-align:center">—</div>
+          <div class="flex-grow-1">
+            <div style="height:8px;border-radius:4px;background:linear-gradient(90deg,#39d98a,#A8FF53,#f0883e,#ff6b35);position:relative;overflow:visible">
+              <div id="fgPointer" style="position:absolute;top:-3px;width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid #000;transition:left 0.4s ease;left:50%;transform:translateX(-7px)"></div>
+            </div>
+            <div class="d-flex justify-content-between" style="font-size:0.6rem;color:var(--text-muted);margin-top:2px">
+              <span>Extreme Fear</span><span>Neutral</span><span>Extreme Greed</span>
+            </div>
+            <div class="mt-1 text-center" style="font-size:0.72rem" id="fgLabel">กำลังโหลด...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-8">
+      <div class="card" style="border-color:rgba(168,255,83,0.15)">
+        <div class="card-header">
+          <i class="bi bi-cash-coin me-1"></i>Funding Rates <span class="text-muted" style="font-size:0.65rem ms-1">Binance Futures (+ = longs pay | − = shorts pay)</span>
+        </div>
+        <div class="card-body py-2">
+          <div id="fundingRates" class="d-flex gap-3 flex-wrap">
+            <span class="text-muted small">กำลังโหลด...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Chart + Activity row -->
   <div class="row g-3">
     <div class="col-md-8">
@@ -3180,6 +3216,62 @@ async function saveThaiSettings() {
 }
 
 // ============================================================
+// Market Sentiment: Fear & Greed + Funding Rates
+// ============================================================
+async function refreshMarketSentiment() {
+  try {
+    const r = await fetch('/api/signals/market');
+    if (!r.ok) return;
+    const d = await r.json();
+
+    // Fear & Greed
+    const fg = d.fear_greed;
+    if (fg) {
+      const v = fg.value;
+      const gauge = document.getElementById('fgGauge');
+      const ptr   = document.getElementById('fgPointer');
+      const lbl   = document.getElementById('fgLabel');
+      if (gauge) {
+        const col = v <= 25 ? '#39d98a' : v <= 45 ? '#A8FF53' : v <= 55 ? '#f0883e' : v <= 75 ? '#ff8c00' : '#ff6b35';
+        gauge.textContent = v;
+        gauge.style.color = col;
+      }
+      if (ptr) ptr.style.left = `calc(${v}% - 7px)`;
+      if (lbl) {
+        const labels = {
+          'Extreme Fear': '😨 Extreme Fear — ตลาดกลัวมาก (โอกาส BUY)',
+          'Fear': '😟 Fear — ตลาดกลัว (มีโอกาส BUY)',
+          'Neutral': '😐 Neutral — ตลาดปกติ',
+          'Greed': '😏 Greed — ตลาดโลภ (ระวัง)',
+          'Extreme Greed': '🤑 Extreme Greed — ตลาดโลภมาก (ระวัง SELL)',
+        };
+        lbl.textContent = labels[fg.label] || fg.label;
+        lbl.style.color = v <= 40 ? '#39d98a' : v >= 60 ? '#ff6b35' : 'var(--text-muted)';
+      }
+    }
+
+    // Funding Rates
+    const fr = d.funding_rates;
+    const frEl = document.getElementById('fundingRates');
+    if (frEl && fr && Object.keys(fr).length) {
+      frEl.innerHTML = Object.entries(fr).map(([sym, rate]) => {
+        const pct = rate.toFixed(4);
+        const col = rate > 0.02 ? '#ff6b35' : rate < -0.02 ? '#39d98a' : rate > 0 ? '#f0883e' : rate < 0 ? '#A8FF53' : 'var(--text-muted)';
+        const bias = rate > 0.02 ? '▼ SELL bias' : rate < -0.02 ? '▲ BUY bias' : rate > 0 ? '↘ slight SELL' : rate < 0 ? '↗ slight BUY' : '→ Neutral';
+        const base = sym.split('/')[0];
+        return `<div class="text-center" style="background:var(--bg-card2);padding:4px 10px;border-radius:6px;border:1px solid ${col}22">
+          <div style="font-size:0.7rem;color:var(--text-muted)">${base}</div>
+          <div style="color:${col};font-family:var(--font-mono);font-size:0.85rem;font-weight:700">${rate >= 0 ? '+' : ''}${pct}%</div>
+          <div style="font-size:0.6rem;color:${col}">${bias}</div>
+        </div>`;
+      }).join('');
+    } else if (frEl) {
+      frEl.innerHTML = '<span class="text-muted small">ไม่มีข้อมูล (ไม่มีการเชื่อมต่ออินเทอร์เน็ต หรือ Binance Futures API ไม่พร้อม)</span>';
+    }
+  } catch {}
+}
+
+// ============================================================
 // Dashboard State (Signal Funnel + PnL Today + Agent Status)
 // ============================================================
 const AGENT_META = {
@@ -3620,6 +3712,7 @@ async function init() {
   await refreshDashboardState();
   await refreshPositions();
   await refreshNotifications();
+  refreshMarketSentiment();  // fire-and-forget on startup
   setInterval(fetchPrices, 5000);
   setInterval(fetchPortfolioStats, 10000);
   setInterval(fetchStats, 30000);
@@ -3627,9 +3720,9 @@ async function init() {
   setInterval(refreshHourlyTrainer, 30000);
   setInterval(refreshDashboardState, 8000);
   setInterval(refreshLoopStatus, 3000);
-  setInterval(refreshPositions, 15000);    // fallback poll (WS pushes too)
+  setInterval(refreshPositions, 15000);
   setInterval(refreshNotifications, 30000);
-  // E: Chart auto-refresh every 15 minutes
+  setInterval(refreshMarketSentiment, 5 * 60 * 1000);  // refresh every 5 min
   setInterval(updateTradingChart, 15 * 60 * 1000);
 }
 

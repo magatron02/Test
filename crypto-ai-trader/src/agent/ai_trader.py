@@ -5,6 +5,7 @@ from typing import Dict, List, Optional, Tuple
 
 from .claude_analyzer import ClaudeAnalyzer
 from .market_analyzer import MarketAnalysis, analyze
+from .market_signals import get_fear_greed, get_funding_rates
 from .strategy_manager import StrategyManager, TradingSignal
 from .trainer import AITrainer
 from ..core.config import settings
@@ -43,6 +44,7 @@ class AITrader:
         # Signal funnel + agent activity (dashboard)
         self._signal_stats: Dict[str, object] = {"date": "", "analyzed": 0, "signals": 0, "approved": 0, "rejected": 0}
         self._last_signal_info: Optional[dict] = None
+        self._ext_signals: dict = {}   # fear_greed + funding_rates, refreshed each cycle
         self._agent_activity: Dict[str, dict] = {
             "analyzer":   {"status": "idle", "detail": "พร้อมทำงาน", "ts": None},
             "strategist": {"status": "idle", "detail": "พร้อมทำงาน", "ts": None},
@@ -107,6 +109,7 @@ class AITrader:
             "agents": self._agent_activity,
             "last_signal": self._last_signal_info,
             "open_positions": len(self._open_trades),
+            "ext_signals": self._ext_signals,
         }
 
     async def _broadcast(self, event: str, data: dict):
@@ -181,11 +184,11 @@ class AITrader:
         if ai_model == "claude":
             sig = await self._claude.analyze(analysis, portfolio)
         elif ai_model == "rule_based":
-            sig = self._strategy.get_signal(analysis)
+            sig = self._strategy.get_signal(analysis, ext_signals=self._ext_signals)
         elif ai_model == "ml" and ml_signal:
             sig = ml_signal
         else:  # hybrid or fallback
-            rule_sig = self._strategy.get_signal(analysis, ml_signal)
+            rule_sig = self._strategy.get_signal(analysis, ml_signal, ext_signals=self._ext_signals)
             if settings.claude_api_key and ai_model in ("claude", "hybrid"):
                 try:
                     claude_sig = await self._claude.analyze(analysis, portfolio)
@@ -254,8 +257,10 @@ class AITrader:
                 "strategy": signal.strategy,
                 "confidence": signal.confidence,
                 "reasoning": signal.reasoning,
+                "stop_loss_pct": signal.stop_loss_pct,
                 "stop_loss_price": order.price * (1 - signal.stop_loss_pct),
                 "take_profit_price": order.price * (1 + signal.take_profit_pct),
+                "trailing_peak": order.price,   # tracks highest price for trailing stop
                 "opened_at": datetime.utcnow(),
             }
 
@@ -358,16 +363,59 @@ class AITrader:
         analysis = self._analyses.get(symbol)
         if not analysis:
             return
-        price = analysis.price
-        sl, tp, entry = trade["stop_loss_price"], trade["take_profit_price"], trade["price"]
+        price  = analysis.price
+        entry  = trade["price"]
+        sl     = trade["stop_loss_price"]
+        tp     = trade["take_profit_price"]
+        sl_pct = trade.get("stop_loss_pct", 0.03)
+
+        # ── Trailing stop ──────────────────────────────────────────────
+        # Activates once the position is profitable by ≥ trail_trigger.
+        # Trails at half the original SL distance so we protect profits
+        # while giving the trade room to breathe.
+        trail_trigger  = float(settings.get("trading", "trail_trigger_pct",  default=0.015))
+        trail_distance = float(settings.get("trading", "trail_distance_pct", default=0.0))
+        if trail_distance == 0.0:
+            trail_distance = sl_pct * 0.5   # default: half original SL
+
+        if price >= entry * (1 + trail_trigger):
+            peak = trade.get("trailing_peak", entry)
+            if price > peak:
+                trade["trailing_peak"] = price
+                peak = price
+            trailing_sl = peak * (1 - trail_distance)
+            if trailing_sl > sl:               # only ever raise the stop
+                trade["stop_loss_price"] = trailing_sl
+                sl = trailing_sl
+
+        # ── Breakeven stop ─────────────────────────────────────────────
+        # Once trade is +breakeven_trigger profitable, move SL to entry
+        # so we can never lose on this trade.
+        be_trigger = float(settings.get("trading", "breakeven_trigger_pct", default=0.02))
+        if price >= entry * (1 + be_trigger) and sl < entry:
+            trade["stop_loss_price"] = entry
+            sl = entry
+
+        # ── Exit checks ────────────────────────────────────────────────
         if price <= sl:
-            await self._close_trade(symbol, price, f"Stop loss hit ({price:.4f} <= {sl:.4f})")
+            trailing = "trailing_peak" in trade and trade["trailing_peak"] > entry * (1 + trail_trigger)
+            reason = "Trailing stop" if trailing else "Stop loss"
+            await self._close_trade(symbol, price, f"{reason} hit ({price:.4f} <= {sl:.4f})")
         elif price >= tp:
             await self._close_trade(symbol, price, f"Take profit hit ({price:.4f} >= {tp:.4f})")
 
     async def run_cycle(self):
         self._ensure_today()
         symbols = settings.symbols
+
+        # Refresh external signals once per cycle (cached 1 hour each)
+        try:
+            fg = await get_fear_greed()
+            fr = await get_funding_rates(symbols)
+            self._ext_signals = {"fear_greed": fg, "funding_rates": fr}
+        except Exception as e:
+            logger.debug(f"External signals fetch failed: {e}")
+
         for symbol in symbols:
             self._set_agent("analyzer", "active", f"กำลังวิเคราะห์ {symbol}")
             analysis = await self.analyze_symbol(symbol)
