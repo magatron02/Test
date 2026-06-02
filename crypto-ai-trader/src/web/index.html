@@ -88,6 +88,25 @@ body {
 .signal-buy-text  { color: var(--accent-buy); font-weight: 700; }
 .signal-sell-text { color: var(--accent-red); font-weight: 700; }
 
+/* ── Regime badges ── */
+.regime-badge { font-size: 0.58rem; padding: 1px 6px; border-radius: 2px; font-weight: 700; letter-spacing: 0.6px; font-family: var(--font-mono); display: inline-block; }
+.regime-bull   { background: rgba(57,217,138,0.15);  color: #39d98a; border: 1px solid rgba(57,217,138,0.3); }
+.regime-bear   { background: rgba(255,107,53,0.15);  color: #ff6b35; border: 1px solid rgba(255,107,53,0.3); }
+.regime-range  { background: rgba(168,255,83,0.10);  color: #A8FF53; border: 1px solid rgba(168,255,83,0.25); }
+.regime-vol    { background: rgba(255,193,7,0.12);   color: #ffc107; border: 1px solid rgba(255,193,7,0.25); }
+.regime-crash  { background: rgba(220,53,69,0.18);   color: #ff4d6d; border: 1px solid rgba(220,53,69,0.4); animation: pulse 1s infinite; }
+
+/* ── Risk / circuit bar ── */
+.heat-bar { height: 5px; border-radius: 2px; background: var(--border); overflow: hidden; }
+.heat-fill { height: 100%; transition: width 0.5s; }
+.circuit-open { color: #ff4d6d; font-weight: 700; animation: pulse 1.2s infinite; }
+
+/* ── Pattern pill ── */
+.pat-pill { font-size: 0.6rem; padding: 2px 7px; border-radius: 100px; font-family: var(--font-mono); font-weight: 600; display: inline-block; margin: 1px 2px; }
+.pat-buy  { background: rgba(57,217,138,0.12); color: #39d98a; border: 1px solid rgba(57,217,138,0.2); }
+.pat-sell { background: rgba(255,107,53,0.12);  color: #ff6b35; border: 1px solid rgba(255,107,53,0.2); }
+.pat-neu  { background: rgba(100,100,100,0.12); color: #888;    border: 1px solid rgba(100,100,100,0.2); }
+
 /* ── Table ── */
 .table { color: var(--text-main); font-family: var(--font-thai); }
 .table td, .table th { border-color: var(--border); font-size: 0.82rem; vertical-align: middle; padding: 8px 12px; }
@@ -538,6 +557,46 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
 
   <!-- Price ticker row -->
   <div class="row g-2 mb-4" id="priceCardsRow"></div>
+
+  <!-- Market Intelligence Row: Regime + Risk + Patterns -->
+  <div class="row g-3 mb-3" id="marketIntelRow">
+    <!-- Market Regime -->
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-radar me-2"></i>Market Regime</span>
+          <span class="text-muted" style="font-size:0.62rem;font-family:var(--font-mono)" id="regimeUpdated">—</span>
+        </div>
+        <div class="card-body p-2" id="regimePanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+    <!-- Risk Engine -->
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-shield-exclamation me-2"></i>Risk Engine</span>
+          <span id="circuitBadge" style="display:none" class="circuit-open" style="font-size:0.7rem">⚡ CIRCUIT</span>
+        </div>
+        <div class="card-body" id="riskPanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+    <!-- Chart Patterns -->
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-diagram-2 me-2"></i>Chart Patterns</span>
+          <select class="form-select form-select-sm" style="width:auto;font-size:0.7rem" id="patternSymbolSelect" onchange="fetchPatterns(this.value)"></select>
+        </div>
+        <div class="card-body p-2" id="patternPanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Signal Funnel + PNL Today + Agent Status -->
   <div class="row g-3 mb-3">
@@ -1267,10 +1326,11 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
       </div>
     </div>
     <div class="col-md-8">
+      <!-- AI Autotrade metrics -->
       <div class="row g-3 mb-3" id="btMetrics" style="display:none">
         <div class="col-6 col-md-3">
           <div class="stat-card" style="background:rgba(57,217,138,0.06);border:1px solid rgba(57,217,138,0.18)">
-            <div class="stat-label">Total Return</div>
+            <div class="stat-label">AI Return</div>
             <div class="stat-value" id="btReturn">—</div>
           </div>
         </div>
@@ -1293,31 +1353,71 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
           </div>
         </div>
       </div>
+
+      <!-- 3-way Comparison table -->
+      <div class="card mb-3" id="btCompareCard" style="display:none">
+        <div class="card-header"><i class="bi bi-bar-chart-line me-2"></i>Strategy Comparison</div>
+        <div class="card-body p-0" style="overflow-x:auto">
+          <table class="table table-dark table-sm mb-0">
+            <thead><tr><th>Strategy</th><th>Return</th><th>Win Rate</th><th>Sharpe</th><th>Drawdown</th><th>Final</th></tr></thead>
+            <tbody id="btCompareBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Equity Curve (multi-series) -->
       <div class="card mb-3" id="btChartCard" style="display:none">
         <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-graph-up me-2"></i>Equity Curve</span>
+          <span><i class="bi bi-graph-up me-2"></i>Equity Curves (Basic vs Hybrid vs AI)</span>
           <span id="btSource" class="badge" style="font-size:0.62rem;font-family:var(--font-mono)"></span>
         </div>
         <div class="card-body p-2">
-          <div class="chart-container"><canvas id="btEquityChart"></canvas></div>
+          <div id="btEquityChart" style="min-height:220px"></div>
         </div>
       </div>
+
+      <!-- Regime + Pattern breakdown (side by side) -->
+      <div class="row g-3 mb-3" id="btBreakdownRow" style="display:none">
+        <div class="col-md-6">
+          <div class="card h-100">
+            <div class="card-header"><i class="bi bi-radar me-2"></i>Regime Breakdown</div>
+            <div class="card-body p-0">
+              <table class="table table-dark table-sm mb-0">
+                <thead><tr><th>Regime</th><th>Trades</th><th>Win %</th><th>Avg PnL</th></tr></thead>
+                <tbody id="btRegimeBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card h-100">
+            <div class="card-header"><i class="bi bi-diagram-2 me-2"></i>Pattern Performance</div>
+            <div class="card-body p-0">
+              <table class="table table-dark table-sm mb-0">
+                <thead><tr><th>Pattern</th><th>Trades</th><th>Win %</th><th>Avg PnL</th></tr></thead>
+                <tbody id="btPatternBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="card" id="btNoData">
         <div class="card-body text-center py-5 text-muted">
           <i class="bi bi-skip-backward-circle" style="font-size:2rem;display:block;margin-bottom:8px"></i>
-          กดปุ่ม Run Backtest เพื่อทดสอบกลยุทธ์บนข้อมูลจำลอง
+          กดปุ่ม Run Backtest เพื่อทดสอบ AI Autotrade vs Baseline บนข้อมูลจริง Binance
         </div>
       </div>
     </div>
   </div>
   <div class="card" id="btTradesCard" style="display:none">
     <div class="card-header d-flex justify-content-between align-items-center">
-      <span><i class="bi bi-table me-2"></i>Backtest Trades (last 20)</span>
+      <span><i class="bi bi-table me-2"></i>AI Autotrade Trades (last 50)</span>
       <span class="text-muted small" id="btTradeCount"></span>
     </div>
     <div class="card-body p-0" style="overflow-x:auto">
       <table class="table table-dark table-sm mb-0">
-        <thead><tr><th>Open</th><th>Close</th><th>Side</th><th>PnL %</th><th>Result</th><th>Regime</th></tr></thead>
+        <thead><tr><th>Open</th><th>Close</th><th>Side</th><th>PnL%</th><th>Win</th><th>Regime</th><th>Pattern</th><th>Size%</th></tr></thead>
         <tbody id="btTradesBody"></tbody>
       </table>
     </div>
@@ -1834,6 +1934,10 @@ async function fetchStatus() {
   } catch {}
 }
 
+let allRegimes = {};
+let riskState  = {};
+let allPatterns = {};
+
 async function fetchPrices() {
   try {
     const r = await fetch('/api/prices');
@@ -1841,6 +1945,119 @@ async function fetchPrices() {
     renderPriceCards();
     updateTradingChart();
   } catch {}
+}
+
+async function fetchRegimes() {
+  try {
+    const r = await fetch('/api/regimes');
+    allRegimes = await r.json();
+    renderRegimePanel();
+    renderPriceCards();   // refresh regime badges on price cards
+    document.getElementById('regimeUpdated').textContent =
+      new Date().toLocaleTimeString('th', {hour:'2-digit', minute:'2-digit'});
+  } catch {}
+}
+
+async function fetchRiskState() {
+  try {
+    const r = await fetch('/api/risk');
+    riskState = await r.json();
+    renderRiskPanel();
+  } catch {}
+}
+
+async function fetchPatterns(symbol) {
+  const sym = symbol || (Object.keys(allPrices)[0]) || 'BTC/USDT';
+  try {
+    const r = await fetch('/api/patterns?symbol=' + encodeURIComponent(sym));
+    const d = await r.json();
+    allPatterns[sym] = d;
+    renderPatternPanel(sym);
+  } catch {}
+}
+
+function renderRegimePanel() {
+  const panel = document.getElementById('regimePanel');
+  if (!panel) return;
+  const entries = Object.entries(allRegimes);
+  if (!entries.length) { panel.innerHTML = '<div class="text-muted text-center small py-2">รอข้อมูล...</div>'; return; }
+
+  const regimeMeta = {
+    BULL_TREND:  {cls:'regime-bull',  icon:'↑', label:'BULL'},
+    BEAR_TREND:  {cls:'regime-bear',  icon:'↓', label:'BEAR'},
+    RANGING:     {cls:'regime-range', icon:'↔', label:'RANGE'},
+    VOLATILE:    {cls:'regime-vol',   icon:'⚡', label:'VOLATILE'},
+    CRASH:       {cls:'regime-crash', icon:'⚠', label:'CRASH'},
+  };
+
+  panel.innerHTML = entries.map(([sym, r]) => {
+    const m = regimeMeta[r.regime] || {cls:'regime-range', icon:'?', label:r.regime};
+    const base = sym.split('/')[0];
+    return `
+      <div class="d-flex align-items-center justify-content-between px-2 py-1" style="border-bottom:1px solid var(--border)">
+        <span style="font-family:var(--font-headline);font-size:0.82rem;font-weight:600">${base}</span>
+        <div class="text-center" style="flex:1;padding:0 6px">
+          <div style="font-size:0.68rem;color:var(--text-muted);font-family:var(--font-mono)">ADX ${r.adx}</div>
+        </div>
+        <span class="regime-badge ${m.cls}">${m.icon} ${m.label}</span>
+        <span style="font-size:0.65rem;color:var(--text-muted);margin-left:6px;font-family:var(--font-mono)">${(r.confidence*100).toFixed(0)}%</span>
+      </div>`;
+  }).join('');
+}
+
+function renderRiskPanel() {
+  const panel = document.getElementById('riskPanel');
+  const badge = document.getElementById('circuitBadge');
+  if (!panel || !riskState.equity) return;
+  const rs = riskState;
+  const dd = (rs.drawdown_pct * 100).toFixed(1);
+  const heat = (rs.portfolio_heat * 100).toFixed(1);
+  const heatColor = rs.portfolio_heat > 0.15 ? '#ff6b35' : rs.portfolio_heat > 0.08 ? '#ffc107' : '#39d98a';
+
+  if (badge) { badge.style.display = rs.circuit_open ? '' : 'none'; }
+
+  panel.innerHTML = `
+    <div class="mb-2">
+      <div class="d-flex justify-content-between mb-1">
+        <span class="stat-label" style="margin:0">Drawdown</span>
+        <span style="font-family:var(--font-mono);font-size:0.8rem;color:${parseFloat(dd)>5?'var(--accent-red)':'var(--text-main)'}">${dd}%</span>
+      </div>
+      <div class="heat-bar"><div class="heat-fill" style="width:${Math.min(parseFloat(dd)*10,100)}%;background:${parseFloat(dd)>5?'var(--accent-red)':'var(--accent-buy)'}"></div></div>
+    </div>
+    <div class="mb-2">
+      <div class="d-flex justify-content-between mb-1">
+        <span class="stat-label" style="margin:0">Portfolio Heat</span>
+        <span style="font-family:var(--font-mono);font-size:0.8rem;color:${heatColor}">${heat}%</span>
+      </div>
+      <div class="heat-bar"><div class="heat-fill" style="width:${Math.min(parseFloat(heat)*5,100)}%;background:${heatColor}"></div></div>
+    </div>
+    <div class="d-flex justify-content-between" style="font-size:0.75rem;color:var(--text-muted)">
+      <span>HWM: <strong style="color:var(--text-main)">$${(rs.high_water_mark||0).toFixed(0)}</strong></span>
+      <span>Daily PnL: <strong style="color:${rs.daily_pnl>=0?'var(--accent-buy)':'var(--accent-red)'}">${rs.daily_pnl>=0?'+':''}${(rs.daily_pnl||0).toFixed(2)}</strong></span>
+    </div>
+    ${rs.circuit_open ? `<div class="mt-2 text-center circuit-open" style="font-size:0.72rem">⚡ ${rs.circuit_reason}</div>` : ''}`;
+}
+
+function renderPatternPanel(sym) {
+  const panel = document.getElementById('patternPanel');
+  if (!panel) return;
+  const data = allPatterns[sym];
+  if (!data) { panel.innerHTML = '<div class="text-muted text-center small py-2">รอข้อมูล...</div>'; return; }
+  if (!data.patterns || !data.patterns.length) {
+    panel.innerHTML = '<div class="text-muted text-center small py-2">ไม่พบ pattern สำหรับ ' + sym + '</div>'; return;
+  }
+  panel.innerHTML = data.patterns.map(p => {
+    const cls = p.signal==='BUY' ? 'pat-buy' : p.signal==='SELL' ? 'pat-sell' : 'pat-neu';
+    const arrow = p.signal==='BUY' ? '↑' : p.signal==='SELL' ? '↓' : '↔';
+    return `
+      <div class="px-2 py-2" style="border-bottom:1px solid var(--border)">
+        <div class="d-flex align-items-center justify-content-between mb-1">
+          <span style="font-weight:600;font-size:0.8rem">${p.name_th}</span>
+          <span class="pat-pill ${cls}">${arrow} ${p.signal} ${(p.confidence*100).toFixed(0)}%</span>
+        </div>
+        <div class="text-muted" style="font-size:0.68rem">${p.description_th}</div>
+      </div>`;
+  }).join('');
 }
 
 async function fetchPortfolioStats() {
@@ -1909,14 +2126,27 @@ async function fetchStats() {
 // ============================================================
 // Rendering
 // ============================================================
+const _REGIME_BADGE = {
+  BULL_TREND: {cls:'regime-bull',  txt:'↑ BULL'},
+  BEAR_TREND: {cls:'regime-bear',  txt:'↓ BEAR'},
+  RANGING:    {cls:'regime-range', txt:'↔ RANGE'},
+  VOLATILE:   {cls:'regime-vol',   txt:'⚡ VOL'},
+  CRASH:      {cls:'regime-crash', txt:'⚠ CRASH'},
+};
+
 function renderPriceCards() {
   const container = document.getElementById('priceCardsRow');
   const symbolSelect = document.getElementById('chartSymbolSelect');
-  const prevSymbols = new Set(Array.from(symbolSelect.options).map(o => o.value));
+  const patternSel   = document.getElementById('patternSymbolSelect');
+  const prevSymbols  = new Set(Array.from(symbolSelect.options).map(o => o.value));
 
   container.innerHTML = '';
   for (const [sym, d] of Object.entries(allPrices)) {
     const up = d.change_24h >= 0;
+    const regime = allRegimes[sym];
+    const rm = regime ? (_REGIME_BADGE[regime.regime] || {cls:'regime-range', txt:regime.regime}) : null;
+    const regimeBadge = rm ? `<span class="regime-badge ${rm.cls}" style="margin-top:4px;display:inline-block">${rm.txt}</span>` : '';
+
     const card = document.createElement('div');
     card.className = 'col-6 col-md-4 col-lg-2';
     card.innerHTML = `
@@ -1926,7 +2156,10 @@ function renderPriceCards() {
           <span class="badge-signal ${d.signal==='BUY'?'signal-buy':d.signal==='SELL'?'signal-sell':'signal-hold'}">${d.signal}</span>
         </div>
         <div class="fw-bold mt-1">$${formatPrice(d.price)}</div>
-        <div class="small ${up?'price-up':'price-down'}">${up?'+':''}${d.change_24h.toFixed(2)}%</div>
+        <div class="d-flex justify-content-between align-items-center">
+          <div class="small ${up?'price-up':'price-down'}">${up?'+':''}${d.change_24h.toFixed(2)}%</div>
+          ${regimeBadge}
+        </div>
       </div>`;
     container.appendChild(card);
 
@@ -1934,6 +2167,11 @@ function renderPriceCards() {
       const opt = document.createElement('option');
       opt.value = sym; opt.textContent = sym;
       symbolSelect.appendChild(opt);
+    }
+    // populate pattern symbol select
+    if (patternSel && !Array.from(patternSel.options).some(o => o.value === sym)) {
+      const o2 = document.createElement('option'); o2.value = sym; o2.textContent = sym;
+      patternSel.appendChild(o2);
     }
   }
   if (!currentSymbol && Object.keys(allPrices).length > 0) {
@@ -2998,87 +3236,164 @@ async function refreshPortfolio() {
 // ============================================================
 let btEquityChart = null;
 
+function _btHide() {
+  ['btMetrics','btChartCard','btTradesCard','btCompareCard','btBreakdownRow'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
+  const nd = document.getElementById('btNoData'); if (nd) nd.style.display = '';
+}
+
 async function runBacktest() {
   const btn = document.getElementById('btRunBtn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Running...';
-  document.getElementById('btNoData').style.display = '';
-  document.getElementById('btMetrics').style.display = 'none';
-  document.getElementById('btChartCard').style.display = 'none';
-  document.getElementById('btTradesCard').style.display = 'none';
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Running AI Backtest...';
+  _btHide();
 
   try {
     const r = await fetch('/api/backtest', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
-        symbol: document.getElementById('btSymbol').value,
-        days:   parseInt(document.getElementById('btDays').value),
-        tp_pct: parseFloat(document.getElementById('btTp').value) / 100,
-        sl_pct: parseFloat(document.getElementById('btSl').value) / 100,
+        symbol:  document.getElementById('btSymbol').value,
+        days:    parseInt(document.getElementById('btDays').value),
+        tp_pct:  parseFloat(document.getElementById('btTp').value) / 100,
+        sl_pct:  parseFloat(document.getElementById('btSl').value) / 100,
       })
     });
     const d = await r.json();
     if (!r.ok) { showToast('Error', d.detail || 'Backtest failed', 'danger'); return; }
 
-    const retColor = d.total_return_pct >= 0 ? '#A8FF53' : '#ff6b35';
-    document.getElementById('btReturn').textContent   = (d.total_return_pct >= 0 ? '+' : '') + d.total_return_pct.toFixed(2) + '%';
-    document.getElementById('btReturn').style.color   = retColor;
-    document.getElementById('btWinRate').textContent   = d.win_rate.toFixed(1) + '%';
-    document.getElementById('btSharpe').textContent    = d.sharpe.toFixed(2);
-    document.getElementById('btDrawdown').textContent  = d.max_drawdown_pct.toFixed(2) + '%';
-    document.getElementById('btMetrics').style.display = '';
-    document.getElementById('btNoData').style.display  = 'none';
+    const nd = document.getElementById('btNoData'); if (nd) nd.style.display = 'none';
 
-    if (d.equity_curve && d.equity_curve.length) {
-      const labels = d.equity_curve.map(p => p.i);
-      const values = d.equity_curve.map(p => p.v);
-      const gridColor = 'rgba(34,34,34,0.8)';
+    // ── Primary metrics (autotrade) ────────────────────────────────
+    const aiRet = d.total_return_pct;
+    const retColor = aiRet >= 0 ? '#A8FF53' : '#ff6b35';
+    document.getElementById('btReturn').textContent  = (aiRet >= 0 ? '+' : '') + aiRet.toFixed(2) + '%';
+    document.getElementById('btReturn').style.color  = retColor;
+    document.getElementById('btWinRate').textContent  = d.win_rate.toFixed(1) + '%';
+    document.getElementById('btSharpe').textContent   = d.sharpe.toFixed(2);
+    document.getElementById('btDrawdown').textContent = d.max_drawdown_pct.toFixed(2) + '%';
+    document.getElementById('btMetrics').style.display = '';
+
+    // ── 3-way comparison table ─────────────────────────────────────
+    if (d.comparison) {
+      const cmp = d.comparison;
+      const fmtRet = (v) => `<span style="color:${v>=0?'#A8FF53':'#ff6b35'}">${v>=0?'+':''}${v.toFixed(2)}%</span>`;
+      const rows = [
+        {label:'🔵 Basic (EMA)', k:'basic', style:'color:#7cb9e8'},
+        {label:'🟡 Hybrid',      k:'hybrid', style:'color:#ffc107'},
+        {label:'🟢 AI Autotrade',k:'autotrade', style:'color:#39d98a;font-weight:700'},
+      ].map(({label, k, style}) => {
+        const c = cmp[k] || {};
+        return `<tr>
+          <td style="${style}">${label}</td>
+          <td>${fmtRet(c.total_return_pct||0)}</td>
+          <td>${(c.win_rate||0).toFixed(1)}%</td>
+          <td>${(c.sharpe||0).toFixed(2)}</td>
+          <td class="text-danger">${(c.max_drawdown_pct||0).toFixed(2)}%</td>
+          <td style="font-family:var(--font-mono)">$${(c.final_capital||0).toFixed(0)}</td>
+        </tr>`;
+      }).join('');
+      document.getElementById('btCompareBody').innerHTML = rows;
+      document.getElementById('btCompareCard').style.display = '';
+    }
+
+    // ── Multi-series equity chart ──────────────────────────────────
+    if (d.comparison) {
+      const cmp = d.comparison;
+      const mkSeries = (key, name) => {
+        const curve = (cmp[key]||{}).equity_curve || [];
+        return {name, data: curve.map(p => p.v)};
+      };
+      const xLabels = ((cmp.autotrade||{}).equity_curve || []).map((_, i) => i);
+      const series  = [
+        mkSeries('basic',     'Basic'),
+        mkSeries('hybrid',    'Hybrid'),
+        mkSeries('autotrade', 'AI Autotrade'),
+      ];
       const equityEl = document.getElementById('btEquityChart');
-      if (!btEquityChart) {
-        btEquityChart = new ApexCharts(equityEl, {
-          ..._apex,
-          chart: {..._apex.chart, type:'area', height:'100%'},
-          series: [{name:'Equity', data:values}],
-          xaxis: { categories:labels, labels:{show:false}, axisBorder:{show:false}, axisTicks:{show:false} },
-          yaxis: { labels:{style:{colors:'#444',fontSize:'10px'}, formatter:v=>'$'+v.toFixed(0)} },
-          stroke: { curve:'smooth', width:2 },
-          fill: { type:'gradient', gradient:{opacityFrom:0.22,opacityTo:0,stops:[0,100]} },
-          dataLabels: { enabled:false }, legend: { show:false },
-          colors: [retColor],
-          markers: { size:0 },
-        });
-        btEquityChart.render();
-      } else {
-        btEquityChart.updateOptions({colors:[retColor],xaxis:{categories:labels}},false,false);
-        btEquityChart.updateSeries([{name:'Equity',data:values}],false);
-      }
+      const apexCfg = {
+        chart: {type:'line', height:220, background:'transparent', toolbar:{show:false},
+                animations:{enabled:false}, fontFamily:'var(--font-mono)'},
+        series,
+        colors: ['#7cb9e8','#ffc107','#39d98a'],
+        stroke: {curve:'smooth', width:[1.5,1.5,2.5]},
+        xaxis: {categories:xLabels, labels:{show:false}, axisBorder:{show:false}, axisTicks:{show:false}},
+        yaxis: {labels:{style:{colors:'#555',fontSize:'10px'}, formatter:v=>'$'+v.toFixed(0)}},
+        grid: {borderColor:'#1a1a1a', strokeDashArray:3},
+        legend: {labels:{colors:'#888'}, position:'top', fontSize:'11px'},
+        dataLabels:{enabled:false}, markers:{size:0},
+        theme:{mode:'dark'},
+        tooltip:{theme:'dark'},
+      };
+      if (btEquityChart) { btEquityChart.destroy(); btEquityChart = null; }
+      btEquityChart = new ApexCharts(equityEl, apexCfg);
+      btEquityChart.render();
+
       const srcEl = document.getElementById('btSource');
       if (srcEl) {
         const real = d.data_source === 'binance';
-        srcEl.textContent = real ? '● Binance real data' : '● simulated data';
-        srcEl.style.background = real ? 'rgba(57,217,138,0.15)' : 'rgba(210,153,34,0.15)';
-        srcEl.style.color = real ? 'var(--accent-buy)' : 'var(--accent-yellow)';
+        srcEl.textContent = real ? '● Binance' : '● simulated';
+        srcEl.style.background = real ? 'rgba(57,217,138,0.15)' : 'rgba(255,193,7,0.15)';
+        srcEl.style.color = real ? '#39d98a' : '#ffc107';
       }
       document.getElementById('btChartCard').style.display = '';
     }
 
+    // ── Regime breakdown ───────────────────────────────────────────
+    const regStats = d.regime_stats || {};
+    const patStats = d.pattern_stats || {};
+    const regimeMeta = {BULL_TREND:'↑ BULL',BEAR_TREND:'↓ BEAR',RANGING:'↔ RANGE',VOLATILE:'⚡ VOL',CRASH:'⚠ CRASH'};
+    const regimeColor= {BULL_TREND:'#39d98a',BEAR_TREND:'#ff6b35',RANGING:'#A8FF53',VOLATILE:'#ffc107',CRASH:'#ff4d6d'};
+    if (Object.keys(regStats).length) {
+      document.getElementById('btRegimeBody').innerHTML =
+        Object.entries(regStats).sort((a,b)=>b[1].trades-a[1].trades).map(([rn, rs]) => {
+          const color = regimeColor[rn]||'#888';
+          return `<tr>
+            <td><span style="color:${color};font-weight:600;font-size:0.75rem">${regimeMeta[rn]||rn}</span></td>
+            <td style="font-family:var(--font-mono)">${rs.trades}</td>
+            <td style="color:${rs.win_rate>=50?'#39d98a':'#ff6b35'}">${rs.win_rate}%</td>
+            <td style="color:${rs.avg_pnl>=0?'#39d98a':'#ff6b35'}">${rs.avg_pnl>=0?'+':''}${rs.avg_pnl}%</td>
+          </tr>`;
+        }).join('');
+    }
+    if (Object.keys(patStats).length) {
+      document.getElementById('btPatternBody').innerHTML =
+        Object.entries(patStats).map(([pn, ps]) => `<tr>
+          <td style="font-size:0.75rem">${pn}</td>
+          <td style="font-family:var(--font-mono)">${ps.trades}</td>
+          <td style="color:${ps.win_rate>=50?'#39d98a':'#ff6b35'}">${ps.win_rate}%</td>
+          <td style="color:${ps.avg_pnl>=0?'#39d98a':'#ff6b35'}">${ps.avg_pnl>=0?'+':''}${ps.avg_pnl}%</td>
+        </tr>`).join('');
+    }
+    if (Object.keys(regStats).length || Object.keys(patStats).length) {
+      document.getElementById('btBreakdownRow').style.display = '';
+    }
+
+    // ── Trade log ─────────────────────────────────────────────────
     if (d.trades && d.trades.length) {
       document.getElementById('btTradeCount').textContent = d.total_trades + ' total trades';
-      document.getElementById('btTradesBody').innerHTML = d.trades.map(t => `
-        <tr>
-          <td class="text-muted" style="font-size:0.75rem">${t.open_at.split('T')[0]}</td>
-          <td class="text-muted" style="font-size:0.75rem">${t.close_at.split('T')[0]}</td>
+      document.getElementById('btTradesBody').innerHTML = d.trades.map(t => {
+        const pats = (t.patterns||[]).map(p => `<span class="regime-badge regime-range" style="font-size:0.55rem">${p}</span>`).join(' ');
+        return `<tr>
+          <td class="text-muted" style="font-size:0.72rem">${(t.open_at||'').split('T')[0]}</td>
+          <td class="text-muted" style="font-size:0.72rem">${(t.close_at||'').split('T')[0]}</td>
           <td class="${t.side==='BUY'?'text-success':'text-danger'}">${t.side}</td>
           <td class="${t.pnl_pct>=0?'text-success':'text-danger'}">${t.pnl_pct>=0?'+':''}${t.pnl_pct}%</td>
           <td>${t.win ? '✅' : '❌'}</td>
-          <td><span class="badge" style="font-size:0.65rem;background:rgba(100,100,100,0.2)">${t.regime}</span></td>
-        </tr>`).join('');
+          <td><span class="regime-badge ${t.regime==='BULL_TREND'?'regime-bull':t.regime==='BEAR_TREND'?'regime-bear':t.regime==='VOLATILE'?'regime-vol':t.regime==='CRASH'?'regime-crash':'regime-range'}" style="font-size:0.58rem">${(t.regime||'').replace('_',' ')}</span></td>
+          <td style="font-size:0.65rem">${pats||'—'}</td>
+          <td class="text-muted" style="font-size:0.7rem">${t.size_pct||0}%</td>
+        </tr>`;
+      }).join('');
       document.getElementById('btTradesCard').style.display = '';
     }
 
     const srcLabel = d.data_source === 'binance' ? 'Binance' : 'simulated';
-    showToast('Backtest Complete', `${d.symbol} ${d.days}d (${srcLabel}) | Return: ${d.total_return_pct.toFixed(2)}% | Sharpe: ${d.sharpe.toFixed(2)}`, d.total_return_pct >= 0 ? 'success' : 'warning');
+    const aiVsBasic = d.comparison ? (d.comparison.autotrade.total_return_pct - d.comparison.basic.total_return_pct) : 0;
+    showToast('Backtest Complete',
+      `${d.symbol} ${d.days}d | AI: ${aiRet>=0?'+':''}${aiRet.toFixed(2)}% | vs Basic: ${aiVsBasic>=0?'+':''}${aiVsBasic.toFixed(2)}%`,
+      aiRet >= 0 ? 'success' : 'warning');
   } catch(e) { showToast('Error', e.message, 'danger'); }
   finally {
     btn.disabled = false;
@@ -3101,12 +3416,13 @@ async function saveThaiSettings() {
 // Dashboard State (Signal Funnel + PnL Today + Agent Status)
 // ============================================================
 const AGENT_META = {
-  analyzer:   {icon: 'bi-search',      label: 'Analyzer'},
-  strategist: {icon: 'bi-diagram-3',   label: 'Strategist'},
+  analyzer:   {icon: 'bi-search',           label: 'Analyzer'},
+  strategist: {icon: 'bi-diagram-3',        label: 'Strategist'},
   executor:   {icon: 'bi-lightning-charge', label: 'Executor'},
-  trainer:    {icon: 'bi-mortarboard', label: 'Trainer'},
+  trainer:    {icon: 'bi-mortarboard',      label: 'ML Trainer'},
+  risk:       {icon: 'bi-shield-exclamation', label: 'Risk Engine'},
 };
-const AGENT_ORDER = ['analyzer', 'strategist', 'executor', 'trainer'];
+const AGENT_ORDER = ['analyzer', 'strategist', 'executor', 'trainer', 'risk'];
 
 function _pnlColor(v) { return v > 0 ? 'var(--accent-buy)' : v < 0 ? 'var(--accent-red)' : 'var(--text-muted)'; }
 function _pnlFmt(v) { return (v >= 0 ? '+' : '') + v.toFixed(2); }
@@ -3144,6 +3460,8 @@ function renderDashboardState(d) {
   if (op && d.open_positions != null) op.textContent = d.open_positions;
   // Agents
   if (d.agents) renderAgents(d.agents);
+  // Risk state embedded in dashboard update
+  if (d.risk) { riskState = d.risk; renderRiskPanel(); }
 }
 
 function renderAgents(agents) {
@@ -3532,6 +3850,9 @@ async function init() {
   await refreshDashboardState();
   await refreshPositions();
   await refreshNotifications();
+  await fetchRegimes();
+  await fetchRiskState();
+  await fetchPatterns(Object.keys(allPrices)[0] || 'BTC/USDT');
   setInterval(fetchPrices, 5000);
   setInterval(fetchPortfolioStats, 10000);
   setInterval(fetchStats, 30000);
@@ -3541,6 +3862,8 @@ async function init() {
   setInterval(refreshLoopStatus, 3000);
   setInterval(refreshPositions, 15000);    // fallback poll (WS pushes too)
   setInterval(refreshNotifications, 30000);
+  setInterval(fetchRegimes, 15000);
+  setInterval(fetchRiskState, 10000);
   // E: Chart auto-refresh every 15 minutes
   setInterval(updateTradingChart, 15 * 60 * 1000);
 }
