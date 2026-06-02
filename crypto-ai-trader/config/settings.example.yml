@@ -78,6 +78,7 @@ trading:
   trail_distance_pct: 0.0     # ระยะ trailing (0 = ปิด)
   max_hold_hours: 24          # ปิด trade อัตโนมัติหลัง 24 ชม. (time-based exit)
   time_exit_stuck_pct: 2.0    # ปิดเฉพาะถ้า drift < 2% (ไม่ใช่ขาขึ้นแรง)
+  live_max_budget_usdt: 0     # เพดานเงินจริงสูงสุดที่ AI ใช้ได้ (0 = ไม่จำกัด) — ตั้งผ่านปุ่ม Start Live
 
 strategy:
   primary: "hybrid"         # dca | trend | mean_reversion | hybrid

@@ -1427,6 +1427,27 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
         </div>
       </div>
 
+      <!-- ONE-CLICK LIVE TRADING -->
+      <div class="card mb-3" style="border-color:var(--accent-red)">
+        <div class="card-header" style="background:rgba(248,81,73,.08)">
+          <i class="bi bi-robot me-2"></i>AI Live Trading <span class="badge bg-danger ms-1">เงินจริง</span>
+        </div>
+        <div class="card-body">
+          <div id="liveStatusLine" class="small mb-2 text-muted">กำลังโหลดสถานะ…</div>
+          <div class="d-flex gap-2 flex-wrap">
+            <button class="btn btn-danger btn-sm px-3 fw-bold" id="btnStartLive" onclick="openLiveModal()">
+              <i class="bi bi-rocket-takeoff me-1"></i>เริ่ม AI เทรดเงินจริง
+            </button>
+            <button class="btn btn-outline-danger btn-sm px-3 fw-bold d-none" id="btnKillSwitch" onclick="killSwitch()">
+              <i class="bi bi-x-octagon-fill me-1"></i>หยุดฉุกเฉิน (Kill Switch)
+            </button>
+          </div>
+          <small class="text-muted d-block mt-2">
+            กดปุ่มเดียวจบ: ทดสอบการเชื่อมต่อ → ตั้งเพดานเงิน → ยืนยัน → AI เริ่มเทรดเงินจริงทันที
+          </small>
+        </div>
+      </div>
+
       <div class="card mb-3">
         <div class="card-header"><i class="bi bi-sliders me-2"></i>Trading Parameters</div>
         <div class="card-body">
@@ -1792,7 +1813,7 @@ function showSection(name, el) {
   if (name === 'trade-history') refreshHistory();
   if (name === 'analytics') { refreshTraining(); refreshLoopStatus(); refreshHourlyTrainer(); }
   if (name === 'thai-market') loadThaiStocks();
-  if (name === 'settings') loadSettings();
+  if (name === 'settings') { loadSettings(); refreshLiveStatus(); }
   if (name === 'trading' && currentSymbol) loadMTF();
   if (name === 'positions') refreshPositions();
   if (name === 'notifications') {
@@ -2586,6 +2607,110 @@ async function refreshLiveReadiness() {
       el.innerHTML = `<span style="color:var(--accent-red)">✗ ยังไม่พร้อม — เปิด exchange + ใส่ API key ในการ์ด Exchange API Keys</span>`;
     }
   } catch(e) { el.innerHTML = ''; }
+}
+
+// ============================================================
+// One-click AI Live Trading (guarded)
+// ============================================================
+async function refreshLiveStatus() {
+  const line = document.getElementById('liveStatusLine');
+  const btnStart = document.getElementById('btnStartLive');
+  const btnKill = document.getElementById('btnKillSwitch');
+  if (!line) return;
+  try {
+    const d = await (await fetch('/api/live/status')).json();
+    if (d.is_live) {
+      const cap = d.budget_usdt > 0 ? `${d.deployed_usdt.toFixed(0)}/${d.budget_usdt.toFixed(0)} USDT` : 'ไม่จำกัด';
+      line.innerHTML = `<span style="color:var(--accent-red,#f85149)">🔴 <b>LIVE</b> ผ่าน ${d.resolved_exchange||'-'}</span>
+        · ใช้ไป ${cap} · ${d.open_positions} position` + (d.paused ? ' · <b>หยุดชั่วคราว</b>' : '');
+      btnStart?.classList.add('d-none');
+      btnKill?.classList.remove('d-none');
+    } else {
+      line.innerHTML = d.live_ready
+        ? `<span style="color:var(--accent-buy,#3fb950)">✓ พร้อมเทรดจริงผ่าน <b>${d.resolved_exchange}</b></span> · ตอนนี้อยู่โหมด Demo`
+        : `<span class="text-muted">โหมด Demo · ยังไม่ได้ตั้งค่า exchange สำหรับเทรดจริง</span>`;
+      btnStart?.classList.remove('d-none');
+      btnKill?.classList.add('d-none');
+    }
+  } catch(e) { line.innerHTML = '<span class="text-muted">โหลดสถานะไม่สำเร็จ</span>'; }
+}
+
+function openLiveModal() {
+  document.getElementById('liveModalErr').textContent = '';
+  document.getElementById('liveTestResult').innerHTML = 'กดปุ่มด้านล่างเพื่อทดสอบ…';
+  document.getElementById('liveConfirm').value = '';
+  document.getElementById('btnConfirmLive').disabled = true;
+  document.getElementById('liveModal').style.display = 'flex';
+  refreshLiveReadiness();
+}
+function closeLiveModal() { document.getElementById('liveModal').style.display = 'none'; }
+
+async function testLiveConn() {
+  const el = document.getElementById('liveTestResult');
+  const btn = document.getElementById('btnTestLive');
+  el.innerHTML = '<span class="spinner-border spinner-border-sm me-1" style="width:11px;height:11px;border-width:1.5px"></span>กำลังทดสอบ…';
+  if (btn) btn.disabled = true;
+  try {
+    const act = await (await fetch('/api/exchange/active')).json();
+    const target = act.resolved;
+    if (!target) {
+      el.innerHTML = '<span style="color:var(--accent-red,#f85149)">✗ ยังไม่ได้เปิด exchange + ใส่ API key (ไปที่การ์ด Exchange API Keys)</span>';
+      return;
+    }
+    const tests = await (await fetch('/api/exchanges/test')).json();
+    const r = tests[target] || {};
+    if (r.ok === true) {
+      el.innerHTML = `<span style="color:var(--accent-buy,#3fb950)">✓ เชื่อมต่อ <b>${target}</b> สำเร็จ · ราคา BTC ~$${(r.price||0).toLocaleString()}</span>`;
+    } else {
+      el.innerHTML = `<span style="color:var(--accent-red,#f85149)">✗ ${target}: ${r.error || r.status || 'เชื่อมต่อไม่ได้'}</span>`;
+    }
+  } catch(e) {
+    el.innerHTML = `<span style="color:var(--accent-red,#f85149)">✗ ${e.message}</span>`;
+  } finally { if (btn) btn.disabled = false; }
+}
+
+async function confirmStartLive() {
+  const err = document.getElementById('liveModalErr');
+  const btn = document.getElementById('btnConfirmLive');
+  err.textContent = '';
+  const budget = parseFloat(document.getElementById('liveBudget').value);
+  const confirm = document.getElementById('liveConfirm').value.trim();
+  if (isNaN(budget) || budget < 10) { err.textContent = 'ตั้งเพดานเงินอย่างน้อย 10 USDT'; return; }
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" style="width:12px;height:12px;border-width:1.5px"></span>กำลังเริ่ม…';
+  try {
+    const r = await fetch('/api/live/start', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({confirm, budget_usdt: budget})
+    });
+    const d = await r.json();
+    if (!r.ok) { err.textContent = d.detail || 'เริ่มไม่สำเร็จ'; return; }
+    closeLiveModal();
+    showToast('🔴 LIVE', `AI เริ่มเทรดเงินจริงผ่าน ${d.exchange} · เพดาน ${d.budget_usdt} USDT · เงินสด ${d.free_cash} ${d.quote}`, 'success');
+    refreshLiveStatus();
+    if (typeof loadStatus === 'function') loadStatus();
+  } catch(e) {
+    err.textContent = e.message;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-rocket-takeoff me-1"></i>เริ่มเทรดเงินจริง';
+  }
+}
+
+async function killSwitch() {
+  if (!confirm('🛑 หยุดฉุกเฉิน?\n\nAI จะหยุดเปิดออเดอร์ใหม่ทันที และกลับสู่โหมด Demo (ถ้าไม่มี position ค้าง)\n\nยืนยัน?')) return;
+  try {
+    const r = await fetch('/api/live/stop', { method:'POST' });
+    const d = await r.json();
+    if (!r.ok) { showToast('Error', d.detail || 'หยุดไม่สำเร็จ', 'danger'); return; }
+    if (d.switched_to_demo) {
+      showToast('🛑 หยุดแล้ว', 'หยุด AI และกลับสู่โหมด Demo เรียบร้อย', 'warning');
+    } else {
+      showToast('🛑 หยุดเปิดออเดอร์ใหม่', `ยังมี ${d.open_live_positions} position เงินจริงค้างอยู่ — ปิดเองในตาราง Positions`, 'warning');
+    }
+    refreshLiveStatus();
+    if (typeof loadStatus === 'function') loadStatus();
+  } catch(e) { showToast('Error', e.message, 'danger'); }
 }
 
 async function saveAISettings() {
@@ -3789,6 +3914,45 @@ init();
     <button onclick="sendChat()" style="background:var(--accent);color:#000;border:none;border-radius:10px;padding:9px 14px;cursor:pointer;font-weight:700;flex-shrink:0;transition:transform 0.1s,box-shadow 0.15s" onmouseenter="this.style.boxShadow='0 0 16px rgba(168,255,83,0.4)'" onmouseleave="this.style.boxShadow='none'">
       <i class="bi bi-send-fill"></i>
     </button>
+  </div>
+</div>
+
+<!-- ONE-CLICK LIVE TRADING MODAL -->
+<div id="liveModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);align-items:center;justify-content:center;">
+  <div style="background:var(--bg-card,#161b22);border:1px solid var(--accent-red,#f85149);border-radius:14px;max-width:440px;width:92%;padding:0;box-shadow:0 20px 60px rgba(0,0,0,.6)">
+    <div style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center">
+      <b style="font-size:1.05rem"><i class="bi bi-rocket-takeoff me-2" style="color:var(--accent-red,#f85149)"></i>เริ่ม AI เทรดเงินจริง</b>
+      <span onclick="closeLiveModal()" style="cursor:pointer;opacity:.6;font-size:1.3rem;line-height:1">&times;</span>
+    </div>
+    <div style="padding:18px">
+      <!-- step 1: test connection -->
+      <div class="small mb-1 fw-bold">1. ทดสอบการเชื่อมต่อ Exchange</div>
+      <div id="liveTestResult" class="small mb-3" style="min-height:20px;color:var(--text-muted,#8b949e)">กดปุ่มด้านล่างเพื่อทดสอบ…</div>
+      <button class="btn btn-outline-info btn-sm w-100 mb-3" id="btnTestLive" onclick="testLiveConn()">
+        <i class="bi bi-wifi me-1"></i>ทดสอบการเชื่อมต่อ + ดูยอดเงิน
+      </button>
+
+      <!-- step 2: budget -->
+      <div class="small mb-1 fw-bold">2. เพดานเงินเริ่มต้น (USDT)</div>
+      <input type="number" id="liveBudget" class="form-control form-control-sm mb-1" min="10" step="10" value="100" placeholder="เช่น 100">
+      <small class="text-muted d-block mb-3">AI จะใช้เงินรวมไม่เกินจำนวนนี้ (กันพลาดวงเงินใหญ่) — ปรับเพิ่มได้ทีหลัง</small>
+
+      <!-- step 3: type LIVE -->
+      <div class="small mb-1 fw-bold">3. พิมพ์ <code style="color:var(--accent-red,#f85149)">LIVE</code> เพื่อยืนยัน</div>
+      <input type="text" id="liveConfirm" class="form-control form-control-sm mb-3" placeholder="พิมพ์ LIVE" autocomplete="off"
+        oninput="document.getElementById('btnConfirmLive').disabled = this.value.trim().toUpperCase()!=='LIVE'">
+
+      <div id="liveModalErr" class="small mb-2" style="color:var(--accent-red,#f85149)"></div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-secondary btn-sm flex-fill" onclick="closeLiveModal()">ยกเลิก</button>
+        <button class="btn btn-danger btn-sm flex-fill fw-bold" id="btnConfirmLive" disabled onclick="confirmStartLive()">
+          <i class="bi bi-rocket-takeoff me-1"></i>เริ่มเทรดเงินจริง
+        </button>
+      </div>
+      <small class="text-muted d-block mt-2" style="line-height:1.4">
+        ⚠️ ใช้เงินจริง มีความเสี่ยงขาดทุน · หยุดได้ทุกเมื่อด้วยปุ่ม Kill Switch
+      </small>
+    </div>
   </div>
 </div>
 

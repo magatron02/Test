@@ -1442,3 +1442,160 @@ async def set_active_exchange(data: Dict[str, str], _=_AUTH):
     settings.save()
     return {"active": name}
 
+
+# ─── One-click live trading (guarded) ──────────────────────────
+
+@router.post("/live/start")
+async def live_start(data: Dict[str, Any], _=_AUTH):
+    """POST /api/live/start — one-click "Start AI Live Trading" with guardrails.
+
+    Body: {"confirm": "LIVE", "budget_usdt": <number>}
+
+    Steps, in order, aborting on the first failure:
+      1. Require the user to type LIVE  (typo guard)
+      2. Require a positive budget cap   (spending guard)
+      3. Test the live exchange connection (keys + connectivity)
+      4. Apply the budget cap, hot-swap to live, un-pause auto-trading
+    """
+    if not _trader:
+        raise HTTPException(503, "Trader not running")
+
+    # 1) typed confirmation
+    if str(data.get("confirm", "")).strip().upper() != "LIVE":
+        raise HTTPException(400, 'Type LIVE to confirm real-money trading.')
+
+    # 2) budget cap (initial spending limit)
+    try:
+        budget = float(data.get("budget_usdt", 0))
+    except (TypeError, ValueError):
+        budget = 0.0
+    if budget < 10:
+        raise HTTPException(400, "Set a starting budget of at least 10 USDT.")
+
+    from ..exchanges import create_live_exchange_strict, LiveExchangeError
+
+    # 3) build + TEST the live exchange before committing anything
+    try:
+        new_exchange, exchange_name = create_live_exchange_strict()
+    except LiveExchangeError as e:
+        raise HTTPException(400, str(e))
+
+    try:
+        balances = await new_exchange.get_balance()
+        quote = new_exchange.quote_currency
+        cash = balances.get(quote)
+        free_cash = float(cash.free) if cash else 0.0
+    except Exception as e:
+        try:
+            if hasattr(new_exchange, "close"):
+                await new_exchange.close()
+        except Exception:
+            pass
+        raise HTTPException(400, f"Connection test failed for {exchange_name}: {e}")
+
+    # Refuse to abandon real open positions on the current live exchange.
+    if not _trader._exchange.is_demo and _trader._open_trades:
+        raise HTTPException(
+            409,
+            f"Close your {len(_trader._open_trades)} open live position(s) first."
+        )
+
+    # 4) commit: budget cap → swap → un-pause
+    settings.set(budget, "trading", "live_max_budget_usdt")
+    settings.set("live", "trading", "mode")
+    settings.save()
+
+    old_exchange = _trader._exchange
+    try:
+        if hasattr(old_exchange, "close"):
+            await old_exchange.close()
+    except Exception:
+        pass
+
+    _trader._exchange = new_exchange
+    _trader._claude.set_exchange(new_exchange)
+    _trader._analyses.clear()
+    _trader._open_trades.clear()
+    _trader._daily_pnl = 0.0
+    _trader._paused = False
+
+    logger.warning(f"LIVE trading started on {exchange_name} (budget cap {budget} USDT)")
+    await _trader._broadcast("mode_changed", {"mode": "live", "exchange": exchange_name})
+
+    return {
+        "ok": True,
+        "mode": "live",
+        "exchange": exchange_name,
+        "budget_usdt": budget,
+        "free_cash": round(free_cash, 2),
+        "quote": quote,
+    }
+
+
+@router.post("/live/stop")
+async def live_stop(_=_AUTH):
+    """POST /api/live/stop — KILL SWITCH.
+
+    Immediately pauses all new entries, then returns to demo mode if no live
+    positions are open. Protective exits (SL/TP/trailing) on any remaining
+    live positions keep running; close them manually to fully exit.
+    """
+    if not _trader:
+        raise HTTPException(503, "Trader not running")
+
+    # Pause first — this always takes effect instantly, blocking new BUYs.
+    _trader._paused = True
+
+    open_live = (not _trader._exchange.is_demo) and bool(_trader._open_trades)
+    swapped = False
+    if not open_live:
+        from ..exchanges import DemoExchange
+        old_exchange = _trader._exchange
+        try:
+            if hasattr(old_exchange, "close"):
+                await old_exchange.close()
+        except Exception:
+            pass
+        _trader._exchange = DemoExchange()
+        _trader._claude.set_exchange(_trader._exchange)
+        _trader._analyses.clear()
+        _trader._open_trades.clear()
+        _trader._daily_pnl = 0.0
+        settings.set("demo", "trading", "mode")
+        settings.save()
+        swapped = True
+        # Back on safe (virtual) demo money — let normal demo auto-trading resume.
+        _trader._paused = False
+        await _trader._broadcast("mode_changed", {"mode": "demo", "exchange": "demo"})
+
+    logger.warning("KILL SWITCH activated — live entries halted" +
+                   (" and switched back to demo" if swapped else " (live positions still open)"))
+    return {
+        "ok": True,
+        "paused": True,
+        "mode": settings.trading_mode,
+        "switched_to_demo": swapped,
+        "open_live_positions": len(_trader._open_trades) if open_live else 0,
+    }
+
+
+@router.get("/live/status")
+async def live_status():
+    """GET /api/live/status — live-trading state for the dashboard control."""
+    from ..exchanges import resolve_live_exchange, has_credentials
+    deployed = 0.0
+    if _trader:
+        deployed = sum(t.get("cost", 0) or 0 for t in _trader._open_trades.values())
+    resolved = resolve_live_exchange()
+    return {
+        "mode": settings.trading_mode,
+        "is_live": bool(_trader and not _trader._exchange.is_demo) if _trader else False,
+        "paused": bool(_trader._paused) if _trader else False,
+        "running": bool(_trader._running) if _trader else False,
+        "budget_usdt": float(settings.get("trading", "live_max_budget_usdt", default=0) or 0),
+        "deployed_usdt": round(deployed, 2),
+        "open_positions": len(_trader._open_trades) if _trader else 0,
+        "resolved_exchange": resolved,
+        "live_ready": bool(resolved and has_credentials(resolved)),
+    }
+

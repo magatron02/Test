@@ -36,6 +36,7 @@ class AITrader:
         self._trainer = AITrainer()
         self._claude = ClaudeAnalyzer(exchange=exchange)
         self._running = False
+        self._paused = False                       # kill-switch: blocks NEW entries (exits still run)
         self._analyses: Dict[str, MarketAnalysis] = {}
         self._open_trades: Dict[str, dict] = {}   # symbol -> trade info
         self._broadcast_fn = None                  # injected by websocket handler
@@ -230,6 +231,12 @@ class AITrader:
             logger.debug(f"SELL {symbol}: no tracked position, skipping")
             return False
 
+        # Kill-switch: when paused, open NO new positions. Protective exits
+        # (stop-loss / take-profit / trailing) keep running via _check_exit_conditions.
+        if signal.action == "BUY" and self._paused and not force:
+            logger.info(f"Skip BUY {symbol}: auto-trading is paused (kill-switch active)")
+            return False
+
         # Check risk limits before executing any trade (skipped for manual/forced trades)
         if signal.action == "BUY" and not force:
             allowed, reason = await self._check_risk_limits()
@@ -248,6 +255,20 @@ class AITrader:
                 portfolio = await self._get_portfolio_summary()
                 portfolio_value = portfolio.get("total_value", avail) or avail
                 amount_usdt = min(portfolio_value * risk_pct, avail * 0.95)
+
+                # Live budget cap (guardrail): never let total deployed capital on a
+                # LIVE exchange exceed live_max_budget_usdt. 0 = unlimited. Demo ignores it.
+                if not self._exchange.is_demo and not force:
+                    budget = float(settings.get("trading", "live_max_budget_usdt", default=0) or 0)
+                    if budget > 0:
+                        deployed = sum(t.get("cost", 0) or 0 for t in self._open_trades.values())
+                        room = budget - deployed
+                        if room < 10:
+                            logger.info(f"Skip BUY {symbol}: live budget cap reached "
+                                        f"(deployed {deployed:.2f}/{budget:.2f} USDT)")
+                            return False
+                        amount_usdt = min(amount_usdt, room)
+
                 if amount_usdt < 10:
                     logger.info(f"Skip BUY {symbol}: insufficient cash ({amount_usdt:.2f} USDT)")
                     return False

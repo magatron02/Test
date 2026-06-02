@@ -723,9 +723,23 @@ async function loadSettings(){
 }
 $('#modeToggle').addEventListener('click',async e=>{
   const b=e.target.closest('button');if(!b)return;
-  const r=await api('/api/mode/swap',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:b.dataset.m})});
-  if(r&&r.swapped){toast('สลับเป็น '+r.mode.toUpperCase()+' ('+r.exchange+')');loadSettings();loadStatus()}
-  else toast('สลับโหมดไม่สำเร็จ — ตรวจ API key','err');
+  if(b.dataset.m==='live'){
+    // Guarded one-click: test → budget cap → type LIVE → start real-money AI trading
+    const budget=parseFloat(prompt('เพดานเงินจริงเริ่มต้น (USDT) — AI จะใช้รวมไม่เกินจำนวนนี้:','100'));
+    if(isNaN(budget)||budget<10){toast('ตั้งเพดานอย่างน้อย 10 USDT','err');return}
+    const cf=prompt('พิมพ์ LIVE เพื่อยืนยันเทรดเงินจริง:','');
+    if(!cf||cf.trim().toUpperCase()!=='LIVE'){toast('ยกเลิก — ต้องพิมพ์ LIVE','err');return}
+    const r=await api('/api/live/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirm:cf,budget_usdt:budget})});
+    if(r&&r.ok){toast('🔴 LIVE — AI เทรดเงินจริงผ่าน '+r.exchange+' · เพดาน '+r.budget_usdt+' USDT');loadSettings();loadStatus()}
+    else toast((r&&r.detail)||'เริ่มไม่สำเร็จ — ตรวจ API key','err');
+  }else{
+    // DEMO button doubles as the kill switch: halt new entries, return to demo
+    const r=await api('/api/live/stop',{method:'POST'});
+    if(r&&r.ok){
+      toast(r.switched_to_demo?'🛑 หยุดแล้ว — กลับสู่ Demo':'🛑 หยุดเปิดออเดอร์ใหม่ · ยังมี '+r.open_live_positions+' position ค้าง');
+      loadSettings();loadStatus();
+    }else toast('หยุดไม่สำเร็จ','err');
+  }
 });
 $('#aiModelSel').addEventListener('change',async e=>{
   await api('/api/ai-model',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:e.target.value})});
