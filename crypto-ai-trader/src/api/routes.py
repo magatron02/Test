@@ -494,16 +494,35 @@ async def get_mtf_analysis(symbol: str = "BTC/USDT"):
 
 @router.post("/backtest")
 async def run_backtest(data: Dict[str, Any]):
-    """POST /api/backtest — Run backtest on real Binance klines (simulated fallback)."""
+    """POST /api/backtest — Backtest with Market Regime + Chart Patterns + Kelly Sizing.
+
+    Body:
+      symbol:          BTC/USDT (default)
+      days:            7-365    (default 30)
+      tp_pct:          take-profit fraction (default 0.04)
+      sl_pct:          stop-loss  fraction  (default 0.02)
+      initial_capital: starting capital USDT (default 10000)
+
+    Response includes:
+      - Primary metrics from autotrade AI stack
+      - comparison.basic / comparison.hybrid / comparison.autotrade
+      - regime_stats: performance breakdown per detected regime
+      - pattern_stats: best/worst chart patterns by PnL
+      - equity_curve + last 50 annotated trades
+    """
     from ..agent.backtest import run_backtest_real as _run
     symbol  = data.get("symbol", "BTC/USDT")
     days    = int(data.get("days", 30))
     tp_pct  = float(data.get("tp_pct", 0.04))
     sl_pct  = float(data.get("sl_pct", 0.02))
+    capital = float(data.get("initial_capital", 10_000.0))
     if days < 7 or days > 365:
         raise HTTPException(400, "days must be 7-365")
+    if capital < 100:
+        raise HTTPException(400, "initial_capital must be >= 100")
     try:
-        result = await _run(symbol, days=days, tp_pct=tp_pct, sl_pct=sl_pct)
+        result = await _run(symbol, days=days, tp_pct=tp_pct, sl_pct=sl_pct,
+                            initial_capital=capital)
         return result
     except Exception as e:
         raise HTTPException(500, str(e))
