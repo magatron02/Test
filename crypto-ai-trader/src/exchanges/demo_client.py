@@ -104,8 +104,11 @@ class DemoExchange(BaseExchange):
 
     async def _get_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
+            resolver = aiohttp.AsyncResolver(nameservers=["8.8.8.8", "1.1.1.1"])
+            connector = aiohttp.TCPConnector(resolver=resolver)
             self._session = aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=10)
+                connector=connector,
+                timeout=aiohttp.ClientTimeout(total=10),
             )
         return self._session
 

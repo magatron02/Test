@@ -61,9 +61,12 @@ class BinanceTHExchange(BaseExchange):
 
     async def _get_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
+            resolver = aiohttp.AsyncResolver(nameservers=["8.8.8.8", "1.1.1.1"])
+            connector = aiohttp.TCPConnector(resolver=resolver)
             self._session = aiohttp.ClientSession(
+                connector=connector,
                 headers={"X-MBX-APIKEY": self._api_key},
-                timeout=aiohttp.ClientTimeout(total=10),
+                timeout=aiohttp.ClientTimeout(total=15),
             )
         return self._session
 
