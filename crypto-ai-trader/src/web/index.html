@@ -1769,7 +1769,7 @@ async function fetchPortfolioStats() {
     const cur = d.quote_currency || 'USDT';
     _quoteCur = cur;
     const sym = cur === 'USDT' ? '$' : '';
-    const initial = 10000;   // demo virtual baseline; PnL-vs-initial is meaningful in demo
+    const initial = d.initial_balance || (cur === 'THB' ? 350000 : 10000);
     animateNum('totalValue', d.total_value, sym, sym ? '' : ' ' + cur, 2);
     animateNum('cashValue',  d.cash_usdt,   sym, sym ? '' : ' ' + cur, 2);
     document.getElementById('positionCount').textContent = d.positions.length + ' positions';
@@ -1838,7 +1838,7 @@ function renderPriceCards() {
           <strong class="small">${sym.split('/')[0]}</strong>
           <span class="badge-signal ${d.signal==='BUY'?'signal-buy':d.signal==='SELL'?'signal-sell':'signal-hold'}">${d.signal}</span>
         </div>
-        <div class="fw-bold mt-1">${formatPrice(d.price)} ${_quoteCur}</div>
+        <div class="fw-bold mt-1">${formatPrice(d.price)} ${sym.split('/')[1] || _quoteCur}</div>
         <div class="small ${up?'price-up':'price-down'}">${up?'+':''}${d.change_24h.toFixed(2)}%</div>
       </div>`;
     container.appendChild(card);

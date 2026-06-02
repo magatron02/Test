@@ -158,12 +158,14 @@ async def get_portfolio():
                     "pnl_pct": (analysis.price - entry) / entry * 100 if entry > 0 else 0,
                 })
 
+        ex = _trader._exchange
         return {
             "cash_usdt": cash,        # kept for UI back-compat; holds `quote` balance
             "quote_currency": quote,
             "total_value": total_value,
             "positions": positions,
-            "is_demo": _trader._exchange.is_demo,
+            "is_demo": ex.is_demo,
+            "initial_balance": getattr(ex, "_initial_cash", None),
         }
     except Exception as e:
         # In live mode a transient API/auth error shouldn't blank the dashboard.

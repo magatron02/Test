@@ -96,6 +96,7 @@ class DemoExchange(BaseExchange):
         else:
             self._cash = float(cfg.get("virtual_balance_usdt", 10000.0))
             self._currency = "USDT"
+        self.quote_currency = self._currency  # sync with base class field
         self._initial_cash = self._cash
         self._positions: Dict[str, dict] = {}  # symbol -> {amount, avg_price}
         self._orders: List[Order] = []
