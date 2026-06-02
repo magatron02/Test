@@ -49,6 +49,12 @@ async def index():
     return FileResponse(WEB_DIR / "index.html")
 
 
+@app.get("/terminal", response_class=FileResponse)
+async def terminal():
+    """New minimal trading terminal UI (JetBrains Mono + Noto Sans Thai Looped)."""
+    return FileResponse(WEB_DIR / "terminal.html")
+
+
 @app.websocket("/ws")
 async def ws_endpoint(websocket: WebSocket):
     await websocket_endpoint(websocket)
