@@ -4,12 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Aiterra v1.0.24</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/apexcharts@3.49.0/dist/apexcharts.min.js"></script>
+<link href="/static/css/bootstrap.min.css" rel="stylesheet">
+<link href="/static/css/bootstrap-icons.min.css" rel="stylesheet">
+<script src="/static/js/apexcharts.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/countup.js@2.8.3/dist/countUp.umd.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Finlandica:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -35,6 +33,9 @@
 /* Base: Noto Sans Thai for body copy (Thai+Latin fallback) */
 body {
   background: var(--bg-dark);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 15% 5%,  rgba(168,255,83,0.035) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 40% at 85% 95%, rgba(57,217,138,0.025) 0%, transparent 55%);
   color: var(--text-main);
   font-family: var(--font-thai), sans-serif;
   margin: 0;
@@ -66,17 +67,17 @@ body {
 .main-content { padding: 32px 36px; min-height: calc(100vh - 62px); }
 
 /* ── Cards ── */
-.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; }
 .card-header {
   background: var(--bg-card2); border-bottom: 1px solid var(--border);
-  padding: 11px 16px;
+  padding: 11px 16px; border-radius: 10px 10px 0 0;
   font-family: var(--font-headline); font-weight: 600; font-size: 0.82rem;
-  letter-spacing: 0.6px; text-transform: uppercase; color: var(--text-muted);
+  letter-spacing: 0.8px; text-transform: uppercase; color: var(--text-muted);
 }
 .card-body { padding: 16px; }
 
 /* ── Stat cards ── */
-.stat-card { border-radius: 4px; padding: 16px; background: var(--bg-card); border: 1px solid var(--border); }
+.stat-card { border-radius: 10px; padding: 16px; background: var(--bg-card); border: 1px solid var(--border); border-top: 2px solid rgba(168,255,83,0.22); }
 .stat-value { font-size: 1.65rem; font-weight: 700; line-height: 1.15; color: var(--text-main); font-family: var(--font-headline); letter-spacing: -0.5px; }
 .stat-label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 5px; font-family: var(--font-mono); }
 
@@ -99,7 +100,7 @@ body {
 .table-hover tbody tr:hover td { background: rgba(168,255,83,0.04); }
 
 /* ── Price cards ── */
-.price-card { border-radius: 4px; padding: 12px 14px; background: var(--bg-card); border: 1px solid var(--border); cursor: pointer; transition: border-color 0.15s; }
+.price-card { border-radius: 8px; padding: 12px 14px; background: var(--bg-card); border: 1px solid var(--border); cursor: pointer; transition: border-color 0.15s; }
 .price-card:hover, .price-card.active { border-color: var(--accent); }
 .price-card strong { font-family: var(--font-headline); font-size: 0.9rem; }
 .price-card .fw-bold { font-family: var(--font-mono); font-size: 0.85rem; }
@@ -116,6 +117,10 @@ body {
 .activity-item { padding: 8px 14px; border-bottom: 1px solid var(--border); font-size: 0.82rem; font-family: var(--font-thai); line-height: 1.5; }
 .activity-item:last-child { border-bottom: none; }
 
+/* ── Funnel progress bar ── */
+.funnel-bar { height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; margin-top: 8px; }
+.funnel-bar-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--accent-buy), var(--accent)); transition: width 0.6s ease; }
+
 /* ── Mode badge ── */
 .mode-badge { padding: 3px 10px; border-radius: 3px; font-size: 0.65rem; font-weight: 700; letter-spacing: 1.2px; font-family: var(--font-mono); }
 .mode-demo { background: rgba(168,255,83,0.10); color: var(--accent); border: 1px solid rgba(168,255,83,0.30); }
@@ -124,7 +129,7 @@ body {
 /* ── Forms ── */
 .form-control, .form-select {
   background: var(--bg-card2); border: 1px solid var(--border2);
-  color: var(--text-main); border-radius: 4px;
+  color: var(--text-main); border-radius: 6px;
   font-family: var(--font-thai); font-size: 0.85rem;
 }
 .form-control:focus, .form-select:focus {
@@ -141,25 +146,25 @@ body {
 /* ── Buttons ── */
 .btn-primary {
   background: var(--accent); border-color: var(--accent); color: #000;
-  font-family: var(--font-headline); font-weight: 700; letter-spacing: 0.3px; border-radius: 4px;
+  font-family: var(--font-headline); font-weight: 700; letter-spacing: 0.3px; border-radius: 6px;
 }
 .btn-primary:hover { background: #C6FF80; border-color: #C6FF80; color: #000; }
 .btn-outline-secondary {
   border-color: var(--border2); color: var(--text-muted);
-  font-family: var(--font-headline); border-radius: 4px;
+  font-family: var(--font-headline); border-radius: 6px;
 }
 .btn-outline-secondary:hover { border-color: var(--accent); color: var(--accent); background: rgba(168,255,83,0.06); }
-.btn-success { background: var(--accent-buy); border-color: var(--accent-buy); color: #000; font-family: var(--font-headline); font-weight: 700; border-radius: 4px; }
-.btn-danger  { background: var(--accent-red);  border-color: var(--accent-red);  color: #000; font-family: var(--font-headline); font-weight: 700; border-radius: 4px; }
+.btn-success { background: var(--accent-buy); border-color: var(--accent-buy); color: #000; font-family: var(--font-headline); font-weight: 700; border-radius: 6px; }
+.btn-danger  { background: var(--accent-red);  border-color: var(--accent-red);  color: #000; font-family: var(--font-headline); font-weight: 700; border-radius: 6px; }
 .btn-sm { font-size: 0.78rem; padding: 4px 10px; }
-.btn-warning { background: var(--accent); border-color: var(--accent); color: #000; font-family: var(--font-headline); font-weight: 700; border-radius: 4px; }
-.btn-outline-danger { border-radius: 4px; font-family: var(--font-headline); }
-.btn-outline-warning { border-radius: 4px; font-family: var(--font-headline); }
+.btn-warning { background: var(--accent); border-color: var(--accent); color: #000; font-family: var(--font-headline); font-weight: 700; border-radius: 6px; }
+.btn-outline-danger { border-radius: 6px; font-family: var(--font-headline); }
+.btn-outline-warning { border-radius: 6px; font-family: var(--font-headline); }
 
 /* ── Tab buttons ── */
 .tab-btn {
   background: none; border: 1px solid var(--border2); color: var(--text-muted);
-  padding: 5px 14px; border-radius: 4px; cursor: pointer;
+  padding: 5px 14px; border-radius: 6px; cursor: pointer;
   font-size: 0.8rem; font-family: var(--font-headline); font-weight: 500;
   transition: all 0.15s;
 }
@@ -167,7 +172,7 @@ body {
 .tab-btn:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
 
 /* ── Progress ── */
-.progress { background: var(--border); height: 6px; border-radius: 0; }
+.progress { background: var(--border); height: 6px; border-radius: 3px; }
 .progress-bar { background: var(--accent); }
 
 /* ── WebSocket dot ── */
@@ -195,10 +200,10 @@ hr { border-color: var(--border); }
 code { color: var(--accent); background: rgba(168,255,83,0.08); padding: 1px 5px; border-radius: 2px; font-family: var(--font-mono); }
 a { color: var(--accent); }
 a:hover { color: #C6FF80; }
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: #000; }
-::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(168,255,83,0.5); }
 /* ── Light mode ── */
 [data-theme="light"] {
   --bg-dark:   #f0f2f5;
@@ -215,7 +220,7 @@ a:hover { color: #C6FF80; }
 [data-theme="light"] .pill-link.active { background: #0d0d0d; color: #fff; }
 [data-theme="light"] .card { background: rgba(255,255,255,0.8) !important; border-color: var(--border) !important; }
 [data-theme="light"] .card::before { background: linear-gradient(90deg,transparent,rgba(168,255,83,0.18),transparent); }
-[data-theme="light"] .stat-card { background: rgba(255,255,255,0.85) !important; border-color: var(--border) !important; }
+[data-theme="light"] .stat-card { background: rgba(255,255,255,0.85) !important; border-color: var(--border) !important; border-top-color: rgba(168,255,83,0.5) !important; }
 [data-theme="light"] .card-header { background: var(--bg-card2); border-bottom-color: var(--border); }
 [data-theme="light"] .table { color: var(--text-main); }
 [data-theme="light"] .table td, [data-theme="light"] .table th { border-color: var(--border); }
@@ -226,23 +231,23 @@ a:hover { color: #C6FF80; }
 
 /* ── Glassmorphism ── */
 .card {
-  background: rgba(12,12,12,0.6) !important;
+  background: rgba(22,22,22,0.85) !important;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255,255,255,0.05) !important;
+  border: 1px solid rgba(255,255,255,0.09) !important;
   position: relative; overflow: hidden;
 }
 .card::before {
   content: '';
-  position: absolute; top: 0; left: 15%; right: 15%; height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(168,255,83,0.12), transparent);
+  position: absolute; top: 0; left: 10%; right: 10%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(168,255,83,0.22), transparent);
   pointer-events: none;
 }
 .stat-card {
-  background: rgba(12,12,12,0.55) !important;
+  background: rgba(20,20,20,0.88) !important;
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(255,255,255,0.05) !important;
+  border: 1px solid rgba(255,255,255,0.09) !important;
 }
 .topnav {
   background: rgba(0,0,0,0.80) !important;
@@ -509,8 +514,9 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
 <section id="sec-dashboard" class="section active">
 
   <!-- Hero row -->
-  <div class="row g-0 mb-4 align-items-end">
-    <div class="col-md-6">
+  <div class="row g-0 mb-4 align-items-end" style="position:relative">
+    <div style="position:absolute;top:-20px;left:-10px;width:320px;height:160px;background:radial-gradient(ellipse,rgba(168,255,83,0.07) 0%,transparent 70%);pointer-events:none"></div>
+    <div class="col-md-6" style="position:relative">
       <div class="text-muted mb-1" style="font-size:0.65rem;text-transform:uppercase;letter-spacing:1.5px;font-family:var(--font-mono)">Total Portfolio</div>
       <div style="font-size:3rem;font-weight:700;line-height:1.05;letter-spacing:-1.5px;font-family:var(--font-headline)">
         <span id="totalValue">$0.00</span>
@@ -560,16 +566,20 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
             </div>
           </div>
           <div class="d-flex gap-2">
-            <div class="flex-fill p-2 text-center" style="background:rgba(57,217,138,0.08);border:1px solid rgba(57,217,138,0.2);border-radius:6px">
+            <div class="flex-fill p-2 text-center" style="background:rgba(57,217,138,0.08);border:1px solid rgba(57,217,138,0.2);border-radius:8px">
               <div class="fw-bold" style="color:var(--accent-buy);font-family:var(--font-mono);font-size:1.15rem" id="funApproved">0</div>
               <div class="stat-label" style="margin:0">Approved ✓</div>
             </div>
-            <div class="flex-fill p-2 text-center" style="background:rgba(255,107,53,0.08);border:1px solid rgba(255,107,53,0.2);border-radius:6px">
+            <div class="flex-fill p-2 text-center" style="background:rgba(255,107,53,0.08);border:1px solid rgba(255,107,53,0.2);border-radius:8px">
               <div class="fw-bold" style="color:var(--accent-red);font-family:var(--font-mono);font-size:1.15rem" id="funRejected">0</div>
               <div class="stat-label" style="margin:0">Rejected ✕</div>
             </div>
           </div>
-          <div class="text-muted mt-2 text-center" style="font-size:0.7rem;font-family:var(--font-mono)" id="funLastSignal">รอสัญญาณ...</div>
+          <div class="funnel-bar mt-3"><div class="funnel-bar-fill" id="funBarFill" style="width:0%"></div></div>
+          <div class="d-flex justify-content-between mt-1" style="font-size:0.62rem;color:var(--text-muted);font-family:var(--font-mono)">
+            <span>0% approved</span><span id="funConvRate">—</span>
+          </div>
+          <div class="text-muted mt-1 text-center" style="font-size:0.7rem;font-family:var(--font-mono)" id="funLastSignal">รอสัญญาณ...</div>
         </div>
       </div>
     </div>
@@ -770,30 +780,30 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
   <!-- Performance metrics row -->
   <div class="row g-3 mb-3">
     <div class="col-6 col-md-3">
-      <div class="stat-card" style="background:rgba(57,217,138,0.06);border:1px solid rgba(57,217,138,0.18)">
+      <div class="stat-card" style="border-top:2px solid rgba(255,107,53,0.5)">
         <div class="stat-label">Max Drawdown</div>
         <div class="stat-value text-danger" id="maxDrawdown">—</div>
         <div class="small text-muted">Peak → Trough</div>
       </div>
     </div>
     <div class="col-6 col-md-3">
-      <div class="stat-card" style="background:rgba(168,255,83,0.06);border:1px solid rgba(168,255,83,0.18)">
+      <div class="stat-card" style="border-top:2px solid rgba(168,255,83,0.5)">
         <div class="stat-label">Sharpe Ratio</div>
         <div class="stat-value" style="color:var(--accent)" id="sharpeRatio">—</div>
         <div class="small text-muted">Risk-adjusted return</div>
       </div>
     </div>
     <div class="col-6 col-md-3">
-      <div class="stat-card" style="background:rgba(168,255,83,0.06);border:1px solid rgba(168,255,83,0.18)">
+      <div class="stat-card" style="border-top:2px solid rgba(168,255,83,0.5)">
         <div class="stat-label">Total Trades</div>
         <div class="stat-value" style="color:var(--accent-yellow)" id="pfTotalTrades">—</div>
         <div class="small text-muted" id="pfWinRate">Win rate —</div>
       </div>
     </div>
     <div class="col-6 col-md-3">
-      <div class="stat-card" style="background:rgba(255,107,53,0.06);border:1px solid rgba(255,107,53,0.18)">
+      <div class="stat-card" style="border-top:2px solid rgba(57,217,138,0.5)">
         <div class="stat-label">Total PnL</div>
-        <div class="stat-value" style="color:var(--accent-red)" id="pfTotalPnl">—</div>
+        <div class="stat-value" style="color:var(--accent-buy)" id="pfTotalPnl">—</div>
         <div class="small text-muted">Closed trades</div>
       </div>
     </div>
@@ -804,16 +814,24 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
     <div class="col-md-8">
       <div class="card">
         <div class="card-header"><i class="bi bi-bar-chart me-2"></i>Daily PnL</div>
-        <div class="card-body p-2">
+        <div class="card-body p-2" style="position:relative">
           <div class="chart-container"><canvas id="dailyPnlChart"></canvas></div>
+          <div id="dailyPnlEmpty" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text-muted);font-size:0.82rem;pointer-events:none">
+            <i class="bi bi-bar-chart" style="font-size:1.8rem;opacity:0.25;margin-bottom:6px"></i>
+            <span style="opacity:0.45">No trade history yet</span>
+          </div>
         </div>
       </div>
     </div>
     <div class="col-md-4">
       <div class="card h-100">
         <div class="card-header"><i class="bi bi-pie-chart me-2"></i>Asset Allocation</div>
-        <div class="card-body">
+        <div class="card-body" style="position:relative">
           <div style="max-height:220px"><canvas id="allocationChart"></canvas></div>
+          <div id="allocationEmpty" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text-muted);font-size:0.82rem;pointer-events:none">
+            <i class="bi bi-pie-chart" style="font-size:1.8rem;opacity:0.25;margin-bottom:6px"></i>
+            <span style="opacity:0.45">No holdings</span>
+          </div>
         </div>
       </div>
     </div>
@@ -1954,6 +1972,8 @@ function updateAllocationChart(positions, cash, cur) {
   });
   charts.allocation.updateOptions({labels:labels,colors:colors},false,false);
   charts.allocation.updateSeries(data,false);
+  const empty = document.getElementById('allocationEmpty');
+  if (empty) empty.style.display = (data.length <= 1 && cash < 1) ? 'flex' : 'none';
 }
 
 // ============================================================
@@ -2753,6 +2773,7 @@ async function refreshAdvancedStats() {
       sr.style.color = d.sharpe >= 1 ? '#A8FF53' : d.sharpe >= 0 ? '#d29922' : '#ff6b35';
     }
 
+    const pnlEmpty = document.getElementById('dailyPnlEmpty');
     if (d.daily_pnl && d.daily_pnl.length) {
       const labels = d.daily_pnl.map(x => x.date);
       const values = d.daily_pnl.map(x => x.pnl);
@@ -2760,7 +2781,8 @@ async function refreshAdvancedStats() {
       const _pColors = values.map(v => v >= 0 ? '#A8FF53' : '#ff6b35');
       charts.dailyPnl.updateOptions({xaxis:{categories:labels},colors:_pColors,plotOptions:{bar:{distributed:true,borderRadius:4,columnWidth:'65%'}}},false,false);
       charts.dailyPnl.updateSeries([{name:'Daily PnL',data:values}],false);
-    }
+      if (pnlEmpty) pnlEmpty.style.display = 'none';
+    } else if (pnlEmpty) { pnlEmpty.style.display = 'flex'; }
   } catch {}
 }
 
@@ -2863,6 +2885,13 @@ function renderDashboardState(d) {
     set('funSignals',  f.signals);
     set('funApproved', f.approved);
     set('funRejected', f.rejected);
+    const pct = f.analyzed > 0 ? Math.round((f.approved / f.analyzed) * 100) : 0;
+    const bar = document.getElementById('funBarFill');
+    if (bar) bar.style.width = pct + '%';
+    const rate = document.getElementById('funConvRate');
+    if (rate) rate.textContent = pct + '% approved';
+    const lbl0 = document.querySelector('.funnel-bar + div span');
+    if (lbl0) lbl0.textContent = pct + '% approved';
   }
   if (d.last_signal) {
     const ls = d.last_signal;
