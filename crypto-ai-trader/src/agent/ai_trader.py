@@ -166,8 +166,15 @@ class AITrader:
         portfolio = await self._get_portfolio_summary()
         portfolio_value = portfolio.get("total_value", 0) or 1.0
 
-        if self._daily_pnl <= -(portfolio_value * max_daily_loss_pct):
-            return False, "Daily loss limit reached"
+        # Include floating (unrealized) losses so deeply underwater positions
+        # are counted against the daily limit even before they are closed.
+        floating_pnl = sum(
+            (self._analyses[sym].price - trade["price"]) * trade.get("amount", 0)
+            for sym, trade in self._open_trades.items()
+            if sym in self._analyses
+        )
+        if (self._daily_pnl + floating_pnl) <= -(portfolio_value * max_daily_loss_pct):
+            return False, "Daily loss limit reached (incl. unrealized)"
 
         if len(self._open_trades) >= max_open_trades:
             return False, "Max open trades reached"
@@ -215,6 +222,12 @@ class AITrader:
             return True
 
         if signal.action not in ("BUY", "SELL"):
+            return False
+
+        # Never execute a bare SELL without a tracked open position —
+        # would otherwise liquidate the user's entire coin balance.
+        if signal.action == "SELL":
+            logger.debug(f"SELL {symbol}: no tracked position, skipping")
             return False
 
         # Check risk limits before executing any trade (skipped for manual/forced trades)

@@ -128,13 +128,18 @@ def funding_bias(rate_pct: float) -> float:
     Returns an additive bias on confidence:
     Positive rate (longs overleveraged) → SELL bias (negative return)
     Negative rate (shorts overleveraged) → BUY bias (positive return)
+
+    Binance lastFundingRate is already multiplied by 100 before being passed here,
+    so rate_pct is in %, e.g. 0.01 = 0.01% per 8h (normal baseline).
+    Thresholds calibrated so normal rates (~0.01%) produce no bias;
+    only extreme rates (>= 0.05%) trigger signals.
     """
-    if rate_pct >= 0.05:    return -0.10  # Very high positive → strong SELL bias
-    if rate_pct >= 0.02:    return -0.05  # High positive → moderate SELL bias
-    if rate_pct >= 0.01:    return -0.02  # Moderate positive → small SELL bias
-    if rate_pct <= -0.05:   return +0.10  # Very negative → strong BUY bias
-    if rate_pct <= -0.02:   return +0.05  # Negative → moderate BUY bias
-    if rate_pct <= -0.01:   return +0.02  # Slightly negative → small BUY bias
+    if rate_pct >= 0.10:    return -0.10  # Very high positive → strong SELL bias
+    if rate_pct >= 0.05:    return -0.05  # High positive → moderate SELL bias
+    if rate_pct >= 0.02:    return -0.02  # Moderate positive → small SELL bias
+    if rate_pct <= -0.10:   return +0.10  # Very negative → strong BUY bias
+    if rate_pct <= -0.05:   return +0.05  # Negative → moderate BUY bias
+    if rate_pct <= -0.02:   return +0.02  # Slightly negative → small BUY bias
     return 0.0
 
 
