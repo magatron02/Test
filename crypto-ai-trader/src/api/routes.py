@@ -19,6 +19,38 @@ from ..notifications import line_notify, telegram_notify
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
 
+# Whitelist of (section → allowed keys) for POST /api/settings.
+# The 'app' section is intentionally absent — api_token must never be writable via API.
+_SETTINGS_WHITELIST: Dict[str, set] = {
+    "trading": {
+        "take_profit_pct", "stop_loss_pct", "min_confidence",
+        "analysis_interval", "risk_per_trade_pct", "max_daily_loss_pct",
+        "max_open_trades",
+    },
+    "ai": {"default_model", "claude"},
+    "exchanges": {"binance", "binance_th", "bitkub", "okx", "demo"},
+    "notifications": {"line", "telegram", "notify_on"},
+}
+
+# For nested dict values, further restrict which sub-keys may be written.
+_NESTED_KEY_WHITELIST: Dict[str, Dict[str, set]] = {
+    "ai": {
+        "claude": {"api_key", "model"},
+    },
+    "exchanges": {
+        "binance":    {"api_key", "api_secret", "enabled", "testnet"},
+        "binance_th": {"api_key", "api_secret", "enabled"},
+        "bitkub":     {"api_key", "api_secret", "enabled"},
+        "okx":        {"api_key", "api_secret", "passphrase", "enabled", "testnet"},
+        "demo":       {"enabled", "data_source", "virtual_balance_usdt", "virtual_balance_thb"},
+    },
+    "notifications": {
+        "line":      {"channel_id", "channel_secret", "user_id", "enabled"},
+        "telegram":  {"bot_token", "chat_id", "enabled"},
+        "notify_on": {"trade_open", "trade_close", "stop_loss", "take_profit", "training_complete"},
+    },
+}
+
 # Reference to trader injected at startup
 _trader = None
 _training_loop = None
@@ -259,8 +291,20 @@ async def get_settings():
 @router.post("/settings")
 async def update_settings(data: Dict[str, Any], _=_AUTH):
     for section, values in data.items():
-        if isinstance(values, dict):
-            for key, val in values.items():
+        if section not in _SETTINGS_WHITELIST:
+            raise HTTPException(400, f"Section '{section}' cannot be modified via this endpoint")
+        if not isinstance(values, dict):
+            continue
+        allowed_keys = _SETTINGS_WHITELIST[section]
+        for key, val in values.items():
+            if key not in allowed_keys:
+                raise HTTPException(400, f"Key '{section}.{key}' cannot be modified via this endpoint")
+            if isinstance(val, dict) and section in _NESTED_KEY_WHITELIST and key in _NESTED_KEY_WHITELIST[section]:
+                allowed_sub = _NESTED_KEY_WHITELIST[section][key]
+                existing = settings.get(section, key) or {}
+                filtered = {sk: sv for sk, sv in val.items() if sk in allowed_sub}
+                settings.set({**existing, **filtered}, section, key)
+            else:
                 settings.set(val, section, key)
     settings.save()
     settings.reload()
