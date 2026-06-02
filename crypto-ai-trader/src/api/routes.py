@@ -23,6 +23,15 @@ router = APIRouter(prefix="/api")
 _trader = None
 _training_loop = None
 _hourly_trainer = None
+_chat_lock: Optional[asyncio.Lock] = None
+
+
+def _get_chat_lock() -> asyncio.Lock:
+    """Lazy-initialise the chat lock inside the running event loop."""
+    global _chat_lock
+    if _chat_lock is None:
+        _chat_lock = asyncio.Lock()
+    return _chat_lock
 
 
 def set_trader(trader):
@@ -1017,106 +1026,108 @@ class ChatHandler:
                 ),
             }
 
-        try:
-            import anthropic
-            client = anthropic.AsyncAnthropic(api_key=api_key)
-            ctx = await self._build_market_context()
+        # Serialise concurrent requests so history append→read→write stays consistent.
+        async with _get_chat_lock():
+            try:
+                import anthropic
+                client = anthropic.AsyncAnthropic(api_key=api_key)
+                ctx = await self._build_market_context()
 
-            market_lines = "\n".join(
-                f"  {sym}: ${d['price']} ({d['change_24h']:+.2f}%) RSI={d['rsi']} signal={d['signal']}"
-                for sym, d in ctx["market"].items()
-            ) or "  (ยังไม่มีข้อมูล)"
+                market_lines = "\n".join(
+                    f"  {sym}: ${d['price']} ({d['change_24h']:+.2f}%) RSI={d['rsi']} signal={d['signal']}"
+                    for sym, d in ctx["market"].items()
+                ) or "  (ยังไม่มีข้อมูล)"
 
-            trade_lines = "\n".join(
-                f"  {t['symbol']} {t['side']} {t['pnl_pct']:+.2f}%"
-                for t in ctx["recent_trades"]
-            ) or "  (ยังไม่มี)"
+                trade_lines = "\n".join(
+                    f"  {t['symbol']} {t['side']} {t['pnl_pct']:+.2f}%"
+                    for t in ctx["recent_trades"]
+                ) or "  (ยังไม่มี)"
 
-            m = ctx["model"]
-            model_line = (
-                f"v{m['version']} | CV={m['cv_accuracy'] or '—'} | "
-                f"Val={m['val_accuracy'] or '—'} | samples={m['samples']} | "
-                f"ready={'✓' if m['ready'] else '✗'}"
-            )
-
-            sys_prompt = (
-                "คุณคือ Aiterra AI Trading Assistant — ผู้ช่วยการเทรด Crypto ที่ฉลาดและเป็นมืออาชีพ\n"
-                "ตอบเป็นภาษาไทยเสมอ กระชับ ชัดเจน ไม่ใช้ markdown symbols (* # _)\n"
-                "ถ้าผู้ใช้ถามเรื่องเหรียญหรือตลาด ให้เรียก tool analyze_symbol เพื่อดูข้อมูลล่าสุดก่อนตอบ\n\n"
-                f"=== ข้อมูลตลาด ณ ตอนนี้ ===\n{market_lines}\n\n"
-                f"=== AI Model ===\n{model_line}\n\n"
-                f"=== การเทรดล่าสุด ===\n{trade_lines}\n\n"
-                f"=== Exchange ===\n{ctx['mode']}"
-            )
-
-            # Append user turn to history
-            ChatHandler._history.append({"role": "user", "content": message})
-            if len(ChatHandler._history) > self.MAX_HISTORY:
-                ChatHandler._history = ChatHandler._history[-self.MAX_HISTORY:]
-
-            # Working copy for this request's tool-call loop
-            loop_msgs = list(ChatHandler._history)
-
-            for _step in range(self.MAX_TOOL_STEPS):
-                resp = await client.messages.create(
-                    model=settings.claude_model,
-                    max_tokens=1024,
-                    system=sys_prompt,
-                    tools=self._CHAT_TOOLS,
-                    messages=loop_msgs,
+                m = ctx["model"]
+                model_line = (
+                    f"v{m['version']} | CV={m['cv_accuracy'] or '—'} | "
+                    f"Val={m['val_accuracy'] or '—'} | samples={m['samples']} | "
+                    f"ready={'✓' if m['ready'] else '✗'}"
                 )
 
-                tool_uses = [b for b in resp.content if b.type == "tool_use"]
+                sys_prompt = (
+                    "คุณคือ Aiterra AI Trading Assistant — ผู้ช่วยการเทรด Crypto ที่ฉลาดและเป็นมืออาชีพ\n"
+                    "ตอบเป็นภาษาไทยเสมอ กระชับ ชัดเจน ไม่ใช้ markdown symbols (* # _)\n"
+                    "ถ้าผู้ใช้ถามเรื่องเหรียญหรือตลาด ให้เรียก tool analyze_symbol เพื่อดูข้อมูลล่าสุดก่อนตอบ\n\n"
+                    f"=== ข้อมูลตลาด ณ ตอนนี้ ===\n{market_lines}\n\n"
+                    f"=== AI Model ===\n{model_line}\n\n"
+                    f"=== การเทรดล่าสุด ===\n{trade_lines}\n\n"
+                    f"=== Exchange ===\n{ctx['mode']}"
+                )
 
-                if resp.stop_reason == "end_turn" or not tool_uses:
-                    text = " ".join(b.text for b in resp.content if b.type == "text").strip()
-                    if text:
-                        ChatHandler._history.append({"role": "assistant", "content": text})
-                        if len(ChatHandler._history) > self.MAX_HISTORY:
-                            ChatHandler._history = ChatHandler._history[-self.MAX_HISTORY:]
-                    return {"type": "ai", "reply": text or "—"}
+                # Append user turn to history
+                ChatHandler._history.append({"role": "user", "content": message})
+                if len(ChatHandler._history) > self.MAX_HISTORY:
+                    ChatHandler._history = ChatHandler._history[-self.MAX_HISTORY:]
 
-                # Build serialisable assistant content (tool_use blocks)
-                assistant_content = []
-                for b in resp.content:
-                    if b.type == "text":
-                        assistant_content.append({"type": "text", "text": b.text})
-                    elif b.type == "tool_use":
-                        assistant_content.append({
-                            "type": "tool_use",
-                            "id":    b.id,
-                            "name":  b.name,
-                            "input": b.input,
+                # Working copy for this request's tool-call loop
+                loop_msgs = list(ChatHandler._history)
+
+                for _step in range(self.MAX_TOOL_STEPS):
+                    resp = await client.messages.create(
+                        model=settings.claude_model,
+                        max_tokens=1024,
+                        system=sys_prompt,
+                        tools=self._CHAT_TOOLS,
+                        messages=loop_msgs,
+                    )
+
+                    tool_uses = [b for b in resp.content if b.type == "tool_use"]
+
+                    if resp.stop_reason == "end_turn" or not tool_uses:
+                        text = " ".join(b.text for b in resp.content if b.type == "text").strip()
+                        if text:
+                            ChatHandler._history.append({"role": "assistant", "content": text})
+                            if len(ChatHandler._history) > self.MAX_HISTORY:
+                                ChatHandler._history = ChatHandler._history[-self.MAX_HISTORY:]
+                        return {"type": "ai", "reply": text or "—"}
+
+                    # Build serialisable assistant content (tool_use blocks)
+                    assistant_content = []
+                    for b in resp.content:
+                        if b.type == "text":
+                            assistant_content.append({"type": "text", "text": b.text})
+                        elif b.type == "tool_use":
+                            assistant_content.append({
+                                "type": "tool_use",
+                                "id":    b.id,
+                                "name":  b.name,
+                                "input": b.input,
+                            })
+
+                    # Execute tools and collect results
+                    tool_results = []
+                    for tu in tool_uses:
+                        result = await self._exec_chat_tool(tu.name, tu.input)
+                        tool_results.append({
+                            "type":        "tool_result",
+                            "tool_use_id": tu.id,
+                            "content":     json.dumps(result, ensure_ascii=False, default=str),
                         })
 
-                # Execute tools and collect results
-                tool_results = []
-                for tu in tool_uses:
-                    result = await self._exec_chat_tool(tu.name, tu.input)
-                    tool_results.append({
-                        "type":        "tool_result",
-                        "tool_use_id": tu.id,
-                        "content":     json.dumps(result, ensure_ascii=False, default=str),
-                    })
+                    loop_msgs.append({"role": "assistant", "content": assistant_content})
+                    loop_msgs.append({"role": "user",      "content": tool_results})
 
-                loop_msgs.append({"role": "assistant", "content": assistant_content})
-                loop_msgs.append({"role": "user",      "content": tool_results})
+                return {"type": "info", "reply": "ไม่สามารถตอบได้ในขณะนี้ กรุณาลองใหม่"}
 
-            return {"type": "info", "reply": "ไม่สามารถตอบได้ในขณะนี้ กรุณาลองใหม่"}
-
-        except Exception as e:
-            logger.warning(f"Chat Claude error: {e}")
-            return {
-                "type": "info",
-                "reply": (
-                    "คำสั่งที่รองรับ:\n"
-                    "• ซื้อ/ขาย BTC ETH SOL XRP BNB\n"
-                    "• วิเคราะห์ BTC\n"
-                    "• รายงานผล\n"
-                    "• พอร์ตฉัน\n"
-                    "• เทรนตัวเอง"
-                ),
-            }
+            except Exception as e:
+                logger.warning(f"Chat Claude error: {e}")
+                return {
+                    "type": "info",
+                    "reply": (
+                        "คำสั่งที่รองรับ:\n"
+                        "• ซื้อ/ขาย BTC ETH SOL XRP BNB\n"
+                        "• วิเคราะห์ BTC\n"
+                        "• รายงานผล\n"
+                        "• พอร์ตฉัน\n"
+                        "• เทรนตัวเอง"
+                    ),
+                }
 
     @classmethod
     def clear_history(cls):

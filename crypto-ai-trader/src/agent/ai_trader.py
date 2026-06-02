@@ -524,6 +524,13 @@ class AITrader:
                 })
             await self._broadcast("positions_update", {"positions": positions})
 
+        # Retrain ML model off the event loop so it never blocks the trading cycle.
+        # update_outcome() sets _pending_train=True when the retrain threshold is hit.
+        if self._trainer._pending_train:
+            self._trainer._pending_train = False
+            self._set_agent("trainer", "active", "กำลัง retrain model...")
+            asyncio.ensure_future(asyncio.to_thread(self._trainer.train))
+
     async def start(self):
         self._running = True
         interval = settings.analysis_interval

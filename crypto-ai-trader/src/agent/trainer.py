@@ -40,6 +40,7 @@ class AITrainer:
             "best_val_accuracy": None,
         }
         self._trades_since_train = 0
+        self._pending_train = False   # set True when retrain threshold hit; consumed by run_cycle
         self._load_model()
         self._load_stats_from_db()
 
@@ -123,14 +124,24 @@ class AITrainer:
             record = db.query(TrainingRecord).filter_by(trade_id=trade_id).first()
             if record:
                 record.outcome = pnl_pct
-                record.label = 1 if pnl_pct > 0 else 0
+                # Direction-aware label:
+                #   BUY trade profitable  → 1 (BUY was correct)
+                #   BUY trade loss        → 0 (should have avoided / SELL)
+                #   SELL trade profitable → 0 (SELL/short was correct)
+                #   SELL trade loss       → 1 (BUY would have been better)
+                if record.action == "BUY":
+                    record.label = 1 if pnl_pct > 0 else 0
+                else:
+                    record.label = 0 if pnl_pct > 0 else 1
                 db.commit()
                 self._stats["labelled_records"] += 1
                 self._trades_since_train += 1
 
                 retrain_interval = settings.get("ai", "ml", "retrain_interval", default=50)
                 if self._trades_since_train >= retrain_interval:
-                    self.train()
+                    # Do NOT call self.train() here — it blocks the async event loop.
+                    # Signal run_cycle() to schedule training off-thread instead.
+                    self._pending_train = True
         finally:
             db.close()
 
