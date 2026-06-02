@@ -92,15 +92,18 @@ echo    [OK] All packages installed
 
 REM --- 5. Config + folders ------------------------------------
 echo.
-echo  [5/5] Setting up config and folders...
+echo  [5/5] Setting up config and importing any previous data...
 if not exist data   mkdir data
 if not exist models mkdir models
 
-if not exist config\settings.yml (
-    copy config\settings.example.yml config\settings.yml >nul
-    echo    [OK] config\settings.yml created
-) else (
-    echo    [OK] config\settings.yml already exists
+REM migrate.py auto-imports settings / history / model from an older
+REM Aiterra folder if one exists nearby, otherwise creates a fresh config.
+python migrate.py
+if errorlevel 1 (
+    REM Never block install on migration — fall back to a plain fresh config.
+    if not exist config\settings.yml (
+        copy config\settings.example.yml config\settings.yml >nul
+    )
 )
 
 REM --- Done ---------------------------------------------------
