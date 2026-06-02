@@ -396,6 +396,24 @@ class AITrader:
             trade["stop_loss_price"] = entry
             sl = entry
 
+        # ── Time-based exit ────────────────────────────────────────────
+        # Close positions that are stuck near entry after max_hold_hours.
+        # "Stuck" = price has drifted less than time_exit_stuck_pct from entry.
+        max_hold_hours = float(settings.get("trading", "max_hold_hours", default=24))
+        if max_hold_hours > 0:
+            opened = trade.get("opened_at")
+            if isinstance(opened, datetime):
+                hold_hours = (datetime.utcnow() - opened).total_seconds() / 3600
+                if hold_hours >= max_hold_hours:
+                    stuck_pct = float(settings.get("trading", "time_exit_stuck_pct", default=2.0))
+                    drift_pct = abs(price - entry) / entry * 100
+                    if drift_pct < stuck_pct:
+                        await self._close_trade(
+                            symbol, price,
+                            f"Time exit: {hold_hours:.0f}h, drift {drift_pct:.1f}% < {stuck_pct:.1f}%",
+                        )
+                        return
+
         # ── Exit checks ────────────────────────────────────────────────
         if price <= sl:
             trailing = "trailing_peak" in trade and trade["trailing_peak"] > entry * (1 + trail_trigger)
@@ -422,6 +440,15 @@ class AITrader:
             if not analysis:
                 continue
             self._signal_stats["analyzed"] += 1
+
+            # BTC dominance signal — extracted right after BTC is analyzed
+            if symbol == "BTC/USDT":
+                self._ext_signals["btc_signal"] = {
+                    "ema_trend":      analysis.ema_trend,
+                    "macd_trend":     analysis.macd_trend,
+                    "rsi":            analysis.rsi,
+                    "overall_signal": analysis.overall_signal,
+                }
 
             await self._check_exit_conditions(symbol)
 

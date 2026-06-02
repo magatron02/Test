@@ -44,6 +44,7 @@ class MarketAnalysis:
 
     volume_ratio: float = 1.0
     volume_signal: str = "NORMAL"
+    volume_spike: bool = False    # True when volume ≥ 3× 20-candle average
 
     overall_signal: str = "HOLD"
     signal_strength: float = 0.0
@@ -182,6 +183,7 @@ def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
         result.volume_signal = "LOW"
     elif result.volume_ratio > 2.0:
         result.volume_signal = "HIGH"
+    result.volume_spike = result.volume_ratio >= 3.0
 
     # Composite signal
     buy_score = 0.0

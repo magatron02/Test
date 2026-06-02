@@ -20,6 +20,27 @@ class TradingSignal:
     take_profit_pct: float
 
 
+def _btc_bias(btc: dict) -> float:
+    """
+    Small confidence adjustment for altcoins based on BTC trend direction.
+    Returns positive (BUY bias) or negative (SELL bias), max ±0.10.
+    Dampened when BTC is at RSI extremes (altcoins tend to decouple there).
+    """
+    bias = 0.0
+    if btc.get("ema_trend") == "BULLISH":
+        bias += 0.05
+    elif btc.get("ema_trend") == "BEARISH":
+        bias -= 0.05
+    if btc.get("macd_trend") == "BULLISH":
+        bias += 0.03
+    elif btc.get("macd_trend") == "BEARISH":
+        bias -= 0.03
+    rsi = btc.get("rsi", 50)
+    if rsi > 75 or rsi < 25:   # extreme RSI → altcoins decouple, dampen
+        bias *= 0.3
+    return round(max(-0.10, min(0.10, bias)), 3)
+
+
 def _atr_sl_tp(atr_pct: float) -> tuple:
     """
     Dynamic SL/TP based on current ATR volatility.
@@ -199,6 +220,31 @@ class StrategyManager:
                 elif bias < 0:
                     sell_score = min(1.0, sell_score + abs(bias))
                     ext_notes.append(f"Funding={fr:+.4f}%→+{abs(bias):.2f} SELL")
+
+        # ── BTC dominance bias (altcoins only) ────────────────────────
+        if ext_signals and analysis.symbol != "BTC/USDT":
+            btc = ext_signals.get("btc_signal")
+            if btc:
+                bias = _btc_bias(btc)
+                if bias > 0:
+                    buy_score  = min(1.0, buy_score  + bias)
+                    ext_notes.append(f"BTC {btc.get('ema_trend','?')} RSI={btc.get('rsi',0):.0f}→+{bias:.2f} BUY")
+                elif bias < 0:
+                    sell_score = min(1.0, sell_score + abs(bias))
+                    ext_notes.append(f"BTC {btc.get('ema_trend','?')} RSI={btc.get('rsi',0):.0f}→+{abs(bias):.2f} SELL")
+
+        # ── Volume spike amplification ─────────────────────────────────
+        # Only amplifies when spike direction aligns with the leading score.
+        # A spike against VWAP is ambiguous — no boost applied.
+        if analysis.volume_spike:
+            spike_boost = min(0.12, (analysis.volume_ratio - 3.0) / 10 + 0.06)
+            vwap = analysis.price_vs_vwap
+            if buy_score > sell_score and vwap == "ABOVE":
+                buy_score  = min(1.0, buy_score  + spike_boost)
+                ext_notes.append(f"VolSpike {analysis.volume_ratio:.1f}x above VWAP→+{spike_boost:.2f} BUY")
+            elif sell_score > buy_score and vwap == "BELOW":
+                sell_score = min(1.0, sell_score + spike_boost)
+                ext_notes.append(f"VolSpike {analysis.volume_ratio:.1f}x below VWAP→+{spike_boost:.2f} SELL")
 
         if ext_notes:
             all_reasons.append("[ext] " + " | ".join(ext_notes))
