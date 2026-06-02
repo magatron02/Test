@@ -1,5 +1,5 @@
 app:
-  name: "Aiterra v1.0.0"
+  name: "Aiterra v1.0.24"
   port: 8888
   open_browser: true
   log_level: "INFO"
@@ -72,9 +72,17 @@ trading:
   risk_per_trade_pct: 0.02    # ความเสี่ยงต่อ trade = 2% ของพอร์ต
   max_daily_loss_pct: 0.05    # หยุดเทรดถ้าขาดทุนเกิน 5% ต่อวัน
   max_open_trades: 3          # จำนวน trade สูงสุดที่เปิดพร้อมกัน
+  # Exit controls
+  breakeven_trigger_pct: 0.02 # ย้าย SL → breakeven เมื่อกำไรถึง 2%
+  trail_trigger_pct: 0.015    # เริ่ม trailing stop เมื่อกำไรถึง 1.5%
+  trail_distance_pct: 0.0     # ระยะ trailing (0 = ปิด)
+  max_hold_hours: 24          # ปิด trade อัตโนมัติหลัง 24 ชม. (time-based exit)
+  time_exit_stuck_pct: 2.0    # ปิดเฉพาะถ้า drift < 2% (ไม่ใช่ขาขึ้นแรง)
 
 strategy:
   primary: "hybrid"         # dca | trend | mean_reversion | hybrid
+  atr_sl_mult: 2.0          # ATR multiplier สำหรับ dynamic stop-loss
+  atr_tp_mult: 3.0          # ATR multiplier สำหรับ dynamic take-profit
   dca:
     interval_hours: 24
     amount_usdt: 50.0

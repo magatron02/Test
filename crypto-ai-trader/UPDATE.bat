@@ -1,12 +1,12 @@
 @echo off
 cd /d "%~dp0"
-title Aiterra v1.0.0 - Update
+title Aiterra v1.0.24 - Update
 color 0B
 
 cls
 echo.
 echo  ============================================================
-echo   Aiterra v1.0.0  --  Update (keeps your settings and data)
+echo   Aiterra v1.0.24  --  Update (keeps your settings and data)
 echo  ============================================================
 echo.
 echo   This updates the program code and dependencies.
