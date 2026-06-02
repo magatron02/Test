@@ -1,5 +1,5 @@
 import logging
-import pickle
+import joblib
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -57,8 +57,7 @@ class AITrainer:
                     logger.warning(f"Could not seed model: {e}")
         if self._model_path.exists():
             try:
-                with open(self._model_path, "rb") as f:
-                    self._model = pickle.load(f)
+                self._model = joblib.load(self._model_path)
                 logger.info("Loaded existing ML model")
             except Exception as e:
                 logger.warning(f"Could not load model: {e}")
@@ -97,8 +96,7 @@ class AITrainer:
             db.close()
 
     def _save_model(self):
-        with open(self._model_path, "wb") as f:
-            pickle.dump(self._model, f)
+        joblib.dump(self._model, self._model_path)
 
     # ── recording ────────────────────────────────────────────────
     def record_trade(self, symbol: str, features: Dict, action: str, trade_id: Optional[int] = None):

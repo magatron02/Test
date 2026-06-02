@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -32,6 +32,23 @@ def _get_chat_lock() -> asyncio.Lock:
     if _chat_lock is None:
         _chat_lock = asyncio.Lock()
     return _chat_lock
+
+
+# ── Auth ───────────────────────────────────────────────────────
+async def _require_auth(x_api_token: str = Header(default="", alias="X-API-Token")):
+    """Dependency: require a valid X-API-Token on mutating endpoints."""
+    if x_api_token != settings.api_token:
+        raise HTTPException(status_code=401, detail="Unauthorized — invalid or missing X-API-Token")
+
+_AUTH = Depends(_require_auth)
+
+
+@router.get("/auth/token")
+async def get_auth_token():
+    """Return the local API token for the in-browser frontend.
+    External sites can't read this response due to the browser same-origin policy.
+    """
+    return {"token": settings.api_token}
 
 
 def set_trader(trader):
@@ -209,7 +226,7 @@ async def get_training_stats():
 
 
 @router.post("/training/trigger")
-async def trigger_training():
+async def trigger_training(_=_AUTH):
     if not _trader:
         raise HTTPException(503, "Trader not running")
     success = _trader._trainer.train()
@@ -240,7 +257,7 @@ async def get_settings():
 
 
 @router.post("/settings")
-async def update_settings(data: Dict[str, Any]):
+async def update_settings(data: Dict[str, Any], _=_AUTH):
     for section, values in data.items():
         if isinstance(values, dict):
             for key, val in values.items():
@@ -251,7 +268,7 @@ async def update_settings(data: Dict[str, Any]):
 
 
 @router.post("/mode")
-async def set_mode(data: Dict[str, str]):
+async def set_mode(data: Dict[str, str], _=_AUTH):
     mode = data.get("mode", "demo")
     if mode not in ("demo", "live"):
         raise HTTPException(400, "Mode must be 'demo' or 'live'")
@@ -261,7 +278,7 @@ async def set_mode(data: Dict[str, str]):
 
 
 @router.post("/strategy")
-async def set_strategy(data: Dict[str, str]):
+async def set_strategy(data: Dict[str, str], _=_AUTH):
     strategy = data.get("strategy", "hybrid")
     if strategy not in ("dca", "trend", "mean_reversion", "hybrid"):
         raise HTTPException(400, "Invalid strategy")
@@ -271,7 +288,7 @@ async def set_strategy(data: Dict[str, str]):
 
 
 @router.post("/ai-model")
-async def set_ai_model(data: Dict[str, str]):
+async def set_ai_model(data: Dict[str, str], _=_AUTH):
     model = data.get("model", "hybrid")
     valid = ("claude", "rule_based", "ml", "hybrid")
     if model not in valid:
@@ -282,7 +299,7 @@ async def set_ai_model(data: Dict[str, str]):
 
 
 @router.post("/demo/reset")
-async def reset_demo():
+async def reset_demo(_=_AUTH):
     if not _trader or not _trader._exchange.is_demo:
         raise HTTPException(400, "Not in demo mode")
     _trader._exchange.reset()
@@ -363,7 +380,7 @@ async def get_thai_settings():
 
 
 @router.post("/thai/settings")
-async def save_thai_settings(data: Dict[str, Any]):
+async def save_thai_settings(data: Dict[str, Any], _=_AUTH):
     for k, v in data.items():
         settings.set(v, "thai", k)
     settings.save()
@@ -413,7 +430,17 @@ async def get_advanced_stats(db: Session = Depends(get_db)):
 
     eq = np.array(equity, dtype=float)
     rets = np.diff(eq) / np.where(eq[:-1] != 0, eq[:-1], 1)
-    sharpe = float((rets.mean() / rets.std()) * math.sqrt(252)) if rets.std() > 0 else 0.0
+
+    # Annualize using the actual average time between consecutive trade closes
+    # rather than a fixed 252-trading-day assumption.
+    trade_dates = [t.closed_at for t in closed if t.closed_at]
+    if len(trade_dates) >= 2:
+        span_days = (max(trade_dates) - min(trade_dates)).total_seconds() / 86400
+        avg_days_per_obs = span_days / max(len(trade_dates) - 1, 1)
+        ann_factor = math.sqrt(365 / avg_days_per_obs) if avg_days_per_obs > 0 else math.sqrt(252)
+    else:
+        ann_factor = math.sqrt(252)
+    sharpe = float((rets.mean() / rets.std()) * ann_factor) if rets.std() > 0 else 0.0
 
     run_max = np.maximum.accumulate(eq)
     max_dd  = float(((eq - run_max) / np.where(run_max != 0, run_max, 1)).min() * 100)
@@ -432,13 +459,20 @@ async def get_advanced_stats(db: Session = Depends(get_db)):
     if len(snapshots) >= 2:
         equity_curve = [{"t": s.recorded_at.isoformat(), "v": round(s.total_value_usdt, 2)}
                         for s in snapshots]
-        # Recompute drawdown from snapshots
         eq_snap = np.array([s.total_value_usdt for s in snapshots])
         run_max_snap = np.maximum.accumulate(eq_snap)
         max_dd = float(((eq_snap - run_max_snap) / np.where(run_max_snap != 0, run_max_snap, 1)).min() * 100)
         rets_snap = np.diff(eq_snap) / np.where(eq_snap[:-1] != 0, eq_snap[:-1], 1)
         if rets_snap.std() > 0:
-            sharpe = float((rets_snap.mean() / rets_snap.std()) * math.sqrt(252 * 288))  # 5-min intervals
+            # Annualize from the actual average snapshot interval
+            snap_dates = [s.recorded_at for s in snapshots if s.recorded_at]
+            if len(snap_dates) >= 2:
+                snap_span = (max(snap_dates) - min(snap_dates)).total_seconds() / 86400
+                snap_avg  = snap_span / max(len(snap_dates) - 1, 1)
+                snap_ann  = math.sqrt(365 / snap_avg) if snap_avg > 0 else math.sqrt(252 * 288)
+            else:
+                snap_ann = math.sqrt(252 * 288)
+            sharpe = float((rets_snap.mean() / rets_snap.std()) * snap_ann)
     else:
         equity_curve = [{"i": i, "v": v} for i, v in enumerate(equity)]
 
@@ -542,7 +576,7 @@ async def run_backtest(data: Dict[str, Any]):
 # ─── Training Loop Routes ──────────────────────────────────────
 
 @router.post("/training/loop/start")
-async def start_training_loop(data: Dict[str, Any] = None):
+async def start_training_loop(data: Dict[str, Any] = None, _=_AUTH):
     if not _training_loop:
         raise HTTPException(503, "Training loop not available")
     d = data or {}
@@ -608,7 +642,7 @@ async def get_open_positions():
 
 
 @router.post("/trade/manual")
-async def manual_trade(data: Dict[str, Any]):
+async def manual_trade(data: Dict[str, Any], _=_AUTH):
     """POST /api/trade/manual — manually open or close a position (demo-safe override).
     Body: {"action":"BUY"|"SELL"|"CLOSE", "symbol":"BTC/USDT", "amount_usdt": 200}
     Bypasses the AI signal so users can test the full trade pipeline.
@@ -667,7 +701,7 @@ async def manual_trade(data: Dict[str, Any]):
 
 
 @router.post("/training/loop/stop")
-async def stop_training_loop():
+async def stop_training_loop(_=_AUTH):
     if not _training_loop:
         raise HTTPException(503, "Training loop not available")
     _training_loop.stop()
@@ -683,7 +717,7 @@ async def hourly_train_status():
 
 
 @router.post("/training/hourly/run")
-async def hourly_train_run():
+async def hourly_train_run(_=_AUTH):
     """POST /api/training/hourly/run — trigger an immediate training run."""
     if not _hourly_trainer:
         raise HTTPException(503, "Hourly trainer not available")
@@ -1265,7 +1299,7 @@ async def test_notifications(data: Dict[str, Any] = None):
 # ─── Live Mode Hot-Swap ────────────────────────────────────────
 
 @router.post("/mode/swap")
-async def hot_swap_mode(data: Dict[str, str]):
+async def hot_swap_mode(data: Dict[str, str], _=_AUTH):
     """POST /api/mode/swap — switch demo↔live without restarting the server.
 
     For live mode the first *enabled* exchange with an api_key is used.
@@ -1343,7 +1377,7 @@ async def get_active_exchange():
 
 
 @router.post("/exchange/active")
-async def set_active_exchange(data: Dict[str, str]):
+async def set_active_exchange(data: Dict[str, str], _=_AUTH):
     """POST /api/exchange/active — choose which live exchange to trade on.
     Body: {"exchange": "binance"|"binance_th"|"bitkub"|"okx"}
     Does not switch mode; call /api/mode/swap to go live.

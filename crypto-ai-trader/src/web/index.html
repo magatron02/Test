@@ -1670,6 +1670,20 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
 <div id="toastContainer" class="notification"></div>
 
 <script>
+// ── Auth token: fetched once at load, injected into every mutating request ──
+window._API_TOKEN = '';
+(function() {
+  const _orig = window.fetch;
+  window.fetch = function(url, opts) {
+    opts = opts || {};
+    if (opts.method && opts.method !== 'GET') {
+      opts.headers = Object.assign({'X-API-Token': window._API_TOKEN}, opts.headers || {});
+    }
+    return _orig.call(this, url, opts);
+  };
+  _orig('/api/auth/token').then(r => r.json()).then(d => { window._API_TOKEN = d.token || ''; }).catch(() => {});
+})();
+
 // ============================================================
 // State
 // ============================================================

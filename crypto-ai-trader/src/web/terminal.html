@@ -488,8 +488,13 @@ $('#nav').addEventListener('click',e=>{
   if(p==='settings')loadSettings();
 });
 
-/* ── api ── */
-async function api(path,opts){try{const r=await fetch(path,opts);if(!r.ok)throw 0;return await r.json()}catch(e){return null}}
+/* ── api (auto-inject auth token on mutating requests) ── */
+let _TOKEN='';
+async function api(path,opts){
+  opts=opts||{};
+  if(opts.method&&opts.method!=='GET'){opts.headers=Object.assign({'X-API-Token':_TOKEN},opts.headers||{});}
+  try{const r=await fetch(path,opts);if(!r.ok)throw 0;return await r.json()}catch(e){return null}
+}
 
 /* ── status + symbols ── */
 async function loadStatus(){
@@ -745,6 +750,9 @@ function connectWS(){
 
 /* ── boot ── */
 (async function(){
+  // Fetch auth token first so all mutating requests are authenticated
+  const tk=await fetch('/api/auth/token').then(r=>r.json()).catch(()=>({}));
+  _TOKEN=tk.token||'';
   await loadStatus();
   await loadCandles();
   await loadPrices();
