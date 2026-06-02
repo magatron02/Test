@@ -3,7 +3,6 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 import numpy as np
-import pandas as pd
 
 from ..exchanges.base import OHLCV
 
@@ -48,6 +47,10 @@ class MarketAnalysis:
     overall_signal: str = "HOLD"
     signal_strength: float = 0.0
     features: Dict = field(default_factory=dict)
+
+    # Chart patterns (populated by detect_patterns)
+    patterns: List = field(default_factory=list)
+    pattern_summary: str = ""
 
 
 def _ema(series: np.ndarray, period: int) -> np.ndarray:
@@ -203,6 +206,17 @@ def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
         buy_score  += 0.10
     elif result.price_vs_vwap == "BELOW" and result.volume_signal == "HIGH":
         sell_score += 0.10
+
+    # ── Chart pattern detection ────────────────────────────────────────
+    try:
+        from .chart_patterns import detect_patterns, patterns_to_signal_boost
+        patterns = detect_patterns(closes, highs, lows, min_confidence=0.50)
+        result.patterns = patterns
+        pat_buy, pat_sell, result.pattern_summary = patterns_to_signal_boost(patterns)
+        buy_score  += pat_buy
+        sell_score += pat_sell
+    except Exception as e:
+        logger.debug("Chart pattern detection skipped: %s", e)
 
     if buy_score > sell_score and buy_score > 0.4:
         result.overall_signal = "BUY"

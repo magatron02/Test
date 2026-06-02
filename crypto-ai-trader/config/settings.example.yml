@@ -98,6 +98,21 @@ strategy:
     atr_period: 14
     vwap_enabled: true
 
+# ── Advanced Risk Management ─────────────────────────────────────────────────
+risk:
+  max_drawdown_pct:   0.10   # หยุดเทรดถ้า portfolio ลดจาก peak เกิน 10%
+  max_daily_loss_pct: 0.05   # หยุดเทรดถ้าขาดทุนเกิน 5% ต่อวัน
+  max_portfolio_heat: 0.20   # สูงสุด 20% ของ portfolio เป็น open risk
+  max_position_pct:   0.10   # สูงสุด 10% ของ portfolio ต่อ 1 position
+
+# ── Smart Position Sizing (Kelly Criterion) ────────────────────────────────
+position_sizer:
+  kelly_fraction:    0.25   # Fractional Kelly (0.25 = 25% of full Kelly)
+  min_trade_usdt:    10.0   # ขั้นต่ำต่อ trade
+  max_trade_usdt:    5000.0 # สูงสุดต่อ trade
+  fallback_risk_pct: 0.02   # ใช้ 2% ถ้ายังไม่มีประวัติ trade
+  target_atr_pct:    2.0    # ATR% ที่ถือว่า "ปกติ" (สูงกว่า = ลด size)
+
 thai:
   sec_api_key: ""           # ลงทะเบียนฟรีที่ api-portal.sec.or.th
   # watch_stocks:           # หุ้นที่ติดตาม (default = SET50 ทั้งหมด)

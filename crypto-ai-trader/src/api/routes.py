@@ -614,6 +614,7 @@ async def manual_trade(data: Dict[str, Any]):
 
     # BUY / SELL
     from ..agent.strategy_manager import TradingSignal
+    from ..agent.market_regime import RegimeResult
     portfolio = await _trader._get_portfolio_summary()
     avail = portfolio.get("available_usdt", 0)
     if amt_usdt <= 0:
@@ -627,7 +628,9 @@ async def manual_trade(data: Dict[str, Any]):
                            strategy="manual",
                            stop_loss_pct=0.02,
                            take_profit_pct=0.04)
-    executed = await _trader._execute_trade(symbol, signal, analysis, force=True)
+    # Use cached regime or default
+    regime = _trader.regimes.get(symbol) or RegimeResult("RANGING", 0.5, 20.0, 2.0, 0.0, "manual")
+    executed = await _trader._execute_trade(symbol, signal, analysis, regime, force=True)
     if executed:
         return {"ok": True, "action": action, "symbol": symbol,
                 "price": round(analysis.price, 6), "amount": round(amount, 6),
@@ -764,12 +767,17 @@ class ChatHandler:
         if not analysis:
             return {"type": "error", "reply": f"วิเคราะห์ {symbol} ไม่ได้"}
         portfolio = await self._trader._get_portfolio_summary()
-        signal = await self._trader._get_final_signal(analysis, portfolio)
+        from ..agent.market_regime import RegimeResult
+        regime = self._trader.regimes.get(symbol) or RegimeResult("RANGING", 0.5, 20.0, 2.0, 0.0, "")
+        signal = await self._trader._get_final_signal(analysis, portfolio, regime)
+        pat_text = ""
+        if getattr(analysis, "patterns", None):
+            pat_text = "\nPattern: " + ", ".join(p.name_th for p in analysis.patterns[:2])
         reply = (
-            f"วิเคราะห์ {symbol}\n"
+            f"วิเคราะห์ {symbol} [{regime.regime}]\n"
             f"ราคา: ${analysis.price:.4f} ({analysis.change_24h:+.2f}%)\n"
             f"RSI: {analysis.rsi:.1f} | EMA: {analysis.ema_trend} | MACD: {analysis.macd_trend}\n"
-            f"Bollinger: {analysis.bb_signal} | Volatility: {analysis.volatility}\n"
+            f"Bollinger: {analysis.bb_signal} | Volatility: {analysis.volatility}{pat_text}\n"
             f"สัญญาณ: {signal.action} (conf {signal.confidence:.0%})\n"
             f"เหตุผล: {signal.reasoning[:220]}"
         )
@@ -784,9 +792,11 @@ class ChatHandler:
         if not analysis:
             return {"type": "error", "reply": f"ดึงข้อมูล {symbol} ไม่ได้"}
         portfolio = await self._trader._get_portfolio_summary()
-        signal = await self._trader._get_final_signal(analysis, portfolio)
+        from ..agent.market_regime import RegimeResult
+        regime = self._trader.regimes.get(symbol) or RegimeResult("RANGING", 0.5, 20.0, 2.0, 0.0, "")
+        signal = await self._trader._get_final_signal(analysis, portfolio, regime)
         if signal.action == action:
-            executed = await self._trader._execute_trade(symbol, signal, analysis)
+            executed = await self._trader._execute_trade(symbol, signal, analysis, regime)
             if executed:
                 return {"type": "trade", "reply": f"✓ ส่งคำสั่ง {action} {symbol} @ ${analysis.price:.4f} (conf {signal.confidence:.0%})\n{signal.reasoning[:180]}"}
             return {"type": "info", "reply": f"AI เห็นด้วยกับ {action} {symbol} แต่ไม่ execute (ติด risk limit / เงินไม่พอ / มี position อยู่แล้ว)"}
@@ -1030,4 +1040,84 @@ async def set_active_exchange(data: Dict[str, str]):
     settings.set(name, "exchanges", "active")
     settings.save()
     return {"active": name}
+
+
+# ─── Autotrade Intelligence Endpoints ─────────────────────────
+
+@router.get("/regimes")
+async def get_market_regimes():
+    """GET /api/regimes — current market regime for each tracked symbol."""
+    if not _trader:
+        return {}
+    return {
+        sym: {
+            "regime":     r.regime,
+            "confidence": round(r.confidence, 2),
+            "adx":        round(r.adx, 1),
+            "atr_pct":    round(r.atr_pct, 2),
+            "trend_slope": round(r.trend_slope, 4),
+            "detail":     r.detail,
+        }
+        for sym, r in _trader.regimes.items()
+    }
+
+
+@router.get("/risk")
+async def get_risk_state():
+    """GET /api/risk — portfolio risk engine state (drawdown, heat, circuit breaker)."""
+    if not _trader:
+        return {}
+    return _trader.risk_summary
+
+
+@router.get("/rl/stats")
+async def get_rl_stats():
+    """GET /api/rl/stats — Reinforcement Learning bandit state per regime."""
+    if not _trader:
+        return {}
+    stats = _trader._rl.stats
+    arm_data = {}
+    for regime in ["BULL_TREND", "BEAR_TREND", "RANGING", "VOLATILE", "CRASH"]:
+        arm_data[regime] = _trader._rl.get_arm_stats(regime)
+        arm_data[regime]["best_strategy"] = _trader._rl.select_strategy(regime)
+    return {**stats, "arms": arm_data}
+
+
+@router.get("/patterns")
+async def get_chart_patterns(symbol: str = "BTC/USDT"):
+    """GET /api/patterns?symbol=BTC/USDT — detected chart patterns for symbol."""
+    if not _trader:
+        raise HTTPException(503, "Trader not running")
+    analysis = _trader.analyses.get(symbol)
+    if not analysis:
+        analysis = await _trader.analyze_symbol(symbol)
+    if not analysis:
+        raise HTTPException(503, f"No data for {symbol}")
+    patterns = getattr(analysis, "patterns", [])
+    return {
+        "symbol":  symbol,
+        "count":   len(patterns),
+        "summary": getattr(analysis, "pattern_summary", ""),
+        "patterns": [
+            {
+                "name":           p.name,
+                "name_th":        p.name_th,
+                "type":           p.pattern_type,
+                "signal":         p.signal,
+                "confidence":     round(p.confidence, 2),
+                "description":    p.description,
+                "description_th": p.description_th,
+            }
+            for p in patterns
+        ],
+    }
+
+
+@router.get("/sizer/stats")
+async def get_sizer_stats():
+    """GET /api/sizer/stats — Kelly Criterion win-rate stats per symbol."""
+    if not _trader:
+        return {}
+    symbols = settings.symbols
+    return {sym: _trader._sizer.stats_for(sym) for sym in symbols}
 

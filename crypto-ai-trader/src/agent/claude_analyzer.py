@@ -260,6 +260,15 @@ class ClaudeAnalyzer:
         )
 
     def _initial_prompt(self, analysis: MarketAnalysis, portfolio: dict) -> str:
+        # Chart patterns section
+        pattern_text = ""
+        if getattr(analysis, "patterns", None):
+            lines = [f"  • {p.name_th} ({p.name}): signal={p.signal} conf={p.confidence:.0%} — {p.description_th}"
+                     for p in analysis.patterns]
+            pattern_text = "\nDetected chart patterns:\n" + "\n".join(lines)
+        elif getattr(analysis, "pattern_summary", ""):
+            pattern_text = f"\nChart patterns: {analysis.pattern_summary}"
+
         return f"""Analyze {analysis.symbol} and decide BUY / SELL / HOLD.
 
 Snapshot (15m timeframe):
@@ -270,7 +279,7 @@ Snapshot (15m timeframe):
 - Bollinger position: {analysis.bb_position:.2f} [{analysis.bb_signal}]
 - ATR: {analysis.atr_pct:.2f}% [{analysis.volatility}] | VWAP: price is {analysis.price_vs_vwap}
 - Volume ratio: {analysis.volume_ratio:.2f}x [{analysis.volume_signal}]
-- Rule-based signal: {analysis.overall_signal} (strength {analysis.signal_strength:.2f})
+- Rule-based signal: {analysis.overall_signal} (strength {analysis.signal_strength:.2f}){pattern_text}
 
 Portfolio: cash {portfolio.get('cash_usdt', 0):.2f} USDT | total {portfolio.get('total_value', 0):.2f} USDT | open positions {portfolio.get('open_positions', 0)}
 
