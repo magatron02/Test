@@ -111,7 +111,6 @@ class AITrader:
             "last_signal": self._last_signal_info,
             "open_positions": len(self._open_trades),
             "ext_signals": self._ext_signals,
-            "quote_currency": self._exchange.quote_currency,
         }
 
     async def _broadcast(self, event: str, data: dict):

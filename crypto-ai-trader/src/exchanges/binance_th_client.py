@@ -96,14 +96,19 @@ class BinanceTHExchange(BaseExchange):
     # ------------------------------------------------------------------ #
 
     async def _thb_rate(self) -> float:
-        """USDT/THB rate from Binance global (approx 34)."""
+        """USDT/THB rate from Binance global, cached 30 s."""
+        now = time.time()
+        if hasattr(self, "_rate_cache") and now - self._rate_cache[1] < 30:
+            return self._rate_cache[0]
+        rate = 34.0
         try:
             r = await self._pub().get(f"{API_COM}/ticker/price", params={"symbol": "USDTTHB"})
             if r.status_code == 200:
-                return float(r.json().get("price", 34.0))
+                rate = float(r.json().get("price", 34.0))
         except Exception:
             pass
-        return 34.0
+        self._rate_cache = (rate, now)
+        return rate
 
     async def get_ticker(self, symbol: str) -> Ticker:
         th_sym = _to_th_symbol(symbol)
