@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from urllib.parse import urlencode
 
-import aiohttp
+import httpx
 
 from .base import Balance, BaseExchange, OHLCV, Order, Ticker
 from ..core.config import settings
@@ -18,18 +18,17 @@ BINANCE_TH_BASE = "https://api.binance.th"
 API_V1 = f"{BINANCE_TH_BASE}/api/v1"
 
 # Symbol mapping: our internal format → Binance TH format
-# Binance TH trades against THB (e.g. BTCTHB, ETHTHB)
 SYMBOL_MAP = {
-    "BTC/THB":  "BTCTHB",
-    "ETH/THB":  "ETHTHB",
-    "BNB/THB":  "BNBTHB",
-    "XRP/THB":  "XRPTHB",
-    "SOL/THB":  "SOLTHB",
-    "USDT/THB": "USDTTHB",
-    "ADA/THB":  "ADATHB",
-    "DOGE/THB": "DOGETHB",
-    "MATIC/THB":"MATICTHB",
-    "DOT/THB":  "DOTTHB",
+    "BTC/THB":   "BTCTHB",
+    "ETH/THB":   "ETHTHB",
+    "BNB/THB":   "BNBTHB",
+    "XRP/THB":   "XRPTHB",
+    "SOL/THB":   "SOLTHB",
+    "USDT/THB":  "USDTTHB",
+    "ADA/THB":   "ADATHB",
+    "DOGE/THB":  "DOGETHB",
+    "MATIC/THB": "MATICTHB",
+    "DOT/THB":   "DOTTHB",
 }
 
 TIMEFRAME_MAP = {
@@ -40,15 +39,11 @@ TIMEFRAME_MAP = {
 
 
 def _to_th_symbol(symbol: str) -> str:
-    """Convert 'BTC/THB' → 'BTCTHB'."""
-    if symbol in SYMBOL_MAP:
-        return SYMBOL_MAP[symbol]
-    # Fallback: strip slash
-    return symbol.replace("/", "")
+    return SYMBOL_MAP.get(symbol, symbol.replace("/", ""))
 
 
 class BinanceTHExchange(BaseExchange):
-    """Binance TH (Thailand) exchange — trades THB pairs via /api/v1/ endpoints."""
+    """Binance TH exchange — THB pairs via /api/v1/ endpoints, uses httpx for system DNS."""
 
     name = "binance_th"
     quote_currency = "THB"
@@ -57,18 +52,16 @@ class BinanceTHExchange(BaseExchange):
         cfg = settings.get("exchanges", "binance_th") or {}
         self._api_key = cfg.get("api_key", "")
         self._api_secret = cfg.get("api_secret", "")
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._client: Optional[httpx.AsyncClient] = None
 
-    async def _get_session(self) -> aiohttp.ClientSession:
-        if self._session is None or self._session.closed:
-            resolver = aiohttp.AsyncResolver(nameservers=["8.8.8.8", "1.1.1.1"])
-            connector = aiohttp.TCPConnector(resolver=resolver)
-            self._session = aiohttp.ClientSession(
-                connector=connector,
+    def _get_client(self) -> httpx.AsyncClient:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(
                 headers={"X-MBX-APIKEY": self._api_key},
-                timeout=aiohttp.ClientTimeout(total=15),
+                timeout=httpx.Timeout(15.0),
+                follow_redirects=True,
             )
-        return self._session
+        return self._client
 
     def _sign(self, params: dict) -> str:
         query = urlencode(params)
@@ -79,21 +72,17 @@ class BinanceTHExchange(BaseExchange):
         ).hexdigest()
 
     async def close(self):
-        if self._session and not self._session.closed:
-            await self._session.close()
+        if self._client and not self._client.is_closed:
+            await self._client.aclose()
 
     async def get_ticker(self, symbol: str) -> Ticker:
         th_sym = _to_th_symbol(symbol)
-        session = await self._get_session()
-        async with session.get(
-            f"{API_V1}/ticker/24hr",
-            params={"symbol": th_sym},
-        ) as r:
-            data = await r.json()
-
+        client = self._get_client()
+        r = await client.get(f"{API_V1}/ticker/24hr", params={"symbol": th_sym})
+        r.raise_for_status()
+        data = r.json()
         if isinstance(data, dict) and "code" in data:
             raise ValueError(f"Binance TH ticker error: {data}")
-
         return Ticker(
             symbol=symbol,
             price=float(data["lastPrice"]),
@@ -106,16 +95,12 @@ class BinanceTHExchange(BaseExchange):
     async def get_ohlcv(self, symbol: str, timeframe: str = "5m", limit: int = 100) -> List[OHLCV]:
         th_sym = _to_th_symbol(symbol)
         tf = TIMEFRAME_MAP.get(timeframe, "5m")
-        session = await self._get_session()
-        async with session.get(
-            f"{API_V1}/klines",
-            params={"symbol": th_sym, "interval": tf, "limit": limit},
-        ) as r:
-            data = await r.json()
-
+        client = self._get_client()
+        r = await client.get(f"{API_V1}/klines", params={"symbol": th_sym, "interval": tf, "limit": limit})
+        r.raise_for_status()
+        data = r.json()
         if isinstance(data, dict) and "code" in data:
             raise ValueError(f"Binance TH klines error: {data}")
-
         return [
             OHLCV(
                 timestamp=datetime.fromtimestamp(row[0] / 1000),
@@ -131,13 +116,12 @@ class BinanceTHExchange(BaseExchange):
     async def get_balance(self) -> Dict[str, Balance]:
         params = {"timestamp": int(time.time() * 1000)}
         params["signature"] = self._sign(params)
-        session = await self._get_session()
-        async with session.get(f"{API_V1}/account", params=params) as r:
-            data = await r.json()
-
+        client = self._get_client()
+        r = await client.get(f"{API_V1}/account", params=params)
+        r.raise_for_status()
+        data = r.json()
         if "code" in data:
             raise ValueError(f"Binance TH account error: {data.get('msg', data)}")
-
         return {
             b["asset"]: Balance(
                 b["asset"],
@@ -154,20 +138,19 @@ class BinanceTHExchange(BaseExchange):
     ) -> Order:
         th_sym = _to_th_symbol(symbol)
         params = {
-            "symbol": th_sym,
-            "side": side.upper(),
-            "type": "MARKET",
-            "quantity": amount,
+            "symbol":    th_sym,
+            "side":      side.upper(),
+            "type":      "MARKET",
+            "quantity":  amount,
             "timestamp": int(time.time() * 1000),
         }
         params["signature"] = self._sign(params)
-        session = await self._get_session()
-        async with session.post(f"{API_V1}/order", params=params) as r:
-            data = await r.json()
-
+        client = self._get_client()
+        r = await client.post(f"{API_V1}/order", params=params)
+        r.raise_for_status()
+        data = r.json()
         if "code" in data and int(data["code"]) < 0:
             raise ValueError(f"Binance TH order error: {data.get('msg', data)}")
-
         fills = data.get("fills", [])
         exec_price = float(fills[0]["price"]) if fills else 0.0
         return Order(
