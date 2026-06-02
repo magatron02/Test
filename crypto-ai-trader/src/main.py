@@ -31,9 +31,18 @@ WEB_DIR = (Path(_sys._MEIPASS) / "src" / "web") if getattr(_sys, 'frozen', False
 
 app = FastAPI(title=settings.app_name, version="1.0.0")
 
+# CORS is restricted to the localhost origins this app is served from.
+# The frontend uses same-origin relative URLs, so this does NOT affect the
+# dashboard (even when reached via a LAN IP — that's still same-origin).
+# A wildcard here would let any website the user visits read /api/auth/token
+# cross-origin and then drive authenticated mutations (settings, live trades).
+_port = settings.app_port
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        f"http://localhost:{_port}",
+        f"http://127.0.0.1:{_port}",
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -1,4 +1,5 @@
 import asyncio
+import copy
 import csv
 import io
 import logging
@@ -274,7 +275,10 @@ async def get_model_history(limit: int = 30):
 
 @router.get("/settings")
 async def get_settings():
-    cfg = settings._cfg.copy()
+    # Deep copy — a shallow copy shares the nested dicts with settings._cfg, so
+    # masking below would overwrite the real in-memory keys with "****" and a
+    # later settings.save() would persist that corruption (losing saved API keys).
+    cfg = copy.deepcopy(settings._cfg)
     # mask API keys
     for ex in cfg.get("exchanges", {}).values():
         if isinstance(ex, dict):
@@ -285,6 +289,10 @@ async def get_settings():
     if "ai" in cfg and "claude" in cfg["ai"]:
         key = cfg["ai"]["claude"].get("api_key", "")
         cfg["ai"]["claude"]["api_key"] = key[:8] + "****" if key else ""
+    # Never expose the auth token in the settings dump. The frontend reads it
+    # via the same-origin GET /api/auth/token endpoint instead.
+    if isinstance(cfg.get("app"), dict) and cfg["app"].get("api_token"):
+        cfg["app"]["api_token"] = "****"
     return cfg
 
 
