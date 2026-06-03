@@ -13,6 +13,7 @@ import logging
 from typing import Optional
 
 from .market_analyzer import MarketAnalysis, analyze
+from .memory_manager import MemoryManager
 from .strategy_manager import TradingSignal
 from ..core.config import settings
 from ..core.database import SessionLocal, Trade
@@ -25,16 +26,19 @@ SYSTEM_PROMPT = """You are an expert crypto trading analyst operating an automat
 Your job: decide BUY, SELL, or HOLD for one symbol per analysis cycle.
 
 You have tools to gather context before deciding. Use them deliberately:
+- get_ai_memory: recall past trade outcomes and analysis reasoning stored in long-term memory. Call this FIRST to avoid repeating past mistakes and to recognise proven patterns.
 - get_multi_timeframe: pull indicators across 5m / 15m / 1h / 4h to confirm the trend on multiple horizons before committing. A signal that only shows on one timeframe is weak.
 - get_recent_trades: review how recent trades on this symbol played out, so you learn from wins/losses instead of repeating mistakes.
 - get_portfolio_state: check cash, open positions, and today's PnL before sizing risk. Never recommend BUY if cash is thin or daily loss limits are near.
 
 Method:
-1. Start from the rule-based signal and indicators provided.
-2. Call tools to confirm or refute that read across timeframes and against recent outcomes.
-3. Weigh confluence: align trend (EMA/MACD), momentum (RSI), volatility (ATR), and volume.
-4. Be conservative — when timeframes disagree or volatility is high without direction, prefer HOLD.
-5. Finish by calling submit_trading_decision exactly once with your final call.
+1. Call get_ai_memory to recall what happened in similar past setups for this symbol.
+2. Start from the rule-based signal and indicators provided.
+3. Call tools to confirm or refute that read across timeframes and against recent outcomes.
+4. Weigh confluence: align trend (EMA/MACD), momentum (RSI), volatility (ATR), and volume.
+5. If memory shows a pattern that matches current conditions — weight it heavily.
+6. Be conservative — when timeframes disagree or volatility is high without direction, prefer HOLD.
+7. Finish by calling submit_trading_decision exactly once with your final call.
 
 Risk discipline:
 - stop_loss_pct and take_profit_pct must reflect current volatility (wider stops in high ATR).
@@ -42,6 +46,20 @@ Risk discipline:
 - A HOLD is a valid, often correct, decision. Capital preservation beats forced trades."""
 
 TOOLS = [
+    {
+        "name": "get_ai_memory",
+        "description": "Recall past trade outcomes and AI analysis reasoning stored in long-term memory for this symbol. Use FIRST to learn from historical patterns before forming your own view.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "context": {
+                    "type": "string",
+                    "description": "Current market context to focus the memory search (e.g. 'RSI oversold, MACD bullish crossover').",
+                }
+            },
+            "required": [],
+        },
+    },
     {
         "name": "get_multi_timeframe",
         "description": "Get technical indicators (RSI, MACD, EMA trend, Bollinger position, ATR, VWAP) for the symbol across multiple timeframes (5m, 15m, 1h, 4h). Use to confirm trend alignment before deciding.",
@@ -98,6 +116,7 @@ class ClaudeAnalyzer:
     def __init__(self, exchange=None):
         self._client = None
         self._exchange = exchange  # injected by AITrader for tool execution
+        self._memory = MemoryManager()
 
     def set_exchange(self, exchange):
         self._exchange = exchange
@@ -114,6 +133,8 @@ class ClaudeAnalyzer:
     # ── tool execution ───────────────────────────────────────────────────
     async def _exec_tool(self, name: str, tool_input: dict, analysis: MarketAnalysis) -> str:
         try:
+            if name == "get_ai_memory":
+                return await self._tool_ai_memory(analysis.symbol, tool_input.get("context", ""))
             if name == "get_multi_timeframe":
                 return await self._tool_multi_timeframe(analysis, tool_input.get("timeframes"))
             if name == "get_recent_trades":
@@ -124,6 +145,12 @@ class ClaudeAnalyzer:
         except Exception as e:
             logger.warning(f"Tool {name} failed: {e}")
             return json.dumps({"error": str(e)})
+
+    async def _tool_ai_memory(self, symbol: str, context: str) -> str:
+        memories = await self._memory.recall(symbol, context=context)
+        if not memories:
+            return json.dumps({"status": "no_memory", "message": "No past records found for this symbol yet."})
+        return json.dumps({"status": "ok", "count": len(memories), "memories": memories})
 
     async def _tool_multi_timeframe(self, analysis: MarketAnalysis, timeframes) -> str:
         tfs = timeframes or ["5m", "15m", "1h", "4h"]

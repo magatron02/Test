@@ -6,6 +6,7 @@ from typing import Dict, List, Optional, Tuple
 from .claude_analyzer import ClaudeAnalyzer
 from .market_analyzer import MarketAnalysis, analyze
 from .market_signals import get_fear_greed, get_funding_rates
+from .memory_manager import MemoryManager
 from .strategy_manager import StrategyManager, TradingSignal
 from .trainer import AITrainer
 from ..core.config import settings
@@ -35,6 +36,7 @@ class AITrader:
         self._strategy = StrategyManager()
         self._trainer = AITrainer()
         self._claude = ClaudeAnalyzer(exchange=exchange)
+        self._memory = MemoryManager()
         self._running = False
         self._paused = False                       # kill-switch: blocks NEW entries (exits still run)
         self._analyses: Dict[str, MarketAnalysis] = {}
@@ -210,6 +212,16 @@ class AITrader:
             else:
                 sig = rule_sig
 
+        # Save analysis to long-term memory (fire-and-forget)
+        if sig.action in ("BUY", "SELL"):
+            asyncio.ensure_future(self._memory.add_analysis(
+                symbol=symbol,
+                signal=sig.action,
+                confidence=sig.confidence,
+                reasoning=sig.reasoning or "",
+                price=analysis.price,
+            ))
+
         return sig
 
     async def _execute_trade(self, symbol: str, signal: TradingSignal, analysis: MarketAnalysis, force: bool = False) -> bool:
@@ -376,7 +388,14 @@ class AITrader:
 
             self._trainer.update_outcome(trade["trade_id"], pnl_pct)
             self._daily_pnl += pnl
+            holding_h = (datetime.utcnow() - trade.get("opened_at", datetime.utcnow())).total_seconds() / 3600
             del self._open_trades[symbol]
+
+            # Save outcome to long-term memory
+            asyncio.ensure_future(self._memory.add_outcome(
+                symbol, side="buy", pnl_pct=pnl_pct, reason=reason,
+                holding_hours=holding_h, entry=entry, exit_price=order.price,
+            ))
 
             await self._broadcast("trade_closed", {
                 "symbol": symbol, "reason": reason,
