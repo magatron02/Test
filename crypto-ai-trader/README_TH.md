@@ -1,4 +1,4 @@
-# Aiterra v1.0.0
+# Lunai v1.0.0
 
 โปรแกรม AI เทรด Crypto อัตโนมัติ แบบ Portable — copy folder ไปเครื่องไหนก็ใช้ได้
 
