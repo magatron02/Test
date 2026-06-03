@@ -243,7 +243,7 @@ async def set_strategy(data: Dict[str, str]):
 @router.post("/ai-model")
 async def set_ai_model(data: Dict[str, str]):
     model = data.get("model", "hybrid")
-    valid = ("claude", "rule_based", "ml", "hybrid")
+    valid = ("claude", "rule_based", "ml", "hybrid", "multi_model")
     if model not in valid:
         raise HTTPException(400, f"Model must be one of {valid}")
     settings.set(model, "ai", "default_model")
@@ -1169,4 +1169,67 @@ async def get_analytics(symbol: Optional[str] = None, days: int = 30):
 
     metrics = compute_metrics(trade_dicts, equity, initial)
     return {**metrics, "symbol": symbol, "days": days, "source": "db"}
+
+
+@router.get("/sentiment")
+async def get_sentiment(symbol: str = "BTC/USDT"):
+    """GET /api/sentiment — Fear & Greed index, funding rate, and open interest.
+
+    symbol: crypto pair, e.g. BTC/USDT (used for funding rate fetch)
+    """
+    from ..data.sentiment import get_fear_greed, get_funding_rate, get_open_interest
+
+    binance_symbol = symbol.replace("/", "")  # BTC/USDT → BTCUSDT
+
+    exchange = _trader._exchange if _trader else None
+
+    # Gather concurrently; funding rate needs the exchange client
+    fng_task = get_fear_greed()
+    oi_task  = get_open_interest(binance_symbol)
+
+    if exchange:
+        funding_task = get_funding_rate(exchange, symbol)
+        fng, oi, funding = await asyncio.gather(fng_task, oi_task, funding_task, return_exceptions=True)
+    else:
+        fng, oi = await asyncio.gather(fng_task, oi_task, return_exceptions=True)
+        funding = {"symbol": symbol, "funding_rate": None, "error": "exchange unavailable"}
+
+    fng     = fng     if not isinstance(fng,     Exception) else {"value": None, "label": None, "error": str(fng)}
+    oi      = oi      if not isinstance(oi,      Exception) else {"open_interest_usdt": None, "error": str(oi)}
+    funding = funding if not isinstance(funding, Exception) else {"funding_rate": None, "error": str(funding)}
+
+    # Derive trading bias from Fear & Greed
+    fng_value = fng.get("value")
+    if fng_value is None:
+        bias = "NEUTRAL"
+    elif fng_value <= 25:
+        bias = "CONTRARIAN_BUY"
+    elif fng_value <= 45:
+        bias = "CAUTIOUS_BUY"
+    elif fng_value <= 55:
+        bias = "NEUTRAL"
+    elif fng_value <= 75:
+        bias = "CAUTIOUS_SELL"
+    else:
+        bias = "CONTRARIAN_SELL"
+
+    return {
+        "symbol": symbol,
+        "fear_greed": {
+            "value":        fng.get("value"),
+            "label":        fng.get("label"),
+            "trading_bias": bias,
+            "error":        fng.get("error"),
+        },
+        "funding_rate": {
+            "rate":         funding.get("funding_rate"),
+            "rate_pct":     funding.get("funding_rate_pct"),
+            "next_funding": funding.get("next_funding_time"),
+            "error":        funding.get("error"),
+        },
+        "open_interest": {
+            "usdt":  oi.get("open_interest_usdt"),
+            "error": oi.get("error"),
+        },
+    }
 

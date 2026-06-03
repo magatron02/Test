@@ -251,6 +251,9 @@ class AITrader:
             sig = self._strategy.get_signal(analysis)
         elif ai_model == "ml" and ml_signal:
             sig = ml_signal
+        elif ai_model == "multi_model":
+            from .multi_model import multi_model_signal
+            sig = await multi_model_signal(analysis)
         else:  # hybrid or fallback — let RL guide the primary strategy
             # RL picks the strategy best suited to the current regime; dispatch
             # to that single strategy instead of the blended hybrid (which lets

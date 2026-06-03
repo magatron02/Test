@@ -11,6 +11,7 @@ from .claude_analyzer import ClaudeAnalyzer
 from .risk_analytics import compute_metrics
 from .smc_detector import analyse_smc, SMCResult
 from .indicators_extra import ichimoku, supertrend, stoch_rsi, aroon
+from .multi_model import multi_model_signal
 
 __all__ = [
     "AITrader",
@@ -26,4 +27,5 @@ __all__ = [
     "compute_metrics",
     "analyse_smc", "SMCResult",
     "ichimoku", "supertrend", "stoch_rsi", "aroon",
+    "multi_model_signal",
 ]

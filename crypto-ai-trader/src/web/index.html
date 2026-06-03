@@ -616,6 +616,24 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
     </div>
   </div>
 
+  <!-- Sentiment & On-chain Row -->
+  <div class="row g-3 mb-3" id="sentimentRow">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-emoji-smile me-2"></i>Market Sentiment &amp; On-chain <span class="text-muted" style="font-size:0.7rem;font-weight:400">— Fear &amp; Greed · Funding Rate · Open Interest</span></span>
+          <div class="d-flex gap-2 align-items-center">
+            <span class="text-muted" style="font-size:0.65rem" id="sentimentUpdated">—</span>
+            <button class="btn btn-outline-secondary btn-sm" style="padding:1px 8px;font-size:0.7rem" onclick="fetchSentiment()">↻</button>
+          </div>
+        </div>
+        <div class="card-body p-2" id="sentimentPanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Signal Funnel + PNL Today + Agent Status -->
   <div class="row g-3 mb-3">
     <!-- Signal Funnel -->
@@ -2003,6 +2021,123 @@ async function fetchAnalytics(days = 30) {
     const el = document.getElementById('analyticsUpdated');
     if (el) el.textContent = new Date().toLocaleTimeString('th', {hour:'2-digit', minute:'2-digit'});
   } catch {}
+}
+
+let liveSentiment = {};
+async function fetchSentiment(symbol) {
+  const sym = symbol || (Object.keys(allPrices)[0]) || 'BTC/USDT';
+  try {
+    const r = await fetch('/api/sentiment?symbol=' + encodeURIComponent(sym));
+    liveSentiment = await r.json();
+    renderSentimentPanel();
+    const el = document.getElementById('sentimentUpdated');
+    if (el) el.textContent = new Date().toLocaleTimeString('th', {hour:'2-digit', minute:'2-digit'});
+  } catch {}
+}
+
+function _fngColor(v) {
+  if (v == null) return 'var(--text-muted)';
+  if (v <= 25) return '#e74c3c';
+  if (v <= 45) return '#e67e22';
+  if (v <= 55) return 'var(--text)';
+  if (v <= 75) return '#27ae60';
+  return '#2980b9';
+}
+
+function _biasLabel(bias) {
+  const map = {
+    'CONTRARIAN_BUY':  {label:'Strong Buy Zone', cls:'text-success'},
+    'CAUTIOUS_BUY':    {label:'Cautious Buy',     cls:'text-success'},
+    'NEUTRAL':         {label:'Neutral',           cls:'text-secondary'},
+    'CAUTIOUS_SELL':   {label:'Cautious Sell',     cls:'text-warning'},
+    'CONTRARIAN_SELL': {label:'Overbought Zone',   cls:'text-danger'},
+  };
+  const m = map[bias] || {label: bias || '—', cls: 'text-secondary'};
+  return `<span class="${m.cls}">${m.label}</span>`;
+}
+
+function _fundingColor(rate) {
+  if (rate == null) return 'var(--text-muted)';
+  if (rate > 0.001) return 'var(--accent-red)';   // very high positive → longs pay lots
+  if (rate > 0)     return 'var(--accent-buy)';
+  return '#e67e22'; // negative → shorts pay (bullish bias)
+}
+
+function renderSentimentPanel() {
+  const panel = document.getElementById('sentimentPanel');
+  if (!panel) return;
+  const s = liveSentiment;
+  if (!s || !s.fear_greed) {
+    panel.innerHTML = '<div class="text-muted text-center small py-2">รอข้อมูล...</div>';
+    return;
+  }
+
+  const fg = s.fear_greed || {};
+  const fr = s.funding_rate || {};
+  const oi = s.open_interest || {};
+  const fgv = fg.value;
+  const fgPct = fgv != null ? Math.round(fgv) : null;
+
+  // Gauge arc (SVG)
+  const gaugeAngle = fgv != null ? (fgv / 100) * 180 - 90 : -90;
+  const gaugeSvg = `
+    <svg width="120" height="65" viewBox="0 0 120 65">
+      <path d="M10,60 A50,50 0 0,1 110,60" fill="none" stroke="#e74c3c" stroke-width="8" stroke-dasharray="50 157"/>
+      <path d="M10,60 A50,50 0 0,1 110,60" fill="none" stroke="#e67e22" stroke-width="8" stroke-dasharray="30 157" stroke-dashoffset="-50"/>
+      <path d="M10,60 A50,50 0 0,1 110,60" fill="none" stroke="#95a5a6" stroke-width="8" stroke-dasharray="20 157" stroke-dashoffset="-80"/>
+      <path d="M10,60 A50,50 0 0,1 110,60" fill="none" stroke="#27ae60" stroke-width="8" stroke-dasharray="30 157" stroke-dashoffset="-100"/>
+      <path d="M10,60 A50,50 0 0,1 110,60" fill="none" stroke="#2980b9" stroke-width="8" stroke-dasharray="27 157" stroke-dashoffset="-130"/>
+      ${fgv != null ? `<line x1="60" y1="60" x2="${60 + 40*Math.cos((gaugeAngle-90)*Math.PI/180)}" y2="${60 + 40*Math.sin((gaugeAngle-90)*Math.PI/180)}" stroke="white" stroke-width="2" stroke-linecap="round"/>` : ''}
+      <circle cx="60" cy="60" r="4" fill="white"/>
+    </svg>`;
+
+  const fgLabel = fg.label || '—';
+  const bias = fg.trading_bias || 'NEUTRAL';
+
+  // Funding rate display
+  const frRate = fr.rate_pct != null ? (fr.rate_pct > 0 ? '+' : '') + fr.rate_pct.toFixed(4) + '%' : '—';
+  const frColor = _fundingColor(fr.rate);
+  const frNote = fr.rate != null
+    ? (fr.rate > 0.001 ? 'Longs pay heavily → bearish pressure' : fr.rate > 0 ? 'Longs pay (normal)' : 'Shorts pay → bullish pressure')
+    : '';
+
+  // OI display
+  const oiVal = oi.usdt != null ? (oi.usdt >= 1e9 ? (oi.usdt/1e9).toFixed(2)+'B' : (oi.usdt/1e6).toFixed(0)+'M') + ' USDT' : '—';
+
+  panel.innerHTML = `
+    <div class="d-flex flex-wrap gap-3 align-items-center py-1 px-2">
+      <!-- Fear & Greed Gauge -->
+      <div class="text-center" style="min-width:130px">
+        ${gaugeSvg}
+        <div style="font-family:var(--font-mono);font-size:1.5rem;font-weight:700;color:${_fngColor(fgv)};line-height:1">${fgPct ?? '—'}</div>
+        <div style="font-size:0.7rem;color:var(--text-muted)">${fgLabel}</div>
+        <div style="font-size:0.65rem;margin-top:2px">${_biasLabel(bias)}</div>
+      </div>
+      <!-- Metrics -->
+      <div class="d-flex flex-wrap gap-3 flex-grow-1">
+        <div style="min-width:140px">
+          <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em">Funding Rate (${s.symbol || 'BTC/USDT'})</div>
+          <div style="font-family:var(--font-mono);font-size:1.1rem;font-weight:700;color:${frColor}">${frRate}</div>
+          <div style="font-size:0.6rem;color:var(--text-muted)">${frNote}</div>
+        </div>
+        <div style="min-width:140px">
+          <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em">Open Interest</div>
+          <div style="font-family:var(--font-mono);font-size:1.1rem;font-weight:700">${oiVal}</div>
+          <div style="font-size:0.6rem;color:var(--text-muted)">Binance perpetual futures</div>
+        </div>
+        <div style="min-width:200px;border-left:1px solid var(--border);padding-left:12px">
+          <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em">Interpretation</div>
+          <div style="font-size:0.7rem;line-height:1.5;margin-top:4px">
+            ${fgv != null && fgv <= 25 ? '<span style="color:#e74c3c">Extreme Fear: historically best time to accumulate</span>' :
+              fgv != null && fgv <= 45 ? '<span style="color:#e67e22">Fear: market oversold, consider cautious buys at key levels</span>' :
+              fgv != null && fgv <= 55 ? '<span style="color:var(--text-muted)">Neutral: no strong sentiment edge</span>' :
+              fgv != null && fgv <= 75 ? '<span style="color:#27ae60">Greed: market extended, tighten stops on new longs</span>' :
+              fgv != null ? '<span style="color:#e74c3c">Extreme Greed: historically risky to buy; watch for reversal</span>' :
+              '<span style="color:var(--text-muted)">No data</span>'}
+          </div>
+        </div>
+      </div>
+    </div>`;
 }
 
 function _metricCard(label, value, color, sub) {
@@ -3952,6 +4087,7 @@ async function init() {
   await fetchRiskState();
   await fetchPatterns(Object.keys(allPrices)[0] || 'BTC/USDT');
   await fetchAnalytics();
+  await fetchSentiment(Object.keys(allPrices)[0] || 'BTC/USDT');
   setInterval(fetchPrices, 5000);
   setInterval(fetchPortfolioStats, 10000);
   setInterval(fetchStats, 30000);
@@ -3964,6 +4100,7 @@ async function init() {
   setInterval(fetchRegimes, 15000);
   setInterval(fetchRiskState, 10000);
   setInterval(fetchAnalytics, 60000);
+  setInterval(() => fetchSentiment(Object.keys(allPrices)[0] || 'BTC/USDT'), 300000); // 5 min
   // E: Chart auto-refresh every 15 minutes
   setInterval(updateTradingChart, 15 * 60 * 1000);
 }
