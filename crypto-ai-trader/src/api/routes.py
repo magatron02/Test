@@ -1140,3 +1140,33 @@ async def get_sizer_stats():
     symbols = settings.symbols
     return {sym: _trader._sizer.stats_for(sym) for sym in symbols}
 
+
+@router.get("/analytics")
+async def get_analytics(symbol: Optional[str] = None, days: int = 30):
+    """GET /api/analytics — Sharpe, Sortino, Calmar, VaR, streaks from DB trade history."""
+    from ..agent.risk_analytics import compute_metrics
+
+    with SessionLocal() as db:
+        q = db.query(Trade).filter(Trade.status == "closed", Trade.pnl_pct.isnot(None))
+        if symbol:
+            q = q.filter(Trade.symbol == symbol)
+        cutoff = datetime.utcnow() - timedelta(days=days)
+        q = q.filter(Trade.closed_at >= cutoff)
+        trades_db = q.order_by(Trade.opened_at).all()
+
+    if not trades_db:
+        from ..agent.risk_analytics import _empty
+        return {**_empty(), "symbol": symbol, "days": days, "source": "db", "note": "no closed trades"}
+
+    trade_dicts = [{"pnl_pct": t.pnl_pct, "win": (t.pnl_pct or 0) > 0} for t in trades_db]
+
+    # Approximate equity curve from trade outcomes
+    initial = 10_000.0
+    equity  = [initial]
+    for t in trades_db:
+        last    = equity[-1]
+        equity.append(last * (1 + (t.pnl_pct or 0) / 100))
+
+    metrics = compute_metrics(trade_dicts, equity, initial)
+    return {**metrics, "symbol": symbol, "days": days, "source": "db"}
+

@@ -137,32 +137,38 @@ def _to_ohlcv(candles: List[dict]):
 # ── Rolling Kelly tracker ─────────────────────────────────────────────────────
 
 class _KellyTracker:
-    def __init__(self, fraction: float = 0.25, fallback: float = 0.02):
-        self.fraction = fraction
-        self.fallback = fallback
-        self.wins = 0
-        self.losses = 0
-        self.gain_sum = 0.0
-        self.loss_sum = 0.0
+    """Rolling Kelly sizer with Bayesian warm-start (matches PositionSizer logic)."""
+
+    PRIOR_N = 5
+    PRIOR_P = 0.55
+    PRIOR_B = 1.5
+
+    def __init__(self, fraction: float = 0.25):
+        self.fraction  = fraction
+        self.wins      = 0
+        self.losses    = 0
+        self.gain_sum  = 0.0
+        self.loss_sum  = 0.0
 
     def update(self, pnl_pct: float):
         if pnl_pct > 0:
-            self.wins += 1
+            self.wins     += 1
             self.gain_sum += pnl_pct
         else:
-            self.losses += 1
+            self.losses   += 1
             self.loss_sum += abs(pnl_pct)
 
     @property
     def fraction_for_trade(self) -> float:
-        total = self.wins + self.losses
-        if total < 10:
-            return self.fallback
-        p = self.wins / total
-        q = 1 - p
-        avg_win  = self.gain_sum / self.wins   if self.wins   > 0 else 0.01
-        avg_loss = self.loss_sum / self.losses if self.losses > 0 else 0.01
-        b = avg_win / avg_loss
+        P, B = self.PRIOR_P, self.PRIOR_B
+        bw = self.wins   + self.PRIOR_N * P
+        bl = self.losses + self.PRIOR_N * (1 - P)
+        bt = bw + bl
+        p  = bw / bt
+        q  = 1.0 - p
+        aw = ((self.gain_sum + self.PRIOR_N * P * B) / bw) if bw > 0 else B
+        al = ((self.loss_sum + self.PRIOR_N * (1 - P)) / bl) if bl > 0 else 1.0
+        b  = aw / al if al > 0 else B
         kelly = (p * b - q) / b
         return max(0.0, min(kelly * self.fraction, 0.15))
 
@@ -266,10 +272,10 @@ def _run_loop(
     initial_capital: float,
     mode: str = "basic",       # basic | hybrid | autotrade
     window_size: int = 80,
-) -> Tuple[dict, list, list]:
+) -> Tuple[dict, list, list, list]:
     """
     Core simulation loop shared by all modes.
-    Returns (metrics_dict, equity_list, trades_list).
+    Returns (metrics_dict, curve_list, trades_list, equity_raw).
     """
     capital = initial_capital
     equity  = [capital]
@@ -467,7 +473,7 @@ def _run_loop(
         "regime_stats":     regime_out,
         "pattern_stats":    pattern_out,
     }
-    return metrics, curve, trades
+    return metrics, curve, trades, list(equity)
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -514,9 +520,35 @@ def _build_result(
     data_source: str,
 ) -> dict:
     """Run all 3 modes and merge into one result."""
-    basic_m,  basic_curve,  basic_trades  = _run_loop(symbol, candles, tp_pct, sl_pct, initial_capital, "basic")
-    hybrid_m, hybrid_curve, hybrid_trades = _run_loop(symbol, candles, tp_pct, sl_pct, initial_capital, "hybrid")
-    ai_m,     ai_curve,     ai_trades     = _run_loop(symbol, candles, tp_pct, sl_pct, initial_capital, "autotrade")
+    from .risk_analytics import compute_metrics
+
+    basic_m,  basic_curve,  basic_trades,  basic_eq  = _run_loop(symbol, candles, tp_pct, sl_pct, initial_capital, "basic")
+    hybrid_m, hybrid_curve, hybrid_trades, hybrid_eq = _run_loop(symbol, candles, tp_pct, sl_pct, initial_capital, "hybrid")
+    ai_m,     ai_curve,     ai_trades,     ai_eq     = _run_loop(symbol, candles, tp_pct, sl_pct, initial_capital, "autotrade")
+
+    basic_analytics  = compute_metrics(basic_trades,  basic_eq,  initial_capital)
+    hybrid_analytics = compute_metrics(hybrid_trades, hybrid_eq, initial_capital)
+    ai_analytics     = compute_metrics(ai_trades,     ai_eq,     initial_capital)
+
+    def _mode_block(m, curve, analytics):
+        return {
+            "total_trades":     m["total_trades"],
+            "win_rate":         m["win_rate"],
+            "total_return_pct": m["total_return_pct"],
+            "sharpe":           analytics["sharpe"],
+            "sortino":          analytics["sortino"],
+            "calmar":           analytics["calmar"],
+            "var_95_pct":       analytics["var_95_pct"],
+            "max_drawdown_pct": m["max_drawdown_pct"],
+            "profit_factor":    analytics["profit_factor"],
+            "max_win_streak":   analytics["max_win_streak"],
+            "max_loss_streak":  analytics["max_loss_streak"],
+            "avg_win_pct":      analytics["avg_win_pct"],
+            "avg_loss_pct":     analytics["avg_loss_pct"],
+            "expectancy_pct":   analytics["expectancy_pct"],
+            "final_capital":    m["final_capital"],
+            "equity_curve":     curve,
+        }
 
     # Primary result = autotrade (full AI stack)
     result = {
@@ -531,41 +563,18 @@ def _build_result(
             "total_trades", "win_rate", "total_return_pct",
             "sharpe", "max_drawdown_pct", "initial_capital", "final_capital",
         )},
+        "analytics":     ai_analytics,
 
-        "equity_curve": ai_curve,
-        "trades":       ai_trades[-50:],
-        "regime_stats": ai_m["regime_stats"],
+        "equity_curve":  ai_curve,
+        "trades":        ai_trades[-50:],
+        "regime_stats":  ai_m["regime_stats"],
         "pattern_stats": ai_m["pattern_stats"],
 
-        # Side-by-side comparison
+        # Side-by-side comparison (full analytics per mode)
         "comparison": {
-            "basic": {
-                "total_trades":     basic_m["total_trades"],
-                "win_rate":         basic_m["win_rate"],
-                "total_return_pct": basic_m["total_return_pct"],
-                "sharpe":           basic_m["sharpe"],
-                "max_drawdown_pct": basic_m["max_drawdown_pct"],
-                "final_capital":    basic_m["final_capital"],
-                "equity_curve":     basic_curve,
-            },
-            "hybrid": {
-                "total_trades":     hybrid_m["total_trades"],
-                "win_rate":         hybrid_m["win_rate"],
-                "total_return_pct": hybrid_m["total_return_pct"],
-                "sharpe":           hybrid_m["sharpe"],
-                "max_drawdown_pct": hybrid_m["max_drawdown_pct"],
-                "final_capital":    hybrid_m["final_capital"],
-                "equity_curve":     hybrid_curve,
-            },
-            "autotrade": {
-                "total_trades":     ai_m["total_trades"],
-                "win_rate":         ai_m["win_rate"],
-                "total_return_pct": ai_m["total_return_pct"],
-                "sharpe":           ai_m["sharpe"],
-                "max_drawdown_pct": ai_m["max_drawdown_pct"],
-                "final_capital":    ai_m["final_capital"],
-                "equity_curve":     ai_curve,
-            },
+            "basic":      _mode_block(basic_m,  basic_curve,  basic_analytics),
+            "hybrid":     _mode_block(hybrid_m, hybrid_curve, hybrid_analytics),
+            "autotrade":  _mode_block(ai_m,     ai_curve,     ai_analytics),
         },
     }
     return result

@@ -57,14 +57,31 @@ class PositionSizer:
         losses = s.get("losses", 0)
         total  = wins + losses
 
-        if total < 10:
-            return self._fallback_risk_pct
+        # Bayesian warm-start: blend actual data with a weak prior (5-trade
+        # weight, 55% win rate, 1.5:1 win/loss → raw Kelly ≈ 25%) so cold-
+        # start positions are ~5% instead of the static 2% fallback.
+        PRIOR_N   = 5
+        PRIOR_P   = 0.55
+        PRIOR_B   = 1.5        # avg_win / avg_loss assumption
 
-        p = wins / total
-        q = 1.0 - p
-        avg_win  = s["gain_sum"] / wins   if wins   > 0 else 0.01
-        avg_loss = s["loss_sum"] / losses if losses > 0 else 0.01
-        b = avg_win / avg_loss
+        if total == 0:
+            # Fully prior-based
+            raw_kelly = (PRIOR_P * PRIOR_B - (1 - PRIOR_P)) / PRIOR_B
+            return max(0.0, raw_kelly * self._kelly_fraction)
+
+        # Once we have some data, blend actual stats with the prior
+        blended_wins    = wins   + PRIOR_N * PRIOR_P
+        blended_losses  = losses + PRIOR_N * (1 - PRIOR_P)
+        blended_total   = blended_wins + blended_losses
+        p  = blended_wins / blended_total
+        q  = 1.0 - p
+
+        avg_win  = ((s.get("gain_sum", 0.0) + PRIOR_N * PRIOR_P * PRIOR_B) /
+                    blended_wins)   if blended_wins  > 0 else PRIOR_B
+        avg_loss = ((s.get("loss_sum", 0.0) + PRIOR_N * (1 - PRIOR_P) * 1.0) /
+                    blended_losses) if blended_losses > 0 else 1.0
+        b = avg_win / avg_loss if avg_loss > 0 else PRIOR_B
+
         kelly = (p * b - q) / b
         return max(0.0, kelly * self._kelly_fraction)
 

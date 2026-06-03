@@ -598,6 +598,24 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
     </div>
   </div>
 
+  <!-- Risk Analytics Row -->
+  <div class="row g-3 mb-3" id="analyticsRow">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-bar-chart-steps me-2"></i>Risk Analytics <span class="text-muted" style="font-size:0.7rem;font-weight:400">— live trades</span></span>
+          <div class="d-flex gap-2 align-items-center">
+            <span class="text-muted" style="font-size:0.65rem" id="analyticsUpdated">—</span>
+            <button class="btn btn-outline-secondary btn-sm" style="padding:1px 8px;font-size:0.7rem" onclick="fetchAnalytics()">↻</button>
+          </div>
+        </div>
+        <div class="card-body p-2" id="analyticsPanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Signal Funnel + PNL Today + Agent Status -->
   <div class="row g-3 mb-3">
     <!-- Signal Funnel -->
@@ -1934,9 +1952,10 @@ async function fetchStatus() {
   } catch {}
 }
 
-let allRegimes = {};
-let riskState  = {};
-let allPatterns = {};
+let allRegimes   = {};
+let riskState    = {};
+let allPatterns  = {};
+let liveAnalytics = {};
 
 async function fetchPrices() {
   try {
@@ -1974,6 +1993,62 @@ async function fetchPatterns(symbol) {
     allPatterns[sym] = d;
     renderPatternPanel(sym);
   } catch {}
+}
+
+async function fetchAnalytics(days = 30) {
+  try {
+    const r = await fetch('/api/analytics?days=' + days);
+    liveAnalytics = await r.json();
+    renderAnalyticsPanel();
+    const el = document.getElementById('analyticsUpdated');
+    if (el) el.textContent = new Date().toLocaleTimeString('th', {hour:'2-digit', minute:'2-digit'});
+  } catch {}
+}
+
+function _metricCard(label, value, color, sub) {
+  return `<div class="text-center px-2" style="min-width:90px">
+    <div style="font-family:var(--font-mono);font-size:1.1rem;font-weight:700;color:${color}">${value}</div>
+    <div style="font-size:0.62rem;color:var(--text-muted);line-height:1.2">${label}</div>
+    ${sub ? `<div style="font-size:0.6rem;color:var(--text-muted)">${sub}</div>` : ''}
+  </div>`;
+}
+
+function renderAnalyticsPanel() {
+  const panel = document.getElementById('analyticsPanel');
+  if (!panel) return;
+  const a = liveAnalytics;
+  if (!a || !a.total_trades) {
+    panel.innerHTML = '<div class="text-muted text-center small py-2">ยังไม่มีข้อมูล Trade ที่ปิดแล้ว</div>';
+    return;
+  }
+  const pf = a.profit_factor >= 99 ? '∞' : a.profit_factor.toFixed(2);
+  const sharpeC  = a.sharpe  >= 1   ? 'var(--accent-buy)' : a.sharpe  >= 0 ? 'var(--text)' : 'var(--accent-red)';
+  const sortinoC = a.sortino >= 1   ? 'var(--accent-buy)' : a.sortino >= 0 ? 'var(--text)' : 'var(--accent-red)';
+  const calmarC  = a.calmar  >= 0.5 ? 'var(--accent-buy)' : a.calmar  >= 0 ? 'var(--text)' : 'var(--accent-red)';
+  const pfC      = a.profit_factor >= 1.5 ? 'var(--accent-buy)' : a.profit_factor >= 1 ? 'var(--text)' : 'var(--accent-red)';
+  const retC     = a.total_return_pct >= 0 ? 'var(--accent-buy)' : 'var(--accent-red)';
+  const varC     = 'var(--accent-red)';
+
+  panel.innerHTML = `
+    <div class="d-flex flex-wrap gap-1 justify-content-around py-1">
+      ${_metricCard('Sharpe Ratio', a.sharpe.toFixed(2), sharpeC, '≥1 ดี')}
+      ${_metricCard('Sortino Ratio', a.sortino.toFixed(2), sortinoC, 'downside only')}
+      ${_metricCard('Calmar Ratio', a.calmar.toFixed(2), calmarC, 'ret/maxDD')}
+      ${_metricCard('VaR 95%', a.var_95_pct.toFixed(1)+'%', varC, 'worst 5% day')}
+      ${_metricCard('Profit Factor', pf, pfC, '≥1.5 ดี')}
+      ${_metricCard('Max DD', a.max_drawdown_pct.toFixed(1)+'%', a.max_drawdown_pct < -10 ? 'var(--accent-red)' : 'var(--text-muted)', '')}
+      ${_metricCard('Expectancy', a.expectancy_pct.toFixed(2)+'%', a.expectancy_pct >= 0 ? 'var(--accent-buy)' : 'var(--accent-red)', 'per trade')}
+      ${_metricCard('Win Streak', a.max_win_streak, 'var(--accent-buy)', '')}
+      ${_metricCard('Loss Streak', a.max_loss_streak, a.max_loss_streak >= 5 ? 'var(--accent-red)' : 'var(--text-muted)', '')}
+      ${_metricCard('Win Rate', a.win_rate.toFixed(1)+'%', a.win_rate >= 55 ? 'var(--accent-buy)' : 'var(--text)', a.total_trades + ' trades')}
+      ${_metricCard('Total Return', (a.total_return_pct >= 0 ? '+' : '') + a.total_return_pct.toFixed(1)+'%', retC, '')}
+    </div>
+    <div class="d-flex justify-content-center gap-4 mt-1" style="font-size:0.68rem;color:var(--text-muted)">
+      <span>Avg Win <span style="color:var(--accent-buy);font-family:var(--font-mono)">+${a.avg_win_pct.toFixed(2)}%</span></span>
+      <span>Avg Loss <span style="color:var(--accent-red);font-family:var(--font-mono)">${a.avg_loss_pct.toFixed(2)}%</span></span>
+      <span>Gross P <span style="color:var(--accent-buy);font-family:var(--font-mono)">+${a.gross_profit_pct.toFixed(1)}%</span></span>
+      <span>Gross L <span style="color:var(--accent-red);font-family:var(--font-mono)">-${a.gross_loss_pct.toFixed(1)}%</span></span>
+    </div>`;
 }
 
 function renderRegimePanel() {
@@ -3275,22 +3350,45 @@ async function runBacktest() {
     document.getElementById('btDrawdown').textContent = d.max_drawdown_pct.toFixed(2) + '%';
     document.getElementById('btMetrics').style.display = '';
 
-    // ── 3-way comparison table ─────────────────────────────────────
+    // ── 3-way comparison table (full analytics) ───────────────────
     if (d.comparison) {
       const cmp = d.comparison;
       const fmtRet = (v) => `<span style="color:${v>=0?'#A8FF53':'#ff6b35'}">${v>=0?'+':''}${v.toFixed(2)}%</span>`;
+      const fmtN   = (v, dec=2, suffix='') => v == null ? '—' : v.toFixed(dec) + suffix;
+      const fmtPF  = (v) => v == null ? '—' : (v >= 99 ? '∞' : v.toFixed(2));
+      const pfColor = (v) => v >= 1.5 ? '#39d98a' : v >= 1 ? '#ccc' : '#ff6b35';
+      const srColor = (v) => v >= 1 ? '#39d98a' : v >= 0 ? '#ccc' : '#ff6b35';
+
+      // Update table headers to show all analytics columns
+      const thead = document.querySelector('#btCompareCard thead tr');
+      if (thead) thead.innerHTML = `
+        <th>Mode</th><th>Return</th><th>Win%</th>
+        <th title="Sharpe Ratio">Sharpe</th>
+        <th title="Sortino Ratio">Sortino</th>
+        <th title="Calmar Ratio">Calmar</th>
+        <th title="Value at Risk 95%">VaR 95%</th>
+        <th title="Profit Factor">P.Factor</th>
+        <th>MaxDD</th>
+        <th title="Max consecutive wins/losses">Streak W/L</th>
+        <th>Final $</th>`;
+
       const rows = [
-        {label:'🔵 Basic (EMA)', k:'basic', style:'color:#7cb9e8'},
-        {label:'🟡 Hybrid',      k:'hybrid', style:'color:#ffc107'},
+        {label:'🔵 Basic (EMA)', k:'basic',     style:'color:#7cb9e8'},
+        {label:'🟡 Hybrid',      k:'hybrid',    style:'color:#ffc107'},
         {label:'🟢 AI Autotrade',k:'autotrade', style:'color:#39d98a;font-weight:700'},
       ].map(({label, k, style}) => {
         const c = cmp[k] || {};
         return `<tr>
           <td style="${style}">${label}</td>
           <td>${fmtRet(c.total_return_pct||0)}</td>
-          <td>${(c.win_rate||0).toFixed(1)}%</td>
-          <td>${(c.sharpe||0).toFixed(2)}</td>
-          <td class="text-danger">${(c.max_drawdown_pct||0).toFixed(2)}%</td>
+          <td>${fmtN(c.win_rate,1,'%')}</td>
+          <td style="color:${srColor(c.sharpe||0)}">${fmtN(c.sharpe)}</td>
+          <td style="color:${srColor(c.sortino||0)}">${fmtN(c.sortino)}</td>
+          <td style="color:${srColor(c.calmar||0)}">${fmtN(c.calmar)}</td>
+          <td style="color:#ff6b35">${fmtN(c.var_95_pct,1,'%')}</td>
+          <td style="color:${pfColor(c.profit_factor||0)}">${fmtPF(c.profit_factor)}</td>
+          <td class="text-danger">${fmtN(c.max_drawdown_pct,2,'%')}</td>
+          <td style="font-size:0.75rem"><span style="color:#39d98a">${c.max_win_streak||0}W</span> / <span style="color:#ff6b35">${c.max_loss_streak||0}L</span></td>
           <td style="font-family:var(--font-mono)">$${(c.final_capital||0).toFixed(0)}</td>
         </tr>`;
       }).join('');
@@ -3853,6 +3951,7 @@ async function init() {
   await fetchRegimes();
   await fetchRiskState();
   await fetchPatterns(Object.keys(allPrices)[0] || 'BTC/USDT');
+  await fetchAnalytics();
   setInterval(fetchPrices, 5000);
   setInterval(fetchPortfolioStats, 10000);
   setInterval(fetchStats, 30000);
@@ -3864,6 +3963,7 @@ async function init() {
   setInterval(refreshNotifications, 30000);
   setInterval(fetchRegimes, 15000);
   setInterval(fetchRiskState, 10000);
+  setInterval(fetchAnalytics, 60000);
   // E: Chart auto-refresh every 15 minutes
   setInterval(updateTradingChart, 15 * 60 * 1000);
 }
