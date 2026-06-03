@@ -9,6 +9,8 @@ from .strategy_manager import StrategyManager, TradingSignal
 from .trainer import AITrainer
 from .claude_analyzer import ClaudeAnalyzer
 from .risk_analytics import compute_metrics
+from .smc_detector import analyse_smc, SMCResult
+from .indicators_extra import ichimoku, supertrend, stoch_rsi, aroon
 
 __all__ = [
     "AITrader",
@@ -22,4 +24,6 @@ __all__ = [
     "AITrainer",
     "ClaudeAnalyzer",
     "compute_metrics",
+    "analyse_smc", "SMCResult",
+    "ichimoku", "supertrend", "stoch_rsi", "aroon",
 ]

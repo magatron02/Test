@@ -165,6 +165,36 @@ class StrategyManager:
     def record_dca(self, symbol: str):
         self._last_dca[symbol] = datetime.utcnow()
 
+    def ichimoku_strategy(self, analysis: MarketAnalysis) -> TradingSignal:
+        """Ichimoku Cloud strategy — all-in-one Japanese trend system."""
+        sig = analysis.ichimoku_signal
+        if sig == "BULL":
+            conf = 0.72
+            if analysis.supertrend_signal == "BUY":
+                conf = min(conf + 0.10, 0.90)
+            return TradingSignal("BUY", conf, "ichimoku", "Ichimoku bullish: TK cross + above cloud", 0.025, 0.05)
+        elif sig == "BEAR":
+            conf = 0.72
+            if analysis.supertrend_signal == "SELL":
+                conf = min(conf + 0.10, 0.90)
+            return TradingSignal("SELL", conf, "ichimoku", "Ichimoku bearish: TK cross + below cloud", 0.025, 0.05)
+        return TradingSignal("HOLD", 0.30, "ichimoku", "Price inside Ichimoku cloud — no signal", 0.025, 0.05)
+
+    def smc_strategy(self, analysis: MarketAnalysis) -> TradingSignal:
+        """Smart Money Concepts strategy — institutional price action."""
+        bs, ss = analysis.smc_buy, analysis.smc_sell
+        min_score = 0.40
+        if bs > ss and bs >= min_score:
+            conf = min(0.50 + bs, 0.90)
+            return TradingSignal("BUY", conf, "smc",
+                                 f"SMC buy: {analysis.smc_summary}", 0.02, 0.05)
+        elif ss > bs and ss >= min_score:
+            conf = min(0.50 + ss, 0.90)
+            return TradingSignal("SELL", conf, "smc",
+                                 f"SMC sell: {analysis.smc_summary}", 0.02, 0.05)
+        return TradingSignal("HOLD", max(bs, ss), "smc",
+                             f"SMC: {analysis.smc_summary}", 0.02, 0.05)
+
     def signal_for_strategy(
         self,
         strategy: str,
@@ -183,6 +213,10 @@ class StrategyManager:
             return self.trend_signal(analysis)
         if strategy == "mean_reversion":
             return self.mean_reversion_signal(analysis)
+        if strategy == "ichimoku":
+            return self.ichimoku_strategy(analysis)
+        if strategy == "smc":
+            return self.smc_strategy(analysis)
         return self.hybrid_signal(analysis, ml_signal)
 
     def get_signal(self, analysis: MarketAnalysis, ml_signal: Optional[TradingSignal] = None) -> TradingSignal:

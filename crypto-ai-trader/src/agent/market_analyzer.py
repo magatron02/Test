@@ -52,6 +52,19 @@ class MarketAnalysis:
     patterns: List = field(default_factory=list)
     pattern_summary: str = ""
 
+    # Extended indicators (populated when available)
+    supertrend_signal: str = "NEUTRAL"   # BUY | SELL | NEUTRAL
+    stoch_rsi_k: float = 50.0
+    stoch_rsi_signal: str = "NEUTRAL"
+    williams_r: float = -50.0
+    cci: float = 0.0
+    rsi_divergence: str = "NONE"         # BULLISH | BEARISH | NONE
+    ichimoku_signal: str = "NEUTRAL"     # BULL | BEAR | NEUTRAL
+    smc_buy: float = 0.0
+    smc_sell: float = 0.0
+    smc_summary: str = ""
+    aroon_signal: str = "NEUTRAL"
+
 
 def _ema(series: np.ndarray, period: int) -> np.ndarray:
     k = 2 / (period + 1)
@@ -218,6 +231,83 @@ def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
     except Exception as e:
         logger.debug("Chart pattern detection skipped: %s", e)
 
+    # ── Advanced indicators (AI trading knowledge) ─────────────────────
+    try:
+        from .indicators_extra import (
+            supertrend, stoch_rsi, williams_r as calc_wr, cci as calc_cci,
+            rsi_divergence, ichimoku, ichimoku_signal_score, aroon,
+        )
+        # SuperTrend
+        st = supertrend(closes, highs, lows)
+        result.supertrend_signal = st["signal"]
+        if st["signal"] == "BUY":
+            buy_score  += 0.15
+        elif st["signal"] == "SELL":
+            sell_score += 0.15
+
+        # Stochastic RSI
+        srsi = stoch_rsi(closes)
+        result.stoch_rsi_k      = srsi["k"]
+        result.stoch_rsi_signal = srsi["signal"]
+        if srsi["signal"] == "OVERSOLD":
+            buy_score  += 0.10
+        elif srsi["signal"] == "OVERBOUGHT":
+            sell_score += 0.10
+
+        # Williams %R
+        wr = calc_wr(closes, highs, lows)
+        result.williams_r = wr
+        if wr < -80:
+            buy_score  += 0.08
+        elif wr > -20:
+            sell_score += 0.08
+
+        # CCI
+        cci_val = calc_cci(closes, highs, lows)
+        result.cci = cci_val
+        if cci_val < -100:
+            buy_score  += 0.08
+        elif cci_val > 100:
+            sell_score += 0.08
+
+        # RSI Divergence
+        div = rsi_divergence(closes)
+        result.rsi_divergence = div
+        if div == "BULLISH":
+            buy_score  += 0.12
+        elif div == "BEARISH":
+            sell_score += 0.12
+
+        # Ichimoku Cloud
+        ichi = ichimoku(closes, highs, lows)
+        ichi_buy, ichi_sell = ichimoku_signal_score(ichi)
+        result.ichimoku_signal = "BULL" if ichi_buy > ichi_sell else ("BEAR" if ichi_sell > ichi_buy else "NEUTRAL")
+        buy_score  += ichi_buy  * 0.20
+        sell_score += ichi_sell * 0.20
+
+        # Aroon
+        arr = aroon(highs, lows)
+        result.aroon_signal = arr["signal"]
+        if arr["signal"] == "BULL":
+            buy_score  += 0.08
+        elif arr["signal"] == "BEAR":
+            sell_score += 0.08
+
+    except Exception as e:
+        logger.debug("Extended indicators skipped: %s", e)
+
+    # ── SMC (Smart Money Concepts) ─────────────────────────────────────
+    try:
+        from .smc_detector import analyse_smc
+        smc = analyse_smc(closes, opens, highs, lows)
+        result.smc_buy     = smc.buy_score
+        result.smc_sell    = smc.sell_score
+        result.smc_summary = smc.summary
+        buy_score  += smc.buy_score  * 0.25
+        sell_score += smc.sell_score * 0.25
+    except Exception as e:
+        logger.debug("SMC detection skipped: %s", e)
+
     if buy_score > sell_score and buy_score > 0.4:
         result.overall_signal = "BUY"
         result.signal_strength = min(buy_score, 1.0)
@@ -229,15 +319,25 @@ def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
         result.signal_strength = max(buy_score, sell_score)
 
     result.features = {
-        "rsi": result.rsi,
-        "macd_hist": result.macd_hist,
-        "ema_9": result.ema_9,
-        "ema_21": result.ema_21,
-        "bb_position": result.bb_position,
-        "atr_pct": result.atr_pct,
-        "volume_ratio": result.volume_ratio,
-        "price_vs_vwap": 1 if result.price_vs_vwap == "ABOVE" else 0,
-        "change_24h": change_24h,
+        "rsi":              result.rsi,
+        "macd_hist":        result.macd_hist,
+        "ema_9":            result.ema_9,
+        "ema_21":           result.ema_21,
+        "bb_position":      result.bb_position,
+        "atr_pct":          result.atr_pct,
+        "volume_ratio":     result.volume_ratio,
+        "price_vs_vwap":    1 if result.price_vs_vwap == "ABOVE" else 0,
+        "change_24h":       change_24h,
+        # Extended features for ML training
+        "stoch_rsi_k":      result.stoch_rsi_k,
+        "williams_r":       result.williams_r,
+        "cci":              result.cci,
+        "smc_buy":          result.smc_buy,
+        "smc_sell":         result.smc_sell,
+        "ichimoku_bull":    1 if result.ichimoku_signal == "BULL" else 0,
+        "supertrend_buy":   1 if result.supertrend_signal == "BUY" else 0,
+        "rsi_div_bull":     1 if result.rsi_divergence == "BULLISH" else 0,
+        "rsi_div_bear":     1 if result.rsi_divergence == "BEARISH" else 0,
     }
 
     return result

@@ -28,13 +28,13 @@ logger = logging.getLogger(__name__)
 BINANCE_KLINES = "https://api.binance.com/api/v3/klines"
 
 # Regime → preferred single strategy (the policy the RL bandit converges to).
-# Trends ride momentum; ranging/volatile markets favour mean reversion.
+# Ichimoku & SMC work well in trending markets; mean-reversion for ranging.
 _REGIME_STRATEGY = {
-    "BULL_TREND": "trend",
-    "BEAR_TREND": "trend",
+    "BULL_TREND": "ichimoku",      # Ichimoku excels in trending markets
+    "BEAR_TREND": "smc",           # SMC detects bearish structure + liquidity sweeps
     "RANGING":    "mean_reversion",
     "VOLATILE":   "mean_reversion",
-    "CRASH":      "trend",
+    "CRASH":      "smc",           # SMC BOS/ChoCH useful for crash structure reads
 }
 
 # ── Regime simulation parameters (used when Binance is unreachable) ───────────
@@ -170,7 +170,9 @@ class _KellyTracker:
         al = ((self.loss_sum + self.PRIOR_N * (1 - P)) / bl) if bl > 0 else 1.0
         b  = aw / al if al > 0 else B
         kelly = (p * b - q) / b
-        return max(0.0, min(kelly * self.fraction, 0.15))
+        # Minimum 2% floor so system keeps trading and collecting data
+        # (live system's RiskEngine provides the true safety circuit breaker)
+        return max(0.02, min(kelly * self.fraction, 0.15))
 
 
 # ── Basic signal (v1 baseline — EMA crossover) ────────────────────────────────
@@ -235,6 +237,9 @@ def _ai_signal(
     if use_regime and regime:
         strat = _REGIME_STRATEGY.get(regime.regime, "trend")
         signal = sm.signal_for_strategy(strat, analysis)
+        # Fallback: if primary strategy has no conviction, try trend-following
+        if signal.action == "HOLD" and signal.confidence < 0.20 and strat not in ("trend", "mean_reversion"):
+            signal = sm.signal_for_strategy("trend", analysis)
     else:
         signal = sm.get_signal(analysis)
 

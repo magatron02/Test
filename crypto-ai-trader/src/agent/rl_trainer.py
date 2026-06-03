@@ -26,7 +26,7 @@ from .strategy_manager import StrategyManager
 
 logger = logging.getLogger(__name__)
 
-STRATEGIES = ["dca", "trend", "mean_reversion"]
+STRATEGIES = ["dca", "trend", "mean_reversion", "ichimoku", "smc"]
 REGIMES    = ["BULL_TREND", "BEAR_TREND", "RANGING", "VOLATILE", "CRASH"]
 
 
@@ -53,9 +53,12 @@ class BanditArm:
 
 class RLTrainer:
     def __init__(self, models_dir: Optional[Path] = None):
-        self._arms: Dict[Tuple[str, str], BanditArm] = {
+        # Reinitialise arms whenever STRATEGIES/REGIMES expands.
+        # Load from disk then add any new arms not in the saved state.
+        base_arms: Dict[Tuple[str, str], BanditArm] = {
             (s, r): BanditArm() for s in STRATEGIES for r in REGIMES
         }
+        self._arms: Dict[Tuple[str, str], BanditArm] = base_arms
         self._total_pulls = 0
         self._pending: Dict[int, Tuple[str, str]] = {}  # trade_id → (strategy, regime)
         self._models_dir = models_dir
@@ -73,8 +76,12 @@ class RLTrainer:
             try:
                 with open(p, "rb") as f:
                     data = pickle.load(f)
-                self._arms         = data.get("arms",         self._arms)
-                self._total_pulls  = data.get("total_pulls",  0)
+                saved_arms = data.get("arms", {})
+                # Merge: keep existing learned arms, add any new (strategy,regime) pairs
+                for key, arm in saved_arms.items():
+                    if key in self._arms:
+                        self._arms[key] = arm
+                self._total_pulls = data.get("total_pulls", 0)
                 logger.info("Loaded RL bandit state (%d pulls)", self._total_pulls)
             except Exception as e:
                 logger.warning("Could not load RL state: %s", e)
@@ -151,11 +158,13 @@ class RLTrainer:
 
     def _push_weights(self, regime: str, strategy_manager: StrategyManager):
         """Translate arm means into StrategyManager weights (sum to ~1)."""
-        # Shift means to [floor, ∞) to avoid zero/negative weights
         floor = 0.10
-        raw = {s: max(self._arms[(s, regime)].mean + 1.0, floor) for s in STRATEGIES}
+        raw = {s: max(self._arms[(s, regime)].mean + 1.0, floor)
+               for s in STRATEGIES if (s, regime) in self._arms}
+        if not raw:
+            return
         total = sum(raw.values())
-        weights = {s: raw[s] / total for s in STRATEGIES}
+        weights = {s: raw[s] / total for s in raw}
         strategy_manager.update_weights(weights)
         logger.debug("RL pushed weights for regime=%s: %s", regime,
                      {s: f"{v:.3f}" for s, v in weights.items()})
