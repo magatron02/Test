@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -18,6 +18,21 @@ from ..notifications import line_notify, telegram_notify
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
+
+# ── Rate limiting (slowapi) ───────────────────────────────────────────────────
+try:
+    from slowapi import Limiter
+    from slowapi.util import get_remote_address
+    _limiter = Limiter(key_func=get_remote_address, default_limits=[])
+except ImportError:
+    _limiter = None
+
+
+def _rate_limit(limit_string: str):
+    """Dependency that applies a rate limit when slowapi is available."""
+    if _limiter is None:
+        return Depends(lambda: None)
+    return Depends(_limiter.limit(limit_string))
 
 # Reference to trader injected at startup
 _trader = None
@@ -121,6 +136,7 @@ async def get_portfolio():
 
 @router.get("/trades")
 async def get_trades(limit: int = 50, db: Session = Depends(get_db)):
+    limit = max(1, min(limit, 1000))   # cap unbounded reads
     trades = db.query(Trade).order_by(Trade.opened_at.desc()).limit(limit).all()
     return [
         {
@@ -186,7 +202,7 @@ async def get_training_stats():
 
 
 @router.post("/training/trigger")
-async def trigger_training():
+async def trigger_training(request: Request):
     if not _trader:
         raise HTTPException(503, "Trader not running")
     success = _trader._trainer.train()
@@ -253,7 +269,9 @@ async def get_settings():
     for ex in cfg.get("exchanges", {}).values():
         if isinstance(ex, dict):
             if "api_key" in ex and ex["api_key"]:
-                ex["api_key"] = ex["api_key"][:4] + "****"
+                ex["api_key"] = "****"          # full mask — even first chars leak entropy
+            if "api_secret" in ex and ex["api_secret"]:
+                ex["api_secret"] = "****"
             if "api_secret" in ex and ex["api_secret"]:
                 ex["api_secret"] = "****"
     if "ai" in cfg:
@@ -264,12 +282,51 @@ async def get_settings():
     return cfg
 
 
+_SETTINGS_ALLOWLIST: Dict[str, set] = {
+    "trading": {
+        "take_profit_pct", "stop_loss_pct", "min_confidence",
+        "analysis_interval", "risk_per_trade_pct", "max_daily_loss_pct",
+        "max_open_trades", "max_position_pct", "dry_run",
+    },
+    "strategy": {
+        "primary", "roi_table", "trailing_stop",
+    },
+    "risk": {
+        "max_drawdown_pct", "max_daily_loss_pct",
+        "max_portfolio_heat", "max_position_pct",
+    },
+    "ai": {
+        "default_model",
+    },
+    "notifications": {
+        "line", "telegram", "notify_on",
+    },
+    "exchanges": {
+        # allow writing api_key/secret only — not enabled/testnet flags
+        "binance", "binance_th", "bitkub", "okx",
+    },
+    "backtest": {"fee_pct", "slippage_pct"},
+    "position_sizer": {
+        "kelly_fraction", "min_trade_usdt", "max_trade_usdt",
+        "fallback_risk_pct", "target_atr_pct",
+    },
+}
+
+
 @router.post("/settings")
 async def update_settings(data: Dict[str, Any]):
     for section, values in data.items():
+        allowed_keys = _SETTINGS_ALLOWLIST.get(section)
+        if allowed_keys is None:
+            raise HTTPException(400, f"Section '{section}' is not writable via API")
         if isinstance(values, dict):
             for key, val in values.items():
+                if key not in allowed_keys:
+                    raise HTTPException(400, f"Key '{section}.{key}' is not writable via API")
                 settings.set(val, section, key)
+        else:
+            # scalar top-level key
+            settings.set(values, section)
     settings.save()
     settings.reload()
     return {"success": True}
@@ -548,7 +605,7 @@ async def get_mtf_analysis(symbol: str = "BTC/USDT"):
 
 
 @router.post("/backtest")
-async def run_backtest(data: Dict[str, Any]):
+async def run_backtest(request: Request, data: Dict[str, Any]):
     """POST /api/backtest — Backtest with Market Regime + Chart Patterns + Kelly Sizing.
 
     Body:
@@ -566,15 +623,19 @@ async def run_backtest(data: Dict[str, Any]):
       - equity_curve + last 50 annotated trades
     """
     from ..agent.backtest import run_backtest_real as _run
-    symbol  = data.get("symbol", "BTC/USDT")
+    symbol  = str(data.get("symbol", "BTC/USDT"))
     days    = int(data.get("days", 30))
     tp_pct  = float(data.get("tp_pct", 0.04))
     sl_pct  = float(data.get("sl_pct", 0.02))
     capital = float(data.get("initial_capital", 10_000.0))
     if days < 7 or days > 365:
         raise HTTPException(400, "days must be 7-365")
-    if capital < 100:
-        raise HTTPException(400, "initial_capital must be >= 100")
+    if not (0.001 <= tp_pct <= 0.50):
+        raise HTTPException(400, "tp_pct must be between 0.1% and 50%")
+    if not (0.001 <= sl_pct <= 0.50):
+        raise HTTPException(400, "sl_pct must be between 0.1% and 50%")
+    if capital < 100 or capital > 10_000_000:
+        raise HTTPException(400, "initial_capital must be 100 – 10,000,000")
     try:
         result = await _run(symbol, days=days, tp_pct=tp_pct, sl_pct=sl_pct,
                             initial_capital=capital)
@@ -585,6 +646,7 @@ async def run_backtest(data: Dict[str, Any]):
 
 @router.get("/backtest/walkforward")
 async def backtest_walkforward(
+    request: Request,
     symbol: str = "BTC/USDT",
     days: int = 90,
     folds: int = 3,
@@ -594,6 +656,16 @@ async def backtest_walkforward(
 ):
     """Walk-forward validation: Jesse-style rolling IS/OOS parameter optimisation."""
     from ..agent.backtest import run_walkforward
+    if days < 14 or days > 365:
+        raise HTTPException(400, "days must be 14-365")
+    if folds < 2 or folds > 10:
+        raise HTTPException(400, "folds must be 2-10")
+    if not (0.001 <= tp_pct <= 0.50):
+        raise HTTPException(400, "tp_pct must be between 0.1% and 50%")
+    if not (0.001 <= sl_pct <= 0.50):
+        raise HTTPException(400, "sl_pct must be between 0.1% and 50%")
+    if initial_capital < 100 or initial_capital > 10_000_000:
+        raise HTTPException(400, "initial_capital must be 100 – 10,000,000")
     try:
         result = await run_walkforward(
             symbol=symbol, days=days, folds=folds,
@@ -673,18 +745,22 @@ async def get_open_positions():
 
 
 @router.post("/trade/manual")
-async def manual_trade(data: Dict[str, Any]):
+async def manual_trade(request: Request, data: Dict[str, Any]):
     """POST /api/trade/manual — manually open or close a position (demo-safe override).
     Body: {"action":"BUY"|"SELL"|"CLOSE", "symbol":"BTC/USDT", "amount_usdt": 200}
     Bypasses the AI signal so users can test the full trade pipeline.
     """
     if not _trader:
         raise HTTPException(503, "Trader not running")
-    action  = (data.get("action") or "").upper()
-    symbol  = data.get("symbol") or "BTC/USDT"
+    action   = (data.get("action") or "").upper()
+    symbol   = str(data.get("symbol") or "BTC/USDT")
     amt_usdt = float(data.get("amount_usdt") or 0)
     if action not in ("BUY", "SELL", "CLOSE"):
         raise HTTPException(400, "action must be BUY, SELL, or CLOSE")
+    if symbol not in settings.symbols:
+        raise HTTPException(400, f"symbol must be one of: {settings.symbols}")
+    if amt_usdt < 0 or amt_usdt > 1_000_000:
+        raise HTTPException(400, "amount_usdt must be 0 – 1,000,000")
 
     analysis = await _trader.analyze_symbol(symbol)
     if not analysis:

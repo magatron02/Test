@@ -1,5 +1,6 @@
 fastapi>=0.111.0
 uvicorn[standard]>=0.29.0
+slowapi>=0.1.9
 ccxt>=4.3.22
 anthropic>=0.28.0
 ta>=0.11.0

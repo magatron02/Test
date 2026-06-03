@@ -31,10 +31,26 @@ WEB_DIR = (Path(_sys._MEIPASS) / "src" / "web") if getattr(_sys, 'frozen', False
 
 app = FastAPI(title=settings.app_name, version="1.0.0")
 
+# Attach slowapi rate-limiter state so @limiter.limit decorators work.
+try:
+    from slowapi import _rate_limit_exceeded_handler
+    from slowapi.errors import RateLimitExceeded
+    from .api.routes import _limiter as _route_limiter
+    if _route_limiter:
+        app.state.limiter = _route_limiter
+        app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+except Exception:
+    pass  # slowapi optional — graceful degradation if not installed
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
+    # Restrict to localhost only — this is a single-user local app.
+    # If you expose over a LAN, also add your LAN address here.
+    allow_origins=[
+        f"http://localhost:{settings.app_port}",
+        f"http://127.0.0.1:{settings.app_port}",
+    ],
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -153,9 +169,12 @@ def main():
 ║  Port: {settings.app_port:<10} URL: http://localhost:{settings.app_port} ║
 ╚══════════════════════════════════════════╝
 """)
+    # Bind to localhost only by default — prevents unintended LAN exposure.
+    # Set app.host = "0.0.0.0" in settings.yml to expose over a network.
+    host = settings.get("app", "host", default="127.0.0.1")
     uvicorn.run(
         app,
-        host="0.0.0.0",
+        host=host,
         port=settings.app_port,
         reload=False,
         log_level=settings.get("app", "log_level", default="info").lower(),
