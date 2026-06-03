@@ -202,6 +202,7 @@ async def get_training_stats():
 
 
 @router.post("/training/trigger")
+@(_limiter.limit("6/minute") if _limiter else lambda f: f)
 async def trigger_training(request: Request):
     if not _trader:
         raise HTTPException(503, "Trader not running")
@@ -605,6 +606,7 @@ async def get_mtf_analysis(symbol: str = "BTC/USDT"):
 
 
 @router.post("/backtest")
+@(_limiter.limit("10/minute") if _limiter else lambda f: f)
 async def run_backtest(request: Request, data: Dict[str, Any]):
     """POST /api/backtest — Backtest with Market Regime + Chart Patterns + Kelly Sizing.
 
@@ -645,6 +647,7 @@ async def run_backtest(request: Request, data: Dict[str, Any]):
 
 
 @router.get("/backtest/walkforward")
+@(_limiter.limit("4/minute") if _limiter else lambda f: f)
 async def backtest_walkforward(
     request: Request,
     symbol: str = "BTC/USDT",
@@ -745,6 +748,7 @@ async def get_open_positions():
 
 
 @router.post("/trade/manual")
+@(_limiter.limit("12/minute") if _limiter else lambda f: f)
 async def manual_trade(request: Request, data: Dict[str, Any]):
     """POST /api/trade/manual — manually open or close a position (demo-safe override).
     Body: {"action":"BUY"|"SELL"|"CLOSE", "symbol":"BTC/USDT", "amount_usdt": 200}
