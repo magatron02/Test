@@ -193,6 +193,59 @@ async def trigger_training():
     return {"success": success, "stats": _trader.trainer_stats}
 
 
+@router.get("/ml/feature-importance")
+async def ml_feature_importance():
+    """Global SHAP feature importance from the LightGBM signal model (ML4T Ch.12)."""
+    if not _trader:
+        raise HTTPException(503, "Trader not running")
+    try:
+        importance = _trader._trainer.feature_importance()
+        stats = _trader.trainer_stats
+        return {
+            "model_type": stats.get("model_type", "none"),
+            "accuracy":   stats.get("accuracy"),
+            "features":   importance[:20],
+        }
+    except Exception as e:
+        return {"model_type": "none", "features": [], "error": str(e)}
+
+
+@router.get("/portfolio/hrp")
+async def portfolio_hrp():
+    """Hierarchical Risk Parity weights across tracked symbols (ML4T Ch.13)."""
+    if not _trader:
+        raise HTTPException(503, "Trader not running")
+    try:
+        _trader._update_hrp_weights()
+        weights = _trader._hrp_weights or {}
+        n = len(weights)
+        equal = 1.0 / n if n else 0.0
+        rows = [
+            {
+                "symbol":     s,
+                "weight":     round(w, 4),
+                "vs_equal":   round((w / equal) if equal else 1.0, 2),
+                "multiplier": round(_trader._hrp_multiplier(s), 2),
+            }
+            for s, w in sorted(weights.items(), key=lambda kv: -kv[1])
+        ]
+        return {"equal_weight": round(equal, 4), "weights": rows}
+    except Exception as e:
+        return {"weights": [], "error": str(e)}
+
+
+@router.get("/pairs/cointegration")
+async def pairs_cointegration():
+    """Cointegrated pairs for statistical-arbitrage signals (ML4T Ch.9)."""
+    if not _trader:
+        raise HTTPException(503, "Trader not running")
+    try:
+        pairs = _trader.cointegration_pairs()
+        return {"pairs": pairs, "count": len(pairs)}
+    except Exception as e:
+        return {"pairs": [], "count": 0, "error": str(e)}
+
+
 @router.get("/settings")
 async def get_settings():
     cfg = settings._cfg.copy()

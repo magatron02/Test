@@ -106,7 +106,16 @@ class PositionSizer:
             atr_adj = min(self._target_atr_pct / analysis.atr_pct, 1.5)
             atr_adj = max(atr_adj, 0.25)
 
-        fraction = base_fraction * atr_adj * regime_multiplier
+        # GARCH forward-vol adjustment (ML4T Ch.9): trim size pre-emptively when
+        # the model forecasts rising volatility, even if current ATR is still calm.
+        garch_adj = 1.0
+        vol_ratio = getattr(analysis, "garch_vol_ratio", 1.0) or 1.0
+        if vol_ratio > 1.15:        # forecast vol >15% above current → de-risk
+            garch_adj = max(1.0 / vol_ratio, 0.6)
+        elif vol_ratio < 0.85:      # vol expected to fall → modest size-up room
+            garch_adj = min(1.1, 1.0 / vol_ratio)
+
+        fraction = base_fraction * atr_adj * garch_adj * regime_multiplier
         fraction = min(fraction, max_position_pct)
 
         size_usdt = portfolio_value * fraction
@@ -115,8 +124,8 @@ class PositionSizer:
         size_usdt = max(size_usdt, 0.0)
 
         logger.debug(
-            "PositionSizer %s: kelly=%.3f atr_adj=%.2f regime_mult=%.2f → %.2f USDT",
-            symbol, base_fraction, atr_adj, regime_multiplier, size_usdt,
+            "PositionSizer %s: kelly=%.3f atr_adj=%.2f garch_adj=%.2f regime_mult=%.2f → %.2f USDT",
+            symbol, base_fraction, atr_adj, garch_adj, regime_multiplier, size_usdt,
         )
         return size_usdt
 

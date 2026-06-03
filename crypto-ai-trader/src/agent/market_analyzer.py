@@ -66,6 +66,15 @@ class MarketAnalysis:
     aroon_signal: str = "NEUTRAL"
     market_regime: str = ""              # set by AITrader after detect_regime (BULL_TREND, …)
 
+    # Quant features (ML4T Ch.4/Ch.9) — Kalman trend, GARCH vol forecast, WorldQuant alphas
+    kalman_trend: str = "FLAT"           # BULLISH | BEARISH | FLAT (denoised)
+    kalman_velocity: float = 0.0
+    kalman_deviation_pct: float = 0.0    # raw price vs filtered (overextension)
+    garch_forecast_vol_pct: float = 0.0  # forward 5-bar volatility forecast
+    garch_vol_ratio: float = 1.0         # forecast/current (>1 = rising vol)
+    garch_regime_hint: str = "STABLE"    # RISING_VOL | FALLING_VOL | STABLE
+    alphas: Dict = field(default_factory=dict)   # WorldQuant formulaic alpha values
+
 
 def _ema(series: np.ndarray, period: int) -> np.ndarray:
     k = 2 / (period + 1)
@@ -309,6 +318,30 @@ def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
     except Exception as e:
         logger.debug("SMC detection skipped: %s", e)
 
+    # ── Quant features: Kalman trend, GARCH vol forecast, WorldQuant alphas ──
+    try:
+        from .quant_features import kalman_trend, garch_volatility, worldquant_alphas
+
+        kal = kalman_trend(closes)
+        result.kalman_trend         = kal.get("trend", "FLAT")
+        result.kalman_velocity      = kal.get("velocity", 0.0)
+        result.kalman_deviation_pct = kal.get("deviation_pct", 0.0)
+        # Kalman trend adds confluence weight (denoised, less whipsaw than EMA)
+        if result.kalman_trend == "BULLISH":
+            buy_score  += 0.10
+        elif result.kalman_trend == "BEARISH":
+            sell_score += 0.10
+
+        rets = np.diff(closes) / np.where(closes[:-1] != 0, closes[:-1], 1) * 100
+        garch = garch_volatility(rets)
+        result.garch_forecast_vol_pct = garch.get("forecast_vol_pct", 0.0)
+        result.garch_vol_ratio        = garch.get("vol_ratio", 1.0)
+        result.garch_regime_hint      = garch.get("regime_hint", "STABLE")
+
+        result.alphas = worldquant_alphas(opens, highs, lows, closes, vols)
+    except Exception as e:
+        logger.debug("Quant features skipped: %s", e)
+
     if buy_score > sell_score and buy_score > 0.4:
         result.overall_signal = "BUY"
         result.signal_strength = min(buy_score, 1.0)
@@ -339,6 +372,13 @@ def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
         "supertrend_buy":   1 if result.supertrend_signal == "BUY" else 0,
         "rsi_div_bull":     1 if result.rsi_divergence == "BULLISH" else 0,
         "rsi_div_bear":     1 if result.rsi_divergence == "BEARISH" else 0,
+        # Quant features (ML4T)
+        "kalman_velocity":  result.kalman_velocity,
+        "kalman_dev_pct":   result.kalman_deviation_pct,
+        "garch_vol_ratio":  result.garch_vol_ratio,
     }
+    # Merge WorldQuant alphas (prefixed) into the feature vector
+    for name, val in (result.alphas or {}).items():
+        result.features[f"wq_{name}"] = val
 
     return result

@@ -53,6 +53,8 @@ class AITrader:
         self._analyses:   Dict[str, MarketAnalysis] = {}
         self._regimes:    Dict[str, RegimeResult]   = {}
         self._open_trades: Dict[str, dict] = {}
+        self._price_history: Dict[str, list] = {}   # symbol → recent closes (HRP/pairs)
+        self._hrp_weights:   Dict[str, float] = {}  # symbol → correlation-aware weight
         self._broadcast_fn = None
         self._daily_pnl: float = 0.0
         self._daily_reset_date: str = ""
@@ -170,6 +172,10 @@ class AITrader:
             )
             self._analyses[symbol] = analysis
 
+            # Maintain a rolling close-price history for HRP allocation & pairs
+            closes = [c.close for c in candles]
+            self._price_history[symbol] = closes[-200:]
+
             # Detect market regime for this symbol
             regime = detect_regime(candles, analysis)
             self._regimes[symbol] = regime
@@ -179,6 +185,59 @@ class AITrader:
         except Exception as e:
             logger.error("Analysis failed for %s: %s", symbol, e)
             return None
+
+    # ── Correlation-aware allocation (HRP, ML4T Ch.13) ─────────────────────
+
+    def _update_hrp_weights(self):
+        """Recompute Hierarchical Risk Parity weights across tracked symbols.
+
+        Converts each symbol's close history to a return series, then runs HRP
+        so correlated assets (e.g. BTC+ETH) collectively get less weight than
+        independent ones. Stored as a per-symbol multiplier for position sizing.
+        """
+        try:
+            import numpy as np
+            from .hrp_allocator import allocate_capital
+
+            returns_by_symbol = {}
+            for sym, closes in self._price_history.items():
+                if len(closes) >= 30:
+                    arr = np.array(closes, dtype=float)
+                    rets = np.diff(arr) / np.where(arr[:-1] != 0, arr[:-1], 1)
+                    returns_by_symbol[sym] = list(rets)
+            if len(returns_by_symbol) < 2:
+                return
+            alloc = allocate_capital(1.0, returns_by_symbol, max_weight=0.40)
+            self._hrp_weights = {s: d["weight"] for s, d in alloc.items()}
+            logger.debug("HRP weights updated: %s", self._hrp_weights)
+        except Exception as e:
+            logger.debug("HRP weight update skipped: %s", e)
+
+    def _hrp_multiplier(self, symbol: str) -> float:
+        """Return a sizing multiplier from HRP weight vs equal-weight baseline.
+
+        weight == equal-weight → 1.0; over-weighted symbol → >1; correlated /
+        crowded symbol → <1. Clamped to [0.4, 1.6] so it tilts, never dominates.
+        """
+        if not self._hrp_weights or symbol not in self._hrp_weights:
+            return 1.0
+        n = len(self._hrp_weights)
+        equal = 1.0 / n if n else 1.0
+        if equal <= 0:
+            return 1.0
+        return max(0.4, min(self._hrp_weights[symbol] / equal, 1.6))
+
+    def cointegration_pairs(self) -> list:
+        """Scan tracked symbols for cointegrated pairs (ML4T Ch.9 stat-arb)."""
+        try:
+            from .cointegration import find_cointegrated_pairs
+            prices = {s: c for s, c in self._price_history.items() if len(c) >= 50}
+            if len(prices) < 2:
+                return []
+            return find_cointegrated_pairs(prices)
+        except Exception as e:
+            logger.debug("Cointegration scan skipped: %s", e)
+            return []
 
     # ── Portfolio helpers ─────────────────────────────────────────────────
 
@@ -309,6 +368,7 @@ class AITrader:
         if signal.action == "BUY" and not force:
             portfolio = await self._get_portfolio_summary()
             regime_mult = self._risk.get_regime_multiplier(regime.regime)
+            hrp_cap = self._risk.max_position_pct * self._hrp_multiplier(symbol)
 
             # Smart position sizing
             size_usdt = self._sizer.compute(
@@ -318,7 +378,7 @@ class AITrader:
                 available_cash=portfolio.get("available_usdt", 0),
                 regime=regime.regime,
                 regime_multiplier=regime_mult,
-                max_position_pct=self._risk.max_position_pct,
+                max_position_pct=hrp_cap,
             )
 
             if not self._sizer.is_tradeable(size_usdt):
@@ -342,6 +402,7 @@ class AITrader:
                 avail = float(cash.free) if cash else 0.0
                 portfolio = await self._get_portfolio_summary()
                 regime_mult = self._risk.get_regime_multiplier(regime.regime)
+                hrp_cap = self._risk.max_position_pct * self._hrp_multiplier(symbol)
                 amount_usdt = self._sizer.compute(
                     symbol=symbol,
                     portfolio_value=portfolio.get("total_value", avail),
@@ -349,7 +410,7 @@ class AITrader:
                     available_cash=avail,
                     regime=regime.regime,
                     regime_multiplier=regime_mult,
-                    max_position_pct=self._risk.max_position_pct,
+                    max_position_pct=hrp_cap,
                 )
                 if amount_usdt < 10:
                     logger.info("Skip BUY %s: insufficient cash (%.2f USDT)", symbol, amount_usdt)
@@ -559,6 +620,9 @@ class AITrader:
     async def run_cycle(self):
         self._ensure_today()
         symbols = settings.symbols
+
+        # Refresh correlation-aware HRP weights from last cycle's price history
+        self._update_hrp_weights()
 
         # Aggregate regime for risk engine update (use first symbol's regime as proxy)
         dominant_regime = "RANGING"

@@ -1110,6 +1110,47 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
       </div>
     </div>
   </div>
+
+  <!-- ═══ Quant Lab (ML for Trading) ═══ -->
+  <div class="card mb-3" style="border-color:rgba(91,200,255,0.25)">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-cpu me-2"></i>Quant Lab <span class="badge ms-1" style="background:rgba(91,200,255,0.15);color:#5bc8ff;font-size:0.6rem">ML4T</span></span>
+      <button class="btn btn-outline-secondary btn-sm" onclick="loadQuantLab()" id="quantLabBtn">
+        <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+      </button>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <!-- SHAP Feature Importance -->
+        <div class="col-md-5">
+          <div style="font-size:0.8rem;color:#5bc8ff;font-weight:600;margin-bottom:8px">
+            <i class="bi bi-bar-chart-steps me-1"></i>SHAP Feature Importance
+            <span class="text-muted" style="font-size:0.65rem;font-weight:400" id="shapModelType"></span>
+          </div>
+          <div id="shapBars" style="min-height:60px"></div>
+        </div>
+        <!-- HRP Allocation -->
+        <div class="col-md-4">
+          <div style="font-size:0.8rem;color:#A8FF53;font-weight:600;margin-bottom:8px">
+            <i class="bi bi-diagram-3 me-1"></i>HRP Allocation
+            <span class="text-muted" style="font-size:0.65rem;font-weight:400">correlation-aware</span>
+          </div>
+          <table class="table table-dark table-sm mb-0" style="font-size:0.74rem">
+            <thead><tr><th>Symbol</th><th>Weight</th><th title="vs equal weight">×Eq</th><th title="size multiplier">Mult</th></tr></thead>
+            <tbody id="hrpBody"><tr><td colspan="4" class="text-muted text-center">—</td></tr></tbody>
+          </table>
+        </div>
+        <!-- Cointegration Pairs -->
+        <div class="col-md-3">
+          <div style="font-size:0.8rem;color:#ffc107;font-weight:600;margin-bottom:8px">
+            <i class="bi bi-link-45deg me-1"></i>Cointegrated Pairs
+            <span class="text-muted" style="font-size:0.65rem;font-weight:400">stat-arb</span>
+          </div>
+          <div id="cointList" style="font-size:0.74rem"><span class="text-muted">—</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </section>
 <!-- AI TRAINING inner content end -->
   </div><!-- end anl-training -->
@@ -1909,6 +1950,7 @@ function anlTab(tab, el) {
   document.getElementById('anl-backtest-section').style.display = tab === 'backtest' ? '' : 'none';
   document.querySelectorAll('[id^="anlTab-"]').forEach(b => b.classList.remove('active'));
   if (el) el.classList.add('active');
+  if (tab === 'training') { try { loadQuantLab(); } catch(e){} }
 }
 
 // shim for old ai-training section ref
@@ -3755,6 +3797,67 @@ async function runBacktest() {
   finally {
     btn.disabled = false;
     btn.innerHTML = '<i class="bi bi-play-fill me-1"></i>Run Backtest';
+  }
+}
+
+// Quant Lab: SHAP importance + HRP weights + cointegration pairs (ML4T)
+async function loadQuantLab() {
+  const btn = document.getElementById('quantLabBtn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; }
+  try {
+    const [shapR, hrpR, ciR] = await Promise.all([
+      fetch('/api/ml/feature-importance').then(r=>r.json()).catch(()=>({features:[]})),
+      fetch('/api/portfolio/hrp').then(r=>r.json()).catch(()=>({weights:[]})),
+      fetch('/api/pairs/cointegration').then(r=>r.json()).catch(()=>({pairs:[]})),
+    ]);
+
+    // SHAP horizontal bars
+    const feats = shapR.features || [];
+    const mt = document.getElementById('shapModelType');
+    if (mt) mt.textContent = feats.length ? `(${shapR.model_type||'?'}${shapR.accuracy?', acc '+(shapR.accuracy*100).toFixed(0)+'%':''})` : '';
+    const maxImp = feats.length ? Math.max(...feats.map(f=>f.importance)) || 1 : 1;
+    document.getElementById('shapBars').innerHTML = feats.length
+      ? feats.slice(0,10).map(f => {
+          const w = Math.max(2, (f.importance/maxImp*100)).toFixed(0);
+          return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <div style="width:96px;font-size:0.66rem;color:#aaa;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${f.feature}">${f.feature}</div>
+            <div style="flex:1;background:#1a1a1a;border-radius:3px;height:14px;position:relative">
+              <div style="width:${w}%;background:linear-gradient(90deg,#5bc8ff,#A8FF53);height:100%;border-radius:3px"></div>
+            </div>
+            <div style="width:42px;font-size:0.62rem;color:#5bc8ff;font-family:var(--font-mono)">${f.importance.toFixed(3)}</div>
+          </div>`;
+        }).join('')
+      : '<span class="text-muted" style="font-size:0.72rem">โมเดลยังไม่ได้เทรน (ต้องมี trade ปิดอย่างน้อย 30 รายการ)</span>';
+
+    // HRP weights
+    const hrp = hrpR.weights || [];
+    document.getElementById('hrpBody').innerHTML = hrp.length
+      ? hrp.map(w => {
+          const mc = w.multiplier>=1?'#39d98a':'#ff6b35';
+          return `<tr>
+            <td>${w.symbol}</td>
+            <td style="font-family:var(--font-mono)">${(w.weight*100).toFixed(1)}%</td>
+            <td style="color:${w.vs_equal>=1?'#39d98a':'#ff6b35'}">${w.vs_equal}×</td>
+            <td style="color:${mc};font-weight:600">${w.multiplier}×</td>
+          </tr>`;
+        }).join('')
+      : '<tr><td colspan="4" class="text-muted text-center">ต้องการ ≥2 symbols ที่มีประวัติราคา</td></tr>';
+
+    // Cointegration pairs
+    const pairs = ciR.pairs || [];
+    document.getElementById('cointList').innerHTML = pairs.length
+      ? pairs.map(p => {
+          const hl = p.half_life ? p.half_life.toFixed(1)+' bars' : '—';
+          return `<div style="background:rgba(255,193,7,0.08);border:1px solid rgba(255,193,7,0.2);border-radius:5px;padding:5px 7px;margin-bottom:5px">
+            <div style="color:#ffc107;font-weight:600">${p.pair[0]} ↔ ${p.pair[1]}</div>
+            <div style="color:#888;font-size:0.64rem">p=${p.p_value.toFixed(4)} | β=${p.hedge_ratio.toFixed(2)} | HL=${hl}</div>
+          </div>`;
+        }).join('')
+      : '<span class="text-muted" style="font-size:0.72rem">ไม่พบคู่ cointegrated (p<0.05)</span>';
+  } catch(e) {
+    showToast('Quant Lab Error', e.message, 'danger');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Refresh'; }
   }
 }
 
