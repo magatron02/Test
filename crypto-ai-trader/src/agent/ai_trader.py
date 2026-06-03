@@ -377,6 +377,8 @@ class AITrader:
                 "take_profit_price": order.price * (1 + signal.take_profit_pct),
                 "regime":            regime.regime,
                 "opened_at":         datetime.utcnow(),
+                "high_water":        order.price,
+                "trailing_sl":       None,
             }
 
             db = SessionLocal()
@@ -499,11 +501,57 @@ class AITrader:
         analysis = self._analyses.get(symbol)
         if not analysis:
             return
-        price = analysis.price
-        sl, tp, entry = trade["stop_loss_price"], trade["take_profit_price"], trade["price"]
+        price  = analysis.price
+        sl     = trade["stop_loss_price"]
+        tp     = trade["take_profit_price"]
+        entry  = trade["price"]
+        opened = trade.get("opened_at", datetime.utcnow())
+
+        # ── 1. Fixed stop loss ────────────────────────────────────────────
         if price <= sl:
             await self._close_trade(symbol, price, f"Stop loss ({price:.4f} ≤ {sl:.4f})")
-        elif price >= tp:
+            return
+
+        # ── 2. Trailing stop ──────────────────────────────────────────────
+        trail_cfg = settings.get("strategy", "trailing_stop") or {}
+        if trail_cfg.get("enabled"):
+            trail_pct      = float(trail_cfg.get("pct", 0.02))
+            trail_act_pct  = float(trail_cfg.get("activate_pct", 0.01))
+            hw = max(trade.get("high_water", entry), price)
+            trade["high_water"] = hw
+            cur_profit = (hw - entry) / entry
+            if cur_profit >= trail_act_pct:
+                new_trail = hw * (1 - trail_pct)
+                old_trail = trade.get("trailing_sl")
+                if old_trail is None or new_trail > old_trail:
+                    trade["trailing_sl"] = new_trail
+            trail_sl = trade.get("trailing_sl")
+            if trail_sl and price <= trail_sl:
+                await self._close_trade(symbol, price, f"Trailing stop ({price:.4f} ≤ {trail_sl:.4f})")
+                return
+
+        # ── 3. ROI table (time-based take profit) ─────────────────────────
+        roi_tbl = settings.get("strategy", "roi_table") or {}
+        if roi_tbl:
+            roi_sorted = sorted(
+                [(int(k), float(v)) for k, v in roi_tbl.items()],
+                reverse=True,
+            )
+            age_minutes = (datetime.utcnow() - opened).total_seconds() / 60.0
+            roi_thresh = None
+            for min_age, roi_pct in roi_sorted:
+                if age_minutes >= min_age:
+                    roi_thresh = roi_pct
+                    break
+            if roi_thresh is not None:
+                cur_pnl = (price - entry) / entry
+                if cur_pnl >= roi_thresh:
+                    await self._close_trade(symbol, price,
+                        f"ROI table: {cur_pnl:.1%} ≥ {roi_thresh:.1%} at {age_minutes:.0f}min")
+                    return
+
+        # ── 4. Fixed take profit ──────────────────────────────────────────
+        if price >= tp:
             await self._close_trade(symbol, price, f"Take profit ({price:.4f} ≥ {tp:.4f})")
 
     # ── Main cycle ────────────────────────────────────────────────────────

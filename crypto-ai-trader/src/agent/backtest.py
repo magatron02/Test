@@ -275,8 +275,11 @@ def _run_loop(
     tp_pct: float,
     sl_pct: float,
     initial_capital: float,
-    mode: str = "basic",       # basic | hybrid | autotrade
+    mode: str = "basic",
     window_size: int = 80,
+    roi_table: Optional[dict] = None,
+    trailing_stop_pct: Optional[float] = None,
+    trailing_activate_pct: float = 0.01,
 ) -> Tuple[dict, list, list, list]:
     """
     Core simulation loop shared by all modes.
@@ -302,6 +305,14 @@ def _run_loop(
 
     ohlcv_cache = _to_ohlcv(candles)
 
+    # Pre-process ROI table: list of (min_age_minutes, profit_threshold) sorted descending
+    roi_sorted: list = []
+    if roi_table:
+        roi_sorted = sorted(
+            [(int(k), float(v)) for k, v in roi_table.items()],
+            reverse=True,
+        )
+
     for i in range(window_size, len(candles)):
         c = candles[i]
         price = c["close"]
@@ -317,26 +328,83 @@ def _run_loop(
         if open_trade:
             side  = open_trade["side"]
             entry = open_trade["entry"]
-            tp = entry * (1 + tp_pct) if side == "BUY" else entry * (1 - tp_pct)
-            sl = entry * (1 - sl_pct) if side == "BUY" else entry * (1 + sl_pct)
-            hit_tp = c["high"] >= tp if side == "BUY" else c["low"]  <= tp
-            hit_sl = c["low"]  <= sl if side == "BUY" else c["high"] >= sl
+            fixed_tp = entry * (1 + tp_pct) if side == "BUY" else entry * (1 - tp_pct)
+            fixed_sl = entry * (1 - sl_pct) if side == "BUY" else entry * (1 + sl_pct)
 
-            if hit_tp or hit_sl:
-                raw_pnl_pct = tp_pct if hit_tp else -sl_pct
+            # Trailing stop: update high-water mark and trailing level
+            if trailing_stop_pct and side == "BUY":
+                hw = max(open_trade.get("high_water", entry), c["high"])
+                open_trade["high_water"] = hw
+                cur_profit = (hw - entry) / entry
+                if cur_profit >= trailing_activate_pct:
+                    new_trail = hw * (1 - trailing_stop_pct)
+                    old_trail = open_trade.get("trailing_sl")
+                    if old_trail is None or new_trail > old_trail:
+                        open_trade["trailing_sl"] = new_trail
+
+            # --- Exit priority: SL > trailing SL > ROI table > fixed TP ---
+            exit_price = None
+            exit_reason = ""
+            win = False
+
+            # 1. Fixed stop loss (intracandle)
+            if side == "BUY" and c["low"] <= fixed_sl:
+                exit_price = fixed_sl
+                exit_reason = "stop_loss"
+            elif side == "SELL" and c["high"] >= fixed_sl:
+                exit_price = fixed_sl
+                exit_reason = "stop_loss"
+
+            # 2. Trailing stop (intracandle)
+            trail_sl = open_trade.get("trailing_sl")
+            if not exit_reason and trail_sl:
+                if side == "BUY" and c["low"] <= trail_sl:
+                    exit_price = trail_sl
+                    exit_reason = "trailing_stop"
+                    win = True   # trailing stop exits above entry (activated after profit threshold)
+
+            # 3. ROI table (at candle close price)
+            if not exit_reason and roi_sorted:
+                trade_age_s = (c["ts"] - open_trade["at"]).total_seconds()
+                trade_age_m = trade_age_s / 60.0
+                roi_thresh = None
+                for min_age, roi_pct in roi_sorted:
+                    if trade_age_m >= min_age:
+                        roi_thresh = roi_pct
+                        break
+                if roi_thresh is not None:
+                    cur_pnl = (price - entry) / entry if side == "BUY" else (entry - price) / entry
+                    if cur_pnl >= roi_thresh:
+                        exit_price = price
+                        exit_reason = "roi_table"
+                        win = True
+
+            # 4. Fixed take profit (intracandle)
+            if not exit_reason:
+                if side == "BUY" and c["high"] >= fixed_tp:
+                    exit_price = fixed_tp
+                    exit_reason = "take_profit"
+                    win = True
+                elif side == "SELL" and c["low"] <= fixed_tp:
+                    exit_price = fixed_tp
+                    exit_reason = "take_profit"
+                    win = True
+
+            if exit_reason:
+                raw_pnl_pct = (exit_price - entry) / entry if side == "BUY" else (entry - exit_price) / entry
                 capital += open_trade["cost"] * raw_pnl_pct
                 kelly.update(raw_pnl_pct * 100)
 
                 r = open_trade.get("regime", "RANGING")
                 regime_stats[r]["trades"] += 1
                 regime_stats[r]["pnl_sum"] += raw_pnl_pct * 100
-                if hit_tp:
+                if win:
                     regime_stats[r]["wins"] += 1
 
                 for pat in open_trade.get("patterns", []):
                     pattern_stats[pat]["trades"] += 1
                     pattern_stats[pat]["pnl_sum"] += raw_pnl_pct * 100
-                    if hit_tp:
+                    if win:
                         pattern_stats[pat]["wins"] += 1
 
                 trades.append({
@@ -344,12 +412,14 @@ def _run_loop(
                     "close_at":   c["ts"].isoformat(),
                     "side":       side,
                     "entry":      round(entry, 4),
-                    "exit":       round(tp if hit_tp else sl, 4),
+                    "exit":       round(exit_price, 4),
                     "pnl_pct":    round(raw_pnl_pct * 100, 2),
-                    "win":        hit_tp,
+                    "win":        win,
                     "regime":     open_trade.get("regime", "RANGING"),
                     "patterns":   open_trade.get("patterns", []),
                     "strategy":   open_trade.get("strategy", ""),
+                    "exit_reason": exit_reason,
+                    "hour":       open_trade["at"].hour,
                     "size_pct":   round(open_trade["cost"] / capital * 100, 1),
                 })
                 open_trade = None
@@ -417,17 +487,19 @@ def _run_loop(
         raw_pnl_pct = (price - entry) / entry if open_trade["side"] == "BUY" else (entry - price) / entry
         capital += open_trade["cost"] * raw_pnl_pct
         trades.append({
-            "open_at":  open_trade["at"].isoformat(),
-            "close_at": candles[-1]["ts"].isoformat(),
-            "side":     open_trade["side"],
-            "entry":    round(entry, 4),
-            "exit":     round(price, 4),
-            "pnl_pct":  round(raw_pnl_pct * 100, 2),
-            "win":      raw_pnl_pct > 0,
-            "regime":   open_trade.get("regime", "RANGING"),
-            "patterns": open_trade.get("patterns", []),
-            "strategy": open_trade.get("strategy", ""),
-            "size_pct": round(open_trade["cost"] / max(capital, 1) * 100, 1),
+            "open_at":    open_trade["at"].isoformat(),
+            "close_at":   candles[-1]["ts"].isoformat(),
+            "side":       open_trade["side"],
+            "entry":      round(entry, 4),
+            "exit":       round(price, 4),
+            "pnl_pct":    round(raw_pnl_pct * 100, 2),
+            "win":        raw_pnl_pct > 0,
+            "regime":     open_trade.get("regime", "RANGING"),
+            "patterns":   open_trade.get("patterns", []),
+            "strategy":   open_trade.get("strategy", ""),
+            "exit_reason": "end_of_period",
+            "hour":       open_trade["at"].hour,
+            "size_pct":   round(open_trade["cost"] / max(capital, 1) * 100, 1),
         })
         equity.append(round(capital, 2))
 
@@ -481,6 +553,13 @@ def _run_loop(
     return metrics, curve, trades, list(equity)
 
 
+def _exit_reason_stats(trades: list) -> dict:
+    """Summarise exit reasons: take_profit, stop_loss, roi_table, trailing_stop, end_of_period."""
+    from collections import Counter
+    c = Counter(t.get("exit_reason", "unknown") for t in trades)
+    return dict(c)
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def run_backtest(
@@ -527,9 +606,16 @@ def _build_result(
     """Run all 3 modes and merge into one result."""
     from .risk_analytics import compute_metrics
 
-    basic_m,  basic_curve,  basic_trades,  basic_eq  = _run_loop(symbol, candles, tp_pct, sl_pct, initial_capital, "basic")
-    hybrid_m, hybrid_curve, hybrid_trades, hybrid_eq = _run_loop(symbol, candles, tp_pct, sl_pct, initial_capital, "hybrid")
-    ai_m,     ai_curve,     ai_trades,     ai_eq     = _run_loop(symbol, candles, tp_pct, sl_pct, initial_capital, "autotrade")
+    # Load dynamic exit settings
+    from ..core.config import settings as _cfg
+    roi_tbl   = _cfg.get("strategy", "roi_table") or {}
+    trail_cfg = _cfg.get("strategy", "trailing_stop") or {}
+    trail_pct = float(trail_cfg.get("pct", 0.02)) if trail_cfg.get("enabled") else None
+    trail_act = float(trail_cfg.get("activate_pct", 0.01))
+
+    basic_m,  basic_curve,  basic_trades,  basic_eq  = _run_loop(symbol, candles, tp_pct, sl_pct, initial_capital, "basic",      roi_table=roi_tbl, trailing_stop_pct=trail_pct, trailing_activate_pct=trail_act)
+    hybrid_m, hybrid_curve, hybrid_trades, hybrid_eq = _run_loop(symbol, candles, tp_pct, sl_pct, initial_capital, "hybrid",     roi_table=roi_tbl, trailing_stop_pct=trail_pct, trailing_activate_pct=trail_act)
+    ai_m,     ai_curve,     ai_trades,     ai_eq     = _run_loop(symbol, candles, tp_pct, sl_pct, initial_capital, "autotrade",  roi_table=roi_tbl, trailing_stop_pct=trail_pct, trailing_activate_pct=trail_act)
 
     basic_analytics  = compute_metrics(basic_trades,  basic_eq,  initial_capital)
     hybrid_analytics = compute_metrics(hybrid_trades, hybrid_eq, initial_capital)
@@ -555,6 +641,25 @@ def _build_result(
             "equity_curve":     curve,
         }
 
+    # ── Hourly signal quality (which UTC hours produce best AI signals)
+    from collections import defaultdict as _dd
+    hourly: dict = _dd(lambda: {"trades": 0, "wins": 0, "pnl_sum": 0.0})
+    for t in ai_trades:
+        h = t.get("hour")
+        if h is not None:
+            hourly[h]["trades"] += 1
+            hourly[h]["pnl_sum"] += t["pnl_pct"]
+            if t.get("win"):
+                hourly[h]["wins"] += 1
+    hourly_stats = {
+        str(h): {
+            "trades":   d["trades"],
+            "win_rate": round(d["wins"] / d["trades"] * 100, 1) if d["trades"] else 0,
+            "avg_pnl":  round(d["pnl_sum"] / d["trades"], 2) if d["trades"] else 0,
+        }
+        for h, d in sorted(hourly.items())
+    }
+
     # Primary result = autotrade (full AI stack)
     result = {
         "symbol":       symbol,
@@ -574,6 +679,8 @@ def _build_result(
         "trades":        ai_trades[-50:],
         "regime_stats":  ai_m["regime_stats"],
         "pattern_stats": ai_m["pattern_stats"],
+        "hourly_stats":  hourly_stats,
+        "exit_reason_stats": _exit_reason_stats(ai_trades),
 
         # Side-by-side comparison (full analytics per mode)
         "comparison": {
@@ -583,3 +690,126 @@ def _build_result(
         },
     }
     return result
+
+
+async def run_walkforward(
+    symbol: str,
+    days: int = 90,
+    folds: int = 3,
+    tp_pct: float = 0.04,
+    sl_pct: float = 0.02,
+    initial_capital: float = 10_000.0,
+) -> dict:
+    """Walk-forward validation: rolling in-sample parameter optimisation + out-of-sample test.
+
+    For each fold we:
+      1. Optimise TP / SL via a small grid on the in-sample window.
+      2. Test the chosen params on the unseen out-of-sample window.
+      3. Report IS vs OOS performance degradation — high degradation = overfit.
+
+    This is the Jesse-framework approach: zero look-ahead bias by never touching
+    OOS data during parameter selection.
+    """
+    try:
+        candles = await _fetch_real_ohlcv(symbol, days)
+        data_source = "binance"
+    except Exception as e:
+        logger.warning("Walk-forward: using simulation (%s)", e)
+        try:
+            from ..exchanges.demo_client import _SEED_PRICES
+            base_price = _SEED_PRICES.get(symbol, 100.0)
+        except Exception:
+            base_price = 100.0
+        candles = _simulate_ohlcv(days, base_price)
+        data_source = "simulated"
+
+    from .risk_analytics import compute_metrics
+
+    n = len(candles)
+    # Each fold uses an expanding IS window; OOS = next fold_size candles
+    fold_size = n // (folds + 1)
+    if fold_size < 100:
+        return {"error": "Insufficient data for walk-forward (need more days)", "symbol": symbol}
+
+    results = []
+    grid_tp = [tp_pct * f for f in (0.75, 1.0, 1.25, 1.5)]
+    grid_sl = [sl_pct * f for f in (0.75, 1.0, 1.25)]
+
+    for fold_idx in range(folds):
+        is_end   = (fold_idx + 1) * fold_size
+        oos_end  = min(is_end + fold_size, n)
+        if oos_end <= is_end or is_end < 50:
+            break
+
+        is_candles  = candles[:is_end]
+        oos_candles = candles[is_end:oos_end]
+
+        # ── In-sample: grid-search TP/SL by Sharpe ────────────────────────
+        best_tp, best_sl, best_sharpe = tp_pct, sl_pct, -999.0
+        for t in grid_tp:
+            for s in grid_sl:
+                if t <= s:          # require positive R:R
+                    continue
+                m, _, _, _ = _run_loop(symbol, is_candles, t, s, initial_capital, "autotrade")
+                if m["sharpe"] > best_sharpe:
+                    best_sharpe = m["sharpe"]
+                    best_tp, best_sl = t, s
+
+        # ── IS performance with optimised params ──────────────────────────
+        is_m, _, is_trades, is_eq = _run_loop(symbol, is_candles, best_tp, best_sl, initial_capital, "autotrade")
+
+        # ── OOS performance with SAME params (no peeking) ─────────────────
+        oos_m, _, oos_trades, oos_eq = _run_loop(symbol, oos_candles, best_tp, best_sl, initial_capital, "autotrade")
+        oos_ana = compute_metrics(oos_trades, oos_eq, initial_capital)
+
+        # Degradation ratio: OOS_return / IS_return (1.0 = perfect; 0 = all alpha lost OOS)
+        is_ret  = is_m["total_return_pct"]
+        oos_ret = oos_m["total_return_pct"]
+        degradation = round(oos_ret / is_ret, 2) if abs(is_ret) > 0.01 else None
+
+        results.append({
+            "fold":             fold_idx + 1,
+            "is_bars":          len(is_candles),
+            "oos_bars":         len(oos_candles),
+            "optimized_tp_pct": round(best_tp * 100, 2),
+            "optimized_sl_pct": round(best_sl * 100, 2),
+            "is_sharpe":        round(best_sharpe, 2),
+            "is_return_pct":    round(is_ret, 2),
+            "oos_return_pct":   round(oos_ret, 2),
+            "oos_sharpe":       round(oos_ana["sharpe"], 2),
+            "oos_win_rate":     round(oos_m["win_rate"], 1),
+            "oos_trades":       oos_m["total_trades"],
+            "oos_max_dd_pct":   round(oos_m["max_drawdown_pct"], 2),
+            "degradation":      degradation,
+        })
+
+    if not results:
+        return {"error": "No folds completed", "symbol": symbol, "data_source": data_source}
+
+    # ── Summary ────────────────────────────────────────────────────────────
+    profitable_folds = sum(1 for r in results if r["oos_return_pct"] > 0)
+    avg_oos_ret   = round(sum(r["oos_return_pct"] for r in results) / len(results), 2)
+    avg_oos_sharp = round(sum(r["oos_sharpe"] for r in results) / len(results), 2)
+
+    overfit_risk = "LOW"
+    degrading = [r for r in results if r["degradation"] is not None and r["degradation"] < 0.5]
+    if len(degrading) > len(results) / 2:
+        overfit_risk = "HIGH"
+    elif len(degrading) > 0:
+        overfit_risk = "MEDIUM"
+
+    return {
+        "symbol":          symbol,
+        "days":            days,
+        "folds_completed": len(results),
+        "data_source":     data_source,
+        "summary": {
+            "avg_oos_return_pct":   avg_oos_ret,
+            "avg_oos_sharpe":       avg_oos_sharp,
+            "profitable_folds":     profitable_folds,
+            "total_folds":          len(results),
+            "overfit_risk":         overfit_risk,
+            "consistency_pct":      round(profitable_folds / len(results) * 100, 1),
+        },
+        "folds": results,
+    }

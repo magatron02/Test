@@ -92,6 +92,15 @@ strategy:
     bb_period: 20
     bb_std: 2.0
     rsi_period: 14
+  roi_table:              # Time-based take profit: minutes_open → min_profit_%
+    "0": 0.06             # Immediately: 6% profit → close
+    "300": 0.04           # After 5 min: 4% → close
+    "600": 0.025          # After 10 min: 2.5% → close
+    "1800": 0.01          # After 30 min: 1% → close
+  trailing_stop:
+    enabled: false
+    pct: 0.02             # Trail 2% below high-water mark
+    activate_pct: 0.01    # Start trailing after 1% unrealized profit
   indicators:
     rsi_period: 14
     macd_fast: 12
