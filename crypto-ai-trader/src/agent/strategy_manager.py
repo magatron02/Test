@@ -165,12 +165,26 @@ class StrategyManager:
     def record_dca(self, symbol: str):
         self._last_dca[symbol] = datetime.utcnow()
 
-    def get_signal(self, analysis: MarketAnalysis, ml_signal: Optional[TradingSignal] = None) -> TradingSignal:
-        strategy = settings.get("strategy", "primary", default="hybrid")
+    def signal_for_strategy(
+        self,
+        strategy: str,
+        analysis: MarketAnalysis,
+        ml_signal: Optional[TradingSignal] = None,
+    ) -> TradingSignal:
+        """Dispatch to a single named strategy (used by regime/RL-driven selection).
+
+        Selecting one strategy that fits the current regime avoids the
+        trend-vs-mean-reversion conflict that cancels out the blended
+        ``hybrid_signal`` (e.g. in an uptrend ``trend`` wants BUY while
+        ``mean_reversion`` wants SELL, netting to HOLD)."""
         if strategy == "dca":
             return self.dca_signal(analysis)
-        elif strategy == "trend":
+        if strategy == "trend":
             return self.trend_signal(analysis)
-        elif strategy == "mean_reversion":
+        if strategy == "mean_reversion":
             return self.mean_reversion_signal(analysis)
         return self.hybrid_signal(analysis, ml_signal)
+
+    def get_signal(self, analysis: MarketAnalysis, ml_signal: Optional[TradingSignal] = None) -> TradingSignal:
+        strategy = settings.get("strategy", "primary", default="hybrid")
+        return self.signal_for_strategy(strategy, analysis, ml_signal)

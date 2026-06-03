@@ -71,8 +71,11 @@ def _adx(highs: np.ndarray, lows: np.ndarray, closes: np.ndarray, period: int = 
             0.0,
         )
 
+    # wilder() returns a Wilder *sum* (≈ average × period). For +DI/-DI the
+    # period cancels in the ratio, but the final ADX must be the smoothed
+    # *average* of DX — so divide the accumulated sum back down by `period`.
     adx_arr = wilder(dx, period)
-    val = float(adx_arr[-1])
+    val = float(adx_arr[-1]) / period
     return val if val > 0 else 20.0
 
 

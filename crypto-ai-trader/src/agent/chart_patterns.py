@@ -319,6 +319,12 @@ def detect_patterns(
     Run all 13 pattern detectors and return those that pass the confidence threshold.
     Returns the top-3 by confidence (avoid noise from many low-quality matches).
     """
+    # Pattern detectors rely on ndarray methods (.min/.max/.mean) and
+    # scipy.argrelextrema — coerce list/tuple input so callers can pass either.
+    closes = np.asarray(closes, dtype=float)
+    highs  = np.asarray(highs,  dtype=float)
+    lows   = np.asarray(lows,   dtype=float)
+
     if len(closes) < 30:
         return []
 

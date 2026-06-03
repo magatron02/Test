@@ -251,11 +251,11 @@ class AITrader:
             sig = self._strategy.get_signal(analysis)
         elif ai_model == "ml" and ml_signal:
             sig = ml_signal
-        else:  # hybrid or fallback — let RL guide primary strategy
-            if rl_strategy in ("dca", "trend", "mean_reversion"):
-                rule_sig = self._strategy.get_signal(analysis, ml_signal)
-            else:
-                rule_sig = self._strategy.get_signal(analysis, ml_signal)
+        else:  # hybrid or fallback — let RL guide the primary strategy
+            # RL picks the strategy best suited to the current regime; dispatch
+            # to that single strategy instead of the blended hybrid (which lets
+            # conflicting sub-strategies cancel each other out to HOLD).
+            rule_sig = self._strategy.signal_for_strategy(rl_strategy, analysis, ml_signal)
 
             if settings.claude_api_key and ai_model in ("claude", "hybrid"):
                 try:

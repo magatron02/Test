@@ -27,6 +27,16 @@ logger = logging.getLogger(__name__)
 
 BINANCE_KLINES = "https://api.binance.com/api/v3/klines"
 
+# Regime → preferred single strategy (the policy the RL bandit converges to).
+# Trends ride momentum; ranging/volatile markets favour mean reversion.
+_REGIME_STRATEGY = {
+    "BULL_TREND": "trend",
+    "BEAR_TREND": "trend",
+    "RANGING":    "mean_reversion",
+    "VOLATILE":   "mean_reversion",
+    "CRASH":      "trend",
+}
+
 # ── Regime simulation parameters (used when Binance is unreachable) ───────────
 _SIM_REGIMES = {
     "BULL":     {"drift": +0.0040, "vol": 0.0055, "dur": (30, 80)},
@@ -214,17 +224,23 @@ def _ai_signal(
     regime_name = regime.regime if regime else "RANGING"
 
     sm = StrategyManager()
-    signal = sm.get_signal(analysis)
+    # Pick the strategy that fits the regime (the policy the RL bandit converges
+    # to). Blending all strategies lets trend & mean-reversion cancel to HOLD.
+    if use_regime and regime:
+        strat = _REGIME_STRATEGY.get(regime.regime, "trend")
+        signal = sm.signal_for_strategy(strat, analysis)
+    else:
+        signal = sm.get_signal(analysis)
 
     # Regime-aware confidence threshold
-    min_conf = 0.60
+    min_conf = 0.55
     if use_regime and regime:
         if regime.regime == "CRASH":
             min_conf = 0.85
         elif regime.regime == "VOLATILE":
-            min_conf = 0.75
-        elif regime.regime == "BEAR_TREND":
             min_conf = 0.70
+        elif regime.regime == "BEAR_TREND":
+            min_conf = 0.60
 
     if signal.action != "HOLD" and signal.confidence < min_conf:
         return "HOLD", signal.confidence, signal.strategy, regime_name, \

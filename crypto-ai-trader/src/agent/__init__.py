@@ -8,6 +8,7 @@ from .chart_patterns import PatternResult, detect_patterns, patterns_to_signal_b
 from .strategy_manager import StrategyManager, TradingSignal
 from .trainer import AITrainer
 from .claude_analyzer import ClaudeAnalyzer
+from .risk_analytics import compute_metrics
 
 __all__ = [
     "AITrader",
@@ -20,4 +21,5 @@ __all__ = [
     "StrategyManager", "TradingSignal",
     "AITrainer",
     "ClaudeAnalyzer",
+    "compute_metrics",
 ]
