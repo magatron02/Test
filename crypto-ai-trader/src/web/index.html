@@ -1359,6 +1359,11 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
           <button class="btn btn-primary w-100" id="btRunBtn" onclick="runBacktest()">
             <i class="bi bi-play-fill me-1"></i>Run Backtest
           </button>
+          <hr class="my-2" style="border-color:var(--border)">
+          <button class="btn btn-outline-secondary w-100 btn-sm" id="wfRunBtn" onclick="runWalkForward()">
+            <i class="bi bi-arrow-repeat me-1"></i>Walk-Forward Validation
+          </button>
+          <div class="text-center mt-1" style="color:#555;font-size:0.62rem">Jesse-style IS/OOS fold analysis</div>
         </div>
       </div>
     </div>
@@ -1439,6 +1444,42 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
         </div>
       </div>
 
+      <!-- Hourly Signal Quality Heatmap -->
+      <div class="card mb-3" id="btHourlyCard" style="display:none">
+        <div class="card-header"><i class="bi bi-clock-history me-2"></i>Signal Quality by Hour (UTC) — Intelligent Trading Bot concept</div>
+        <div class="card-body p-2">
+          <div id="btHourlyChart" style="min-height:130px"></div>
+        </div>
+      </div>
+
+      <!-- Exit Reason Breakdown -->
+      <div class="card mb-3" id="btExitCard" style="display:none">
+        <div class="card-header"><i class="bi bi-sign-stop me-2"></i>Exit Reason Breakdown</div>
+        <div class="card-body" id="btExitBars" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;min-height:48px"></div>
+      </div>
+
+      <!-- Walk-Forward Results -->
+      <div class="card mb-3" id="wfCard" style="display:none">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-arrow-repeat me-2"></i>Walk-Forward Validation <span class="text-muted" style="font-size:0.7rem;font-weight:400">(Jesse-style IS/OOS)</span></span>
+          <span id="wfOverfitBadge" class="badge" style="font-size:0.65rem"></span>
+        </div>
+        <div class="card-body">
+          <div class="row g-2 mb-2" id="wfSummaryRow"></div>
+          <div style="overflow-x:auto">
+            <table class="table table-dark table-sm mb-0" style="font-size:0.76rem">
+              <thead><tr>
+                <th>Fold</th><th title="Optimised TP">TP%</th><th title="Optimised SL">SL%</th>
+                <th title="In-Sample Sharpe">IS Sharpe</th><th title="In-Sample Return">IS Return</th>
+                <th title="Out-of-Sample Return">OOS Return</th><th title="OOS Sharpe">OOS Sharpe</th>
+                <th title="OOS Win Rate">OOS WR</th><th title="OOS/IS return ratio">Degrad.</th>
+              </tr></thead>
+              <tbody id="wfFoldsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <div class="card" id="btNoData">
         <div class="card-body text-center py-5 text-muted">
           <i class="bi bi-skip-backward-circle" style="font-size:2rem;display:block;margin-bottom:8px"></i>
@@ -1454,7 +1495,7 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
     </div>
     <div class="card-body p-0" style="overflow-x:auto">
       <table class="table table-dark table-sm mb-0">
-        <thead><tr><th>Open</th><th>Close</th><th>Side</th><th>PnL%</th><th>Win</th><th>Regime</th><th>Pattern</th><th>Size%</th></tr></thead>
+        <thead><tr><th>Open</th><th>Close</th><th>Side</th><th>PnL%</th><th>Win</th><th>Exit</th><th>Regime</th><th>Pattern</th><th>Size%</th></tr></thead>
         <tbody id="btTradesBody"></tbody>
       </table>
     </div>
@@ -3473,11 +3514,13 @@ async function refreshPortfolio() {
 let btEquityChart = null;
 
 function _btHide() {
-  ['btMetrics','btChartCard','btTradesCard','btCompareCard','btBreakdownRow'].forEach(id => {
+  ['btMetrics','btChartCard','btTradesCard','btCompareCard','btBreakdownRow',
+   'btHourlyCard','btExitCard','wfCard'].forEach(id => {
     const el = document.getElementById(id); if (el) el.style.display = 'none';
   });
   const nd = document.getElementById('btNoData'); if (nd) nd.style.display = '';
 }
+let _btHourlyChart = null;
 
 async function runBacktest() {
   const btn = document.getElementById('btRunBtn');
@@ -3632,20 +3675,75 @@ async function runBacktest() {
     // ── Trade log ─────────────────────────────────────────────────
     if (d.trades && d.trades.length) {
       document.getElementById('btTradeCount').textContent = d.total_trades + ' total trades';
+      const _exitLabel = {take_profit:'TP',roi_table:'ROI',trailing_stop:'Trail',stop_loss:'SL',end_of_period:'EoP'};
+      const _exitColor = {take_profit:'#39d98a',roi_table:'#A8FF53',trailing_stop:'#5bc8ff',stop_loss:'#ff6b35',end_of_period:'#666'};
       document.getElementById('btTradesBody').innerHTML = d.trades.map(t => {
         const pats = (t.patterns||[]).map(p => `<span class="regime-badge regime-range" style="font-size:0.55rem">${p}</span>`).join(' ');
+        const er = t.exit_reason||'';
+        const erLabel = _exitLabel[er] || er.substring(0,4);
+        const erColor = _exitColor[er] || '#888';
         return `<tr>
           <td class="text-muted" style="font-size:0.72rem">${(t.open_at||'').split('T')[0]}</td>
           <td class="text-muted" style="font-size:0.72rem">${(t.close_at||'').split('T')[0]}</td>
           <td class="${t.side==='BUY'?'text-success':'text-danger'}">${t.side}</td>
           <td class="${t.pnl_pct>=0?'text-success':'text-danger'}">${t.pnl_pct>=0?'+':''}${t.pnl_pct}%</td>
           <td>${t.win ? '✅' : '❌'}</td>
+          <td><span style="color:${erColor};font-size:0.68rem;font-weight:600">${erLabel}</span></td>
           <td><span class="regime-badge ${t.regime==='BULL_TREND'?'regime-bull':t.regime==='BEAR_TREND'?'regime-bear':t.regime==='VOLATILE'?'regime-vol':t.regime==='CRASH'?'regime-crash':'regime-range'}" style="font-size:0.58rem">${(t.regime||'').replace('_',' ')}</span></td>
           <td style="font-size:0.65rem">${pats||'—'}</td>
           <td class="text-muted" style="font-size:0.7rem">${t.size_pct||0}%</td>
         </tr>`;
       }).join('');
       document.getElementById('btTradesCard').style.display = '';
+    }
+
+    // ── Hourly signal quality heatmap ─────────────────────────────
+    const hourly = d.hourly_stats || {};
+    if (Object.keys(hourly).length) {
+      const hrs = Array.from({length:24}, (_,h) => String(h));
+      const vals = hrs.map(h => hourly[h] ? hourly[h].avg_pnl : 0);
+      const wrs  = hrs.map(h => hourly[h] ? hourly[h].win_rate : 0);
+      const trds = hrs.map(h => hourly[h] ? hourly[h].trades : 0);
+      if (_btHourlyChart) { _btHourlyChart.destroy(); _btHourlyChart = null; }
+      _btHourlyChart = new ApexCharts(document.getElementById('btHourlyChart'), {
+        chart: {type:'bar', height:130, background:'transparent', toolbar:{show:false}, animations:{enabled:false}, fontFamily:'var(--font-mono)'},
+        series: [{name:'Avg PnL%', data: vals}],
+        colors: [({value}) => value >= 0 ? '#39d98a' : '#ff6b35'],
+        xaxis: {categories: hrs, labels:{style:{colors:'#555',fontSize:'9px'}}, title:{text:'UTC Hour', style:{color:'#444',fontSize:'10px'}}},
+        yaxis: {labels:{style:{colors:'#555',fontSize:'9px'}, formatter:v=>v.toFixed(1)+'%'}},
+        grid: {borderColor:'#1a1a1a', strokeDashArray:3},
+        dataLabels:{enabled:false}, plotOptions:{bar:{columnWidth:'80%'}},
+        theme:{mode:'dark'}, tooltip:{theme:'dark',
+          custom({dataPointIndex:i}) {
+            const h = hrs[i]; const t = trds[i]; const w = wrs[i]; const p = vals[i];
+            return `<div style="padding:6px 10px;font-size:0.72rem;background:#1a1a1a;border:1px solid #333">
+              <b>${h}:00 UTC</b><br>Trades: ${t}<br>Win: ${w}%<br>Avg: ${p>=0?'+':''}${p.toFixed(2)}%</div>`;
+          }
+        },
+      });
+      _btHourlyChart.render();
+      document.getElementById('btHourlyCard').style.display = '';
+    }
+
+    // ── Exit reason breakdown ──────────────────────────────────────
+    const exitStats = d.exit_reason_stats || {};
+    const exitTotal = Object.values(exitStats).reduce((s,v)=>s+v,0) || 1;
+    const _ec = {take_profit:'#39d98a',roi_table:'#A8FF53',trailing_stop:'#5bc8ff',stop_loss:'#ff6b35',end_of_period:'#555'};
+    const _en = {take_profit:'Take Profit',roi_table:'ROI Table',trailing_stop:'Trailing SL',stop_loss:'Stop Loss',end_of_period:'End of Period'};
+    if (Object.keys(exitStats).length) {
+      document.getElementById('btExitBars').innerHTML =
+        Object.entries(exitStats).sort((a,b)=>b[1]-a[1]).map(([k,v]) => {
+          const pct = (v/exitTotal*100).toFixed(1);
+          const c = _ec[k]||'#888';
+          return `<div style="text-align:center;flex:1;min-width:70px">
+            <div style="background:${c}22;border:1px solid ${c}55;border-radius:6px;padding:6px 4px">
+              <div style="color:${c};font-size:0.95rem;font-weight:700;font-family:var(--font-mono)">${v}</div>
+              <div style="color:${c};font-size:0.6rem;margin-top:2px">${pct}%</div>
+            </div>
+            <div style="color:#666;font-size:0.6rem;margin-top:4px">${_en[k]||k}</div>
+          </div>`;
+        }).join('');
+      document.getElementById('btExitCard').style.display = '';
     }
 
     const srcLabel = d.data_source === 'binance' ? 'Binance' : 'simulated';
@@ -3657,6 +3755,70 @@ async function runBacktest() {
   finally {
     btn.disabled = false;
     btn.innerHTML = '<i class="bi bi-play-fill me-1"></i>Run Backtest';
+  }
+}
+
+// Walk-Forward Validation (Jesse-style)
+async function runWalkForward() {
+  const btn = document.getElementById('wfRunBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Running...';
+  document.getElementById('wfCard').style.display = 'none';
+  try {
+    const symbol = document.getElementById('btSymbol').value;
+    const days   = parseInt(document.getElementById('btDays').value) || 90;
+    const tp     = parseFloat(document.getElementById('btTp').value) / 100 || 0.04;
+    const sl     = parseFloat(document.getElementById('btSl').value) / 100 || 0.02;
+    const r = await fetch(`/api/backtest/walkforward?symbol=${encodeURIComponent(symbol)}&days=${Math.max(days,60)}&tp_pct=${tp}&sl_pct=${sl}&folds=3`);
+    const d = await r.json();
+    if (d.error) { showToast('Walk-Forward Error', d.error, 'warning'); return; }
+
+    // Summary stats
+    const s = d.summary || {};
+    const ovRisk = s.overfit_risk || 'N/A';
+    const ovColor = ovRisk==='LOW'?'#39d98a':ovRisk==='MEDIUM'?'#ffc107':'#ff6b35';
+    const badge = document.getElementById('wfOverfitBadge');
+    badge.textContent = 'Overfit Risk: ' + ovRisk;
+    badge.style.background = ovColor + '22';
+    badge.style.color = ovColor;
+
+    document.getElementById('wfSummaryRow').innerHTML = [
+      ['Avg OOS Return', (s.avg_oos_return_pct>=0?'+':'')+s.avg_oos_return_pct?.toFixed(2)+'%', s.avg_oos_return_pct>=0?'#39d98a':'#ff6b35'],
+      ['Avg OOS Sharpe', s.avg_oos_sharpe?.toFixed(2)||'—', s.avg_oos_sharpe>=0.5?'#39d98a':s.avg_oos_sharpe>=0?'#ccc':'#ff6b35'],
+      ['Profitable Folds', `${s.profitable_folds||0}/${s.total_folds||0}`, '#A8FF53'],
+      ['Consistency', (s.consistency_pct?.toFixed(1)||'0')+'%', s.consistency_pct>=50?'#39d98a':'#ff6b35'],
+    ].map(([label,val,color])=>`
+      <div class="col-6 col-md-3">
+        <div class="stat-card" style="background:${color}0d;border:1px solid ${color}33;padding:10px">
+          <div class="stat-label">${label}</div>
+          <div class="stat-value" style="color:${color};font-size:1.1rem">${val}</div>
+        </div>
+      </div>`).join('');
+
+    // Fold table
+    document.getElementById('wfFoldsBody').innerHTML = (d.folds||[]).map(f => {
+      const oosColor = f.oos_return_pct>=0?'#39d98a':'#ff6b35';
+      const degVal   = f.degradation==null ? '—' : f.degradation.toFixed(2)+'x';
+      const degColor = f.degradation==null?'#666':f.degradation>=0.75?'#39d98a':f.degradation>=0.4?'#ffc107':'#ff6b35';
+      return `<tr>
+        <td style="font-family:var(--font-mono)">#${f.fold}</td>
+        <td style="color:#A8FF53">${f.optimized_tp_pct}%</td>
+        <td style="color:#ff6b35">${f.optimized_sl_pct}%</td>
+        <td style="color:${f.is_sharpe>=0.5?'#39d98a':f.is_sharpe>=0?'#ccc':'#ff6b35'}">${f.is_sharpe?.toFixed(2)}</td>
+        <td style="color:${f.is_return_pct>=0?'#39d98a':'#ff6b35'}">${f.is_return_pct>=0?'+':''}${f.is_return_pct?.toFixed(2)}%</td>
+        <td style="color:${oosColor};font-weight:600">${f.oos_return_pct>=0?'+':''}${f.oos_return_pct?.toFixed(2)}%</td>
+        <td style="color:${f.oos_sharpe>=0.5?'#39d98a':f.oos_sharpe>=0?'#ccc':'#ff6b35'}">${f.oos_sharpe?.toFixed(2)}</td>
+        <td style="color:${f.oos_win_rate>=50?'#39d98a':'#ff6b35'}">${f.oos_win_rate}%</td>
+        <td style="color:${degColor};font-weight:600">${degVal}</td>
+      </tr>`;
+    }).join('');
+
+    document.getElementById('wfCard').style.display = '';
+    showToast('Walk-Forward Complete', `${d.symbol} | OOS Avg: ${s.avg_oos_return_pct>=0?'+':''}${s.avg_oos_return_pct?.toFixed(2)}% | Overfit: ${ovRisk}`, ovRisk==='LOW'?'success':'warning');
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+  finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Walk-Forward Validation';
   }
 }
 

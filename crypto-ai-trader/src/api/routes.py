@@ -530,6 +530,27 @@ async def run_backtest(data: Dict[str, Any]):
         raise HTTPException(500, str(e))
 
 
+@router.get("/backtest/walkforward")
+async def backtest_walkforward(
+    symbol: str = "BTC/USDT",
+    days: int = 90,
+    folds: int = 3,
+    tp_pct: float = 0.04,
+    sl_pct: float = 0.02,
+    initial_capital: float = 10000.0,
+):
+    """Walk-forward validation: Jesse-style rolling IS/OOS parameter optimisation."""
+    from ..agent.backtest import run_walkforward
+    try:
+        result = await run_walkforward(
+            symbol=symbol, days=days, folds=folds,
+            tp_pct=tp_pct, sl_pct=sl_pct, initial_capital=initial_capital,
+        )
+        return result
+    except Exception as e:
+        return {"error": str(e), "symbol": symbol}
+
+
 # ─── Training Loop Routes ──────────────────────────────────────
 
 @router.post("/training/loop/start")
