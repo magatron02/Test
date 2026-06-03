@@ -159,6 +159,14 @@ async def shutdown():
         _trader.stop()
     if _trader_task:
         _trader_task.cancel()
+    # Close exchange HTTP sessions to avoid ResourceWarning on exit
+    try:
+        if _trader and hasattr(_trader._exchange, "close"):
+            await _trader._exchange.close()
+    except Exception:
+        pass
+    if _hourly_trainer_inst:
+        _hourly_trainer_inst.stop()
 
 
 def main():
