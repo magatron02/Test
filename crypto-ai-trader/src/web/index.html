@@ -512,6 +512,7 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
       <option value="rule_based">Rule-based</option>
       <option value="ml">ML</option>
       <option value="claude">Claude API</option>
+      <option value="multi_model">Multi-Model Consensus</option>
     </select>
     <select class="form-select form-select-sm" style="width:auto;font-size:0.72rem" id="strategySelect">
       <option value="hybrid">Hybrid</option>
@@ -1560,6 +1561,14 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
             <option value="claude-opus-4-8">claude-opus-4-8 (ฉลาดสุด)</option>
             <option value="claude-haiku-4-5-20251001">claude-haiku-4-5 (เร็วสุด)</option>
           </select>
+          <hr style="border-color:var(--border);margin:0.75rem 0">
+          <div class="small text-muted mb-2" style="font-size:0.7rem">
+            <i class="bi bi-people me-1"></i>Multi-Model Consensus — ใส่ key เพิ่มเพื่อให้ AI หลายตัวโหวตร่วมกัน (เลือกโหมด "Multi-Model Consensus")
+          </div>
+          <label class="form-label small mb-1">OpenAI API Key (GPT-4)</label>
+          <input type="password" class="form-control form-control-sm mb-2" id="openaiApiKey" placeholder="sk-... (เว้นว่างได้)">
+          <label class="form-label small mb-1">Gemini API Key</label>
+          <input type="password" class="form-control form-control-sm mb-3" id="geminiApiKey" placeholder="AIza... (เว้นว่างได้)">
           <button class="btn btn-primary btn-sm" onclick="saveAISettings()">
             <i class="bi bi-save me-1"></i>Save AI Settings
           </button>
@@ -2101,8 +2110,16 @@ function renderSentimentPanel() {
     ? (fr.rate > 0.001 ? 'Longs pay heavily → bearish pressure' : fr.rate > 0 ? 'Longs pay (normal)' : 'Shorts pay → bullish pressure')
     : '';
 
-  // OI display
-  const oiVal = oi.usdt != null ? (oi.usdt >= 1e9 ? (oi.usdt/1e9).toFixed(2)+'B' : (oi.usdt/1e6).toFixed(0)+'M') + ' USDT' : '—';
+  // OI display — prefer USDT notional, fall back to contract count, then error
+  let oiVal = '—';
+  let oiNote = 'Binance perpetual futures';
+  if (oi.usdt != null) {
+    oiVal = (oi.usdt >= 1e9 ? (oi.usdt/1e9).toFixed(2)+'B' : (oi.usdt/1e6).toFixed(0)+'M') + ' USDT';
+  } else if (oi.contracts != null) {
+    oiVal = Number(oi.contracts).toLocaleString(undefined, {maximumFractionDigits:0}) + ' contracts';
+  } else if (oi.error) {
+    oiNote = 'ไม่พร้อมใช้งาน (region-restricted)';
+  }
 
   panel.innerHTML = `
     <div class="d-flex flex-wrap gap-3 align-items-center py-1 px-2">
@@ -2123,7 +2140,7 @@ function renderSentimentPanel() {
         <div style="min-width:140px">
           <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em">Open Interest</div>
           <div style="font-family:var(--font-mono);font-size:1.1rem;font-weight:700">${oiVal}</div>
-          <div style="font-size:0.6rem;color:var(--text-muted)">Binance perpetual futures</div>
+          <div style="font-size:0.6rem;color:var(--text-muted)">${oiNote}</div>
         </div>
         <div style="min-width:200px;border-left:1px solid var(--border);padding-left:12px">
           <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em">Interpretation</div>
@@ -2915,6 +2932,11 @@ async function saveAISettings() {
     }
   };
   if (!data.ai.claude.api_key) delete data.ai.claude.api_key;
+  // Only send GPT-4/Gemini keys when the user actually typed one (avoid wiping saved keys)
+  const openaiKey = document.getElementById('openaiApiKey').value;
+  const geminiKey = document.getElementById('geminiApiKey').value;
+  if (openaiKey) data.ai.openai = { api_key: openaiKey };
+  if (geminiKey) data.ai.gemini = { api_key: geminiKey };
   try {
     await fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
     showToast('Saved', 'AI settings saved', 'success');
@@ -2974,6 +2996,10 @@ async function loadSettings() {
     }
     // AI model
     if (d.ai?.claude?.model) document.getElementById('claudeModel').value = d.ai.claude.model;
+    if (d.ai?.default_model) document.getElementById('aiModelSelect').value = d.ai.default_model;
+    // Show masked keys as placeholder hints (server returns first 8 chars + ****)
+    if (d.ai?.openai?.api_key) document.getElementById('openaiApiKey').placeholder = d.ai.openai.api_key + ' (มีค่าแล้ว)';
+    if (d.ai?.gemini?.api_key) document.getElementById('geminiApiKey').placeholder = d.ai.gemini.api_key + ' (มีค่าแล้ว)';
     // Exchange enabled states
     ['binance', 'binance_th', 'bitkub', 'okx'].forEach(ex => {
       const cb = document.getElementById(`${ex}_enabled`);

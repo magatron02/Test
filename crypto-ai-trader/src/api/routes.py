@@ -203,9 +203,11 @@ async def get_settings():
                 ex["api_key"] = ex["api_key"][:4] + "****"
             if "api_secret" in ex and ex["api_secret"]:
                 ex["api_secret"] = "****"
-    if "ai" in cfg and "claude" in cfg["ai"]:
-        key = cfg["ai"]["claude"].get("api_key", "")
-        cfg["ai"]["claude"]["api_key"] = key[:8] + "****" if key else ""
+    if "ai" in cfg:
+        for provider in ("claude", "openai", "gemini"):
+            if provider in cfg["ai"] and isinstance(cfg["ai"][provider], dict):
+                key = cfg["ai"][provider].get("api_key", "")
+                cfg["ai"][provider]["api_key"] = key[:8] + "****" if key else ""
     return cfg
 
 
@@ -1183,9 +1185,16 @@ async def get_sentiment(symbol: str = "BTC/USDT"):
 
     exchange = _trader._exchange if _trader else None
 
+    # Current price (for OI contracts → USDT notional)
+    mark_price = None
+    if _trader:
+        a = _trader.analyses.get(symbol)
+        if a:
+            mark_price = a.price
+
     # Gather concurrently; funding rate needs the exchange client
     fng_task = get_fear_greed()
-    oi_task  = get_open_interest(binance_symbol)
+    oi_task  = get_open_interest(binance_symbol, mark_price=mark_price)
 
     if exchange:
         funding_task = get_funding_rate(exchange, symbol)
@@ -1228,8 +1237,9 @@ async def get_sentiment(symbol: str = "BTC/USDT"):
             "error":        funding.get("error"),
         },
         "open_interest": {
-            "usdt":  oi.get("open_interest_usdt"),
-            "error": oi.get("error"),
+            "usdt":      oi.get("open_interest_usdt"),
+            "contracts": oi.get("open_interest_contracts"),
+            "error":     oi.get("error"),
         },
     }
 

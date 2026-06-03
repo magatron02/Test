@@ -173,6 +173,7 @@ class AITrader:
             # Detect market regime for this symbol
             regime = detect_regime(candles, analysis)
             self._regimes[symbol] = regime
+            analysis.market_regime = regime.regime  # plumb regime into the analysis so AI prompts see it
             logger.debug("Regime %s: %s (conf=%.2f)", symbol, regime.regime, regime.confidence)
             return analysis
         except Exception as e:

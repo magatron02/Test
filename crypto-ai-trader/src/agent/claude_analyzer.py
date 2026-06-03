@@ -99,9 +99,16 @@ SYSTEM_PROMPT = """You are an expert crypto trading analyst operating an automat
 ═══════════════════════════════════════════════════════
 
 1. get_multi_timeframe → full indicator picture across all timeframes (includes Ichimoku, SuperTrend, SMC signals, StochRSI, Williams %R, CCI, RSI divergence)
-2. get_recent_trades → learn from outcomes; avoid repeating setups that lost
-3. get_portfolio_state → check cash and risk capacity before any BUY
-4. submit_trading_decision → final call (exactly once)
+2. get_market_sentiment → Fear & Greed Index + funding rate + open interest. Use as a CONTRARIAN overlay: Extreme Greed warns against new longs, Extreme Fear favours accumulation; crowded funding signals squeeze risk.
+3. get_recent_trades → learn from outcomes; avoid repeating setups that lost
+4. get_portfolio_state → check cash and risk capacity before any BUY
+5. submit_trading_decision → final call (exactly once)
+
+SENTIMENT INTEGRATION RULE:
+  • Never open a new LONG when Fear & Greed > 75 (Extreme Greed) unless structure shows a fresh BOS with strong volume — fade euphoria.
+  • Favour LONGS when Fear & Greed < 25 (Extreme Fear) AND price is at a demand zone / discount.
+  • Very high positive funding (> 0.05%/8h) = over-leveraged longs → squeeze risk → reduce confidence on longs.
+  • Negative funding = over-leveraged shorts → potential short squeeze → supports longs.
 
 ═══════════════════════════════════════════════════════
  DECISION RULES
@@ -179,6 +186,11 @@ TOOLS = [
         "input_schema": {"type": "object", "properties": {}, "required": []},
     },
     {
+        "name": "get_market_sentiment",
+        "description": "Get market sentiment & on-chain data: Fear & Greed Index (0-100), perpetual funding rate, and open interest. Use as a CONTRARIAN filter — Extreme Greed (>75) warns against new longs (market overstretched); Extreme Fear (<25) is historically the best accumulation zone. High positive funding = crowded longs (bearish pressure); negative funding = crowded shorts (bullish pressure).",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
         "name": "submit_trading_decision",
         "description": "Submit your final trading decision. Call this exactly once when your analysis is complete.",
         "input_schema": {
@@ -196,7 +208,7 @@ TOOLS = [
     },
 ]
 
-MAX_STEPS = 6  # cap the agentic loop so a cycle can't run away on tool calls
+MAX_STEPS = 7  # cap the agentic loop so a cycle can't run away on tool calls (4 context tools + decision)
 
 
 class ClaudeAnalyzer:
@@ -225,6 +237,8 @@ class ClaudeAnalyzer:
                 return self._tool_recent_trades(analysis.symbol, tool_input.get("limit", 10))
             if name == "get_portfolio_state":
                 return await self._tool_portfolio_state()
+            if name == "get_market_sentiment":
+                return await self._tool_market_sentiment(analysis.symbol, mark_price=analysis.price)
             return json.dumps({"error": f"unknown tool {name}"})
         except Exception as e:
             logger.warning(f"Tool {name} failed: {e}")
@@ -252,30 +266,21 @@ class ClaudeAnalyzer:
                     "overall_signal": a.overall_signal,
                     "signal_strength": round(a.signal_strength, 2),
                 }
-                # ── advanced indicators (may be absent on short candle histories) ──
-                if getattr(a, "ichimoku_signal", None) is not None:
-                    row["ichimoku"] = a.ichimoku_signal
-                if getattr(a, "supertrend_signal", None) is not None:
-                    row["supertrend"] = a.supertrend_signal
-                if getattr(a, "stoch_rsi_k", None) is not None:
-                    row["stoch_rsi"] = {
-                        "k": round(a.stoch_rsi_k, 1),
-                        "d": round(a.stoch_rsi_d, 1),
-                        "signal": a.stoch_rsi_signal,
-                    }
-                if getattr(a, "williams_r", None) is not None:
-                    row["williams_r"] = round(a.williams_r, 1)
-                if getattr(a, "cci", None) is not None:
-                    row["cci"] = round(a.cci, 1)
-                if getattr(a, "rsi_divergence", None) is not None:
+                # ── advanced indicators (carry sensible NEUTRAL/NONE defaults) ──
+                row["ichimoku"]   = a.ichimoku_signal
+                row["supertrend"] = a.supertrend_signal
+                row["stoch_rsi"]  = {"k": round(a.stoch_rsi_k, 1), "signal": a.stoch_rsi_signal}
+                row["williams_r"] = round(a.williams_r, 1)
+                row["cci"]        = round(a.cci, 1)
+                if a.rsi_divergence and a.rsi_divergence != "NONE":
                     row["rsi_divergence"] = a.rsi_divergence
-                if getattr(a, "smc_summary", None) is not None:
+                if a.smc_summary:  # omit empty SMC block (short candle history)
                     row["smc"] = {
                         "summary": a.smc_summary,
                         "buy_score": round(a.smc_buy, 2),
                         "sell_score": round(a.smc_sell, 2),
                     }
-                if getattr(a, "market_regime", None) is not None:
+                if a.market_regime:
                     row["regime"] = a.market_regime
                 out[tf] = row
             except Exception as e:
@@ -329,6 +334,42 @@ class ClaudeAnalyzer:
             "cash": round(float(cash.free), 2) if cash else 0.0,
             "cash_usdt": round(float(cash.free), 2) if cash else 0.0,  # back-compat
             "holdings": holdings,
+        })
+
+    async def _tool_market_sentiment(self, symbol: str, mark_price: Optional[float] = None) -> str:
+        from ..data.sentiment import get_fear_greed, get_funding_rate, get_open_interest
+        binance_symbol = symbol.replace("/", "")
+        fng_task = get_fear_greed()
+        oi_task = get_open_interest(binance_symbol, mark_price=mark_price)
+        if self._exchange:
+            funding_task = get_funding_rate(self._exchange, symbol)
+            fng, oi, funding = await asyncio.gather(fng_task, oi_task, funding_task, return_exceptions=True)
+        else:
+            fng, oi = await asyncio.gather(fng_task, oi_task, return_exceptions=True)
+            funding = {"funding_rate": None}
+        fng     = fng     if isinstance(fng, dict)     else {"value": None}
+        oi      = oi      if isinstance(oi, dict)      else {"open_interest_usdt": None}
+        funding = funding if isinstance(funding, dict) else {"funding_rate": None}
+        fgv = fng.get("value")
+        if fgv is None:
+            bias = "NEUTRAL"
+        elif fgv <= 25:
+            bias = "CONTRARIAN_BUY (extreme fear — accumulation zone)"
+        elif fgv <= 45:
+            bias = "CAUTIOUS_BUY"
+        elif fgv <= 55:
+            bias = "NEUTRAL"
+        elif fgv <= 75:
+            bias = "CAUTIOUS_SELL"
+        else:
+            bias = "CONTRARIAN_SELL (extreme greed — overstretched)"
+        return json.dumps({
+            "fear_greed_value": fgv,
+            "fear_greed_label": fng.get("label"),
+            "contrarian_bias": bias,
+            "funding_rate": funding.get("funding_rate"),
+            "funding_rate_pct": funding.get("funding_rate_pct"),
+            "open_interest_usdt": oi.get("open_interest_usdt"),
         })
 
     # ── agentic loop ──────────────────────────────────────────────────────
@@ -401,29 +442,23 @@ class ClaudeAnalyzer:
         elif getattr(analysis, "pattern_summary", ""):
             pattern_text = f"\nChart patterns: {analysis.pattern_summary}"
 
-        # Advanced indicators section
-        adv_lines = []
-        if getattr(analysis, "ichimoku_signal", None) is not None:
-            adv_lines.append(f"- Ichimoku: {analysis.ichimoku_signal}")
-        if getattr(analysis, "supertrend_signal", None) is not None:
-            adv_lines.append(f"- SuperTrend: {analysis.supertrend_signal}")
-        if getattr(analysis, "stoch_rsi_k", None) is not None:
-            adv_lines.append(
-                f"- StochRSI: K={analysis.stoch_rsi_k:.1f} D={analysis.stoch_rsi_d:.1f} [{analysis.stoch_rsi_signal}]"
-            )
-        if getattr(analysis, "williams_r", None) is not None:
-            adv_lines.append(f"- Williams %R: {analysis.williams_r:.1f}")
-        if getattr(analysis, "cci", None) is not None:
-            adv_lines.append(f"- CCI(20): {analysis.cci:.1f}")
-        if getattr(analysis, "rsi_divergence", None) not in (None, "NONE"):
+        # Advanced indicators section (fields carry NEUTRAL/NONE defaults)
+        adv_lines = [
+            f"- Ichimoku: {analysis.ichimoku_signal}",
+            f"- SuperTrend: {analysis.supertrend_signal}",
+            f"- StochRSI: K={analysis.stoch_rsi_k:.1f} [{analysis.stoch_rsi_signal}]",
+            f"- Williams %R: {analysis.williams_r:.1f}",
+            f"- CCI(20): {analysis.cci:.1f}",
+        ]
+        if analysis.rsi_divergence and analysis.rsi_divergence != "NONE":
             adv_lines.append(f"- RSI Divergence: {analysis.rsi_divergence}")
-        if getattr(analysis, "smc_summary", None) is not None:
+        if analysis.smc_summary:
             adv_lines.append(
                 f"- SMC: {analysis.smc_summary} (buy_score={analysis.smc_buy:.2f} sell_score={analysis.smc_sell:.2f})"
             )
-        if getattr(analysis, "market_regime", None) is not None:
+        if analysis.market_regime:
             adv_lines.append(f"- Detected regime: {analysis.market_regime}")
-        advanced_text = ("\nAdvanced indicators (15m):\n" + "\n".join(adv_lines)) if adv_lines else ""
+        advanced_text = "\nAdvanced indicators (15m):\n" + "\n".join(adv_lines)
 
         return f"""Analyze {analysis.symbol} and decide BUY / SELL / HOLD.
 
@@ -438,4 +473,4 @@ Snapshot (15m timeframe):
 
 Portfolio: cash {portfolio.get('cash_usdt', 0):.2f} USDT | total {portfolio.get('total_value', 0):.2f} USDT | open positions {portfolio.get('open_positions', 0)}
 
-Apply the analytical framework: check market structure → SMC zones → Fibonacci confluence → multi-timeframe alignment → momentum confirmation. Call get_multi_timeframe to see higher timeframes (Ichimoku, SMC, StochRSI included), then get_recent_trades for outcome learning, then submit your decision."""
+Apply the analytical framework: check market structure → SMC zones → Fibonacci confluence → multi-timeframe alignment → momentum confirmation. Call get_multi_timeframe for higher timeframes (Ichimoku, SMC, StochRSI included), get_market_sentiment for the Fear & Greed / funding contrarian overlay, then get_recent_trades for outcome learning, then submit your decision."""

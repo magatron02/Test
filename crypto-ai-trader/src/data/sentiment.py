@@ -131,29 +131,46 @@ async def get_funding_rate(exchange, symbol: str = "BTC/USDT") -> dict:
         return {"symbol": symbol, "funding_rate": None, "error": str(e)}
 
 
-async def get_open_interest(symbol: str = "BTCUSDT") -> dict:
-    """Return open interest from Binance futures (public endpoint). Cached 60 s."""
+async def get_open_interest(symbol: str = "BTCUSDT", mark_price: Optional[float] = None) -> dict:
+    """Return open interest from Binance futures (public endpoint). Cached 60 s.
+
+    The /fapi/v1/openInterest endpoint returns OI in *base-asset contracts*
+    (e.g. BTC), not USDT. Pass ``mark_price`` to convert to a USDT notional;
+    otherwise only the contract count is returned.
+    """
     cache_key = f"oi:{symbol}"
     cached = _cached(cache_key, _CACHE_TTL["oi"])
     if cached is not None:
+        # Recompute USDT if a price is now available and wasn't cached, then persist it
+        if mark_price is not None and cached.get("open_interest_contracts") and cached.get("open_interest_usdt") is None:
+            cached = {**cached, "open_interest_usdt": float(cached["open_interest_contracts"]) * mark_price}
+            _store(cache_key, cached, _CACHE_TTL["oi"])
         return cached
     try:
         url = f"{_BINANCE_OI_URL}?symbol={symbol}"
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
             async with session.get(url) as resp:
                 data = await resp.json(content_type=None)
-        oi = float(data.get("openInterest", 0)) * float(data.get("price", 0)) if "openInterest" in data else None
+        # Binance error responses carry a non-zero code / msg and omit openInterest
+        if "openInterest" not in data:
+            msg = data.get("msg", "unexpected response")
+            logger.warning("Open interest unavailable for %s: %s", symbol, msg)
+            return {"symbol": symbol, "open_interest_contracts": None,
+                    "open_interest_usdt": None, "error": msg[:160]}
+        contracts = float(data["openInterest"])
+        usdt = contracts * mark_price if mark_price is not None else None
         result = {
             "symbol": symbol,
-            "open_interest_contracts": data.get("openInterest"),
-            "open_interest_usdt": oi,
+            "open_interest_contracts": contracts,
+            "open_interest_usdt": usdt,
             "time": data.get("time"),
         }
         _store(cache_key, result, _CACHE_TTL["oi"])
         return result
     except Exception as e:
         logger.warning("Open interest fetch failed for %s: %s", symbol, e)
-        return {"symbol": symbol, "open_interest_usdt": None, "error": str(e)}
+        return {"symbol": symbol, "open_interest_contracts": None,
+                "open_interest_usdt": None, "error": str(e)[:160]}
 
 
 async def get_snapshot(exchange=None, symbol: str = "BTC/USDT") -> SentimentSnapshot:

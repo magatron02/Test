@@ -64,6 +64,7 @@ class MarketAnalysis:
     smc_sell: float = 0.0
     smc_summary: str = ""
     aroon_signal: str = "NEUTRAL"
+    market_regime: str = ""              # set by AITrader after detect_regime (BULL_TREND, …)
 
 
 def _ema(series: np.ndarray, period: int) -> np.ndarray:

@@ -5,11 +5,15 @@ app:
   log_level: "INFO"
 
 ai:
-  default_model: "hybrid"   # options: claude, rule_based, ml, hybrid
+  default_model: "hybrid"   # options: claude, rule_based, ml, hybrid, multi_model
   claude:
     api_key: ""             # ใส่ Claude API key ที่นี่
     model: "claude-sonnet-4-6"  # claude-opus-4-8 | claude-sonnet-4-6 | claude-haiku-4-5-20251001
     max_tokens: 2048            # agentic loop: tool use + multi-step reasoning needs headroom
+  openai:
+    api_key: ""             # GPT-4 key สำหรับ multi-model consensus (ไม่ใส่ก็ได้)
+  gemini:
+    api_key: ""             # Gemini key สำหรับ multi-model consensus (ไม่ใส่ก็ได้)
   rule_based:
     enabled: true
   ml:

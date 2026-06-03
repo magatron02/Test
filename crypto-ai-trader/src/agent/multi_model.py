@@ -159,26 +159,38 @@ def _vote(signals: list[dict]) -> TradingSignal:
         return TradingSignal("HOLD", 0.0, "multi_model", "No model responses", 0.03, 0.06)
 
     buy_w = sell_w = hold_w = 0.0
+    buy_n = sell_n = hold_n = 0
     for s in signals:
         w = s["confidence"]
         if s["action"] == "BUY":
-            buy_w += w
+            buy_w += w; buy_n += 1
         elif s["action"] == "SELL":
-            sell_w += w
+            sell_w += w; sell_n += 1
         else:
-            hold_w += w
+            hold_w += w; hold_n += 1
 
     total = buy_w + sell_w + hold_w or 1.0
     models_str = ", ".join(s["model"] for s in signals)
     reasonings = " | ".join(f"[{s['model']}] {s['reasoning'][:80]}" for s in signals)
 
+    def _conf(winner_w: float, winner_n: int) -> float:
+        # Consensus confidence = (how strongly the winning side agrees, 0..1)
+        #                        × (mean confidence of the winning-side models).
+        # The agreement ratio alone would inflate a lone 0.6 vote to 1.0; scaling
+        # by the winners' mean confidence keeps a single model's call honest.
+        if winner_n == 0:
+            return 0.0
+        agreement   = winner_w / total          # 1.0 only when *all* conviction agrees
+        mean_winner = winner_w / winner_n        # average confidence of agreeing models
+        return round(agreement * mean_winner, 3)
+
     if buy_w >= sell_w and buy_w >= hold_w:
-        return TradingSignal("BUY", round(buy_w / total, 3), "multi_model",
+        return TradingSignal("BUY", _conf(buy_w, buy_n), "multi_model",
                              f"Consensus ({models_str}): {reasonings}", 0.025, 0.05)
     if sell_w >= buy_w and sell_w >= hold_w:
-        return TradingSignal("SELL", round(sell_w / total, 3), "multi_model",
+        return TradingSignal("SELL", _conf(sell_w, sell_n), "multi_model",
                              f"Consensus ({models_str}): {reasonings}", 0.025, 0.05)
-    return TradingSignal("HOLD", round(hold_w / total, 3), "multi_model",
+    return TradingSignal("HOLD", _conf(hold_w, hold_n), "multi_model",
                          f"No consensus ({models_str}): {reasonings}", 0.03, 0.06)
 
 
@@ -191,6 +203,20 @@ async def multi_model_signal(analysis: MarketAnalysis) -> TradingSignal:
     is used when the AI model is explicitly set to 'multi_model'.
     """
     prompt = _build_prompt(analysis)
+
+    # Append live sentiment as a shared contrarian overlay for every model.
+    try:
+        from ..data.sentiment import get_fear_greed
+        fng = await get_fear_greed()
+        fgv = fng.get("value")
+        if fgv is not None:
+            prompt += (
+                f"\n\nMarket sentiment — Fear & Greed Index: {fgv} ({fng.get('label')}). "
+                "Use as a CONTRARIAN filter: Extreme Greed (>75) warns against new longs; "
+                "Extreme Fear (<25) favours accumulation."
+            )
+    except Exception:
+        pass
 
     tasks = [_call_claude(prompt), _call_gpt4(prompt), _call_gemini(prompt)]
     results = await asyncio.gather(*tasks, return_exceptions=True)
