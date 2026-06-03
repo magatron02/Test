@@ -280,16 +280,22 @@ def _run_loop(
     roi_table: Optional[dict] = None,
     trailing_stop_pct: Optional[float] = None,
     trailing_activate_pct: float = 0.01,
+    fee_pct: float = 0.001,
+    slippage_pct: float = 0.0005,
 ) -> Tuple[dict, list, list, list]:
     """
     Core simulation loop shared by all modes.
     Returns (metrics_dict, curve_list, trades_list, equity_raw).
+
+    fee_pct      — round-trip commission per leg (0.001 = 0.1% per side).
+    slippage_pct — market-impact slippage added on entry and subtracted on exit.
     """
-    capital = initial_capital
-    equity  = [capital]
+    capital     = initial_capital
+    equity      = [capital]
     trades: List[dict] = []
-    open_trade = None
-    kelly = _KellyTracker()
+    open_trade  = None
+    kelly       = _KellyTracker()
+    total_fees  = 0.0
 
     # Regime + pattern stats
     regime_stats: Dict[str, dict] = defaultdict(
@@ -391,8 +397,17 @@ def _run_loop(
                     win = True
 
             if exit_reason:
-                raw_pnl_pct = (exit_price - entry) / entry if side == "BUY" else (entry - exit_price) / entry
-                capital += open_trade["cost"] * raw_pnl_pct
+                # Slippage on exit: lose a bit more on the fill
+                if side == "BUY":
+                    eff_exit = exit_price * (1 - slippage_pct)
+                else:
+                    eff_exit = exit_price * (1 + slippage_pct)
+                eff_entry = open_trade.get("eff_entry", entry)
+                raw_pnl_pct = (eff_exit - eff_entry) / eff_entry if side == "BUY" else (eff_entry - eff_exit) / eff_entry
+                exit_fee = open_trade["cost"] * fee_pct
+                capital += open_trade["cost"] * raw_pnl_pct - exit_fee
+                total_fees += exit_fee
+                win = raw_pnl_pct > 0   # recompute with real fill prices
                 kelly.update(raw_pnl_pct * 100)
 
                 r = open_trade.get("regime", "RANGING")
@@ -420,7 +435,8 @@ def _run_loop(
                     "strategy":   open_trade.get("strategy", ""),
                     "exit_reason": exit_reason,
                     "hour":       open_trade["at"].hour,
-                    "size_pct":   round(open_trade["cost"] / capital * 100, 1),
+                    "size_pct":   round(open_trade["cost"] / max(capital, 1) * 100, 1),
+                    "fee_usdt":   round(exit_fee + open_trade.get("entry_fee", 0.0), 4),
                 })
                 open_trade = None
 
@@ -470,26 +486,39 @@ def _run_loop(
         if cost < 1.0:
             continue
 
+        # Apply slippage to entry fill and deduct entry commission
+        eff_entry = price * (1 + slippage_pct) if action == "BUY" else price * (1 - slippage_pct)
+        entry_fee = cost * fee_pct
+        capital  -= entry_fee
+        total_fees += entry_fee
+
         open_trade = {
-            "side":     action,
-            "entry":    price,
-            "cost":     cost,
-            "at":       c["ts"],
-            "regime":   regime_name,
-            "patterns": [s for s in patterns_s.split() if s] if patterns_s else [],
-            "strategy": strategy,
+            "side":       action,
+            "entry":      price,       # raw (used for TP/SL price levels)
+            "eff_entry":  eff_entry,   # slippage-adjusted (used for PnL)
+            "cost":       cost,
+            "entry_fee":  entry_fee,
+            "at":         c["ts"],
+            "regime":     regime_name,
+            "patterns":   [s for s in patterns_s.split() if s] if patterns_s else [],
+            "strategy":   strategy,
         }
 
     # --- Close any open position at end ---
     if open_trade:
-        price = candles[-1]["close"]
-        entry = open_trade["entry"]
-        raw_pnl_pct = (price - entry) / entry if open_trade["side"] == "BUY" else (entry - price) / entry
-        capital += open_trade["cost"] * raw_pnl_pct
+        price     = candles[-1]["close"]
+        entry     = open_trade["entry"]
+        side      = open_trade["side"]
+        eff_entry = open_trade.get("eff_entry", entry)
+        eff_exit  = price * (1 - slippage_pct) if side == "BUY" else price * (1 + slippage_pct)
+        raw_pnl_pct = (eff_exit - eff_entry) / eff_entry if side == "BUY" else (eff_entry - eff_exit) / eff_entry
+        exit_fee  = open_trade["cost"] * fee_pct
+        capital  += open_trade["cost"] * raw_pnl_pct - exit_fee
+        total_fees += exit_fee
         trades.append({
             "open_at":    open_trade["at"].isoformat(),
             "close_at":   candles[-1]["ts"].isoformat(),
-            "side":       open_trade["side"],
+            "side":       side,
             "entry":      round(entry, 4),
             "exit":       round(price, 4),
             "pnl_pct":    round(raw_pnl_pct * 100, 2),
@@ -500,6 +529,7 @@ def _run_loop(
             "exit_reason": "end_of_period",
             "hour":       open_trade["at"].hour,
             "size_pct":   round(open_trade["cost"] / max(capital, 1) * 100, 1),
+            "fee_usdt":   round(exit_fee + open_trade.get("entry_fee", 0.0), 4),
         })
         equity.append(round(capital, 2))
 
@@ -547,6 +577,7 @@ def _run_loop(
         "max_drawdown_pct": round(max_dd, 2),
         "initial_capital":  initial_capital,
         "final_capital":    round(capital, 2),
+        "total_fees_pct":   round(total_fees / initial_capital * 100, 3),
         "regime_stats":     regime_out,
         "pattern_stats":    pattern_out,
     }
@@ -608,14 +639,20 @@ def _build_result(
 
     # Load dynamic exit settings
     from ..core.config import settings as _cfg
-    roi_tbl   = _cfg.get("strategy", "roi_table") or {}
-    trail_cfg = _cfg.get("strategy", "trailing_stop") or {}
-    trail_pct = float(trail_cfg.get("pct", 0.02)) if trail_cfg.get("enabled") else None
-    trail_act = float(trail_cfg.get("activate_pct", 0.01))
+    roi_tbl    = _cfg.get("strategy",  "roi_table")       or {}
+    trail_cfg  = _cfg.get("strategy",  "trailing_stop")   or {}
+    bt_cfg     = _cfg.get("backtest")                      or {}
+    trail_pct  = float(trail_cfg.get("pct", 0.02)) if trail_cfg.get("enabled") else None
+    trail_act  = float(trail_cfg.get("activate_pct", 0.01))
+    fee_pct    = float(bt_cfg.get("fee_pct",      0.001))
+    slip_pct   = float(bt_cfg.get("slippage_pct", 0.0005))
 
-    basic_m,  basic_curve,  basic_trades,  basic_eq  = _run_loop(symbol, candles, tp_pct, sl_pct, initial_capital, "basic",      roi_table=roi_tbl, trailing_stop_pct=trail_pct, trailing_activate_pct=trail_act)
-    hybrid_m, hybrid_curve, hybrid_trades, hybrid_eq = _run_loop(symbol, candles, tp_pct, sl_pct, initial_capital, "hybrid",     roi_table=roi_tbl, trailing_stop_pct=trail_pct, trailing_activate_pct=trail_act)
-    ai_m,     ai_curve,     ai_trades,     ai_eq     = _run_loop(symbol, candles, tp_pct, sl_pct, initial_capital, "autotrade",  roi_table=roi_tbl, trailing_stop_pct=trail_pct, trailing_activate_pct=trail_act)
+    loop_kw = dict(roi_table=roi_tbl, trailing_stop_pct=trail_pct,
+                   trailing_activate_pct=trail_act, fee_pct=fee_pct, slippage_pct=slip_pct)
+
+    basic_m,  basic_curve,  basic_trades,  basic_eq  = _run_loop(symbol, candles, tp_pct, sl_pct, initial_capital, "basic",     **loop_kw)
+    hybrid_m, hybrid_curve, hybrid_trades, hybrid_eq = _run_loop(symbol, candles, tp_pct, sl_pct, initial_capital, "hybrid",    **loop_kw)
+    ai_m,     ai_curve,     ai_trades,     ai_eq     = _run_loop(symbol, candles, tp_pct, sl_pct, initial_capital, "autotrade", **loop_kw)
 
     basic_analytics  = compute_metrics(basic_trades,  basic_eq,  initial_capital)
     hybrid_analytics = compute_metrics(hybrid_trades, hybrid_eq, initial_capital)
@@ -637,6 +674,7 @@ def _build_result(
             "avg_win_pct":      analytics["avg_win_pct"],
             "avg_loss_pct":     analytics["avg_loss_pct"],
             "expectancy_pct":   analytics["expectancy_pct"],
+            "total_fees_pct":   m.get("total_fees_pct", 0.0),
             "final_capital":    m["final_capital"],
             "equity_curve":     curve,
         }
@@ -672,7 +710,10 @@ def _build_result(
         **{k: ai_m[k] for k in (
             "total_trades", "win_rate", "total_return_pct",
             "sharpe", "max_drawdown_pct", "initial_capital", "final_capital",
+            "total_fees_pct",
         )},
+        "fee_pct":      fee_pct,
+        "slippage_pct": slip_pct,
         "analytics":     ai_analytics,
 
         "equity_curve":  ai_curve,
@@ -724,6 +765,11 @@ async def run_walkforward(
         data_source = "simulated"
 
     from .risk_analytics import compute_metrics
+    from ..core.config import settings as _cfg2
+    _bt2 = _cfg2.get("backtest") or {}
+    _fee    = float(_bt2.get("fee_pct",      0.001))
+    _slip   = float(_bt2.get("slippage_pct", 0.0005))
+    _wf_kw  = dict(fee_pct=_fee, slippage_pct=_slip)
 
     n = len(candles)
     # Each fold uses an expanding IS window; OOS = next fold_size candles
@@ -750,16 +796,16 @@ async def run_walkforward(
             for s in grid_sl:
                 if t <= s:          # require positive R:R
                     continue
-                m, _, _, _ = _run_loop(symbol, is_candles, t, s, initial_capital, "autotrade")
+                m, _, _, _ = _run_loop(symbol, is_candles, t, s, initial_capital, "autotrade", **_wf_kw)
                 if m["sharpe"] > best_sharpe:
                     best_sharpe = m["sharpe"]
                     best_tp, best_sl = t, s
 
         # ── IS performance with optimised params ──────────────────────────
-        is_m, _, is_trades, is_eq = _run_loop(symbol, is_candles, best_tp, best_sl, initial_capital, "autotrade")
+        is_m, _, is_trades, is_eq = _run_loop(symbol, is_candles, best_tp, best_sl, initial_capital, "autotrade", **_wf_kw)
 
         # ── OOS performance with SAME params (no peeking) ─────────────────
-        oos_m, _, oos_trades, oos_eq = _run_loop(symbol, oos_candles, best_tp, best_sl, initial_capital, "autotrade")
+        oos_m, _, oos_trades, oos_eq = _run_loop(symbol, oos_candles, best_tp, best_sl, initial_capital, "autotrade", **_wf_kw)
         oos_ana = compute_metrics(oos_trades, oos_eq, initial_capital)
 
         # Degradation ratio: OOS_return / IS_return (1.0 = perfect; 0 = all alpha lost OOS)

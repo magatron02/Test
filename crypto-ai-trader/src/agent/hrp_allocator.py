@@ -173,7 +173,21 @@ def allocate_capital(
         weights = hrp_weights(aligned, symbols)
         w = np.array([weights[s] for s in symbols], dtype=float)
 
-        w = np.minimum(w, max_weight)
+        # Iterative water-filling: cap overweight assets and redistribute
+        # excess to uncapped assets, repeating until stable.
+        for _ in range(n + 1):
+            over = w > max_weight + 1e-9
+            if not np.any(over):
+                break
+            excess = float(np.sum(w[over] - max_weight))
+            w[over] = max_weight
+            under = ~over
+            under_sum = float(w[under].sum())
+            if under_sum > 0:
+                w[under] += excess * (w[under] / under_sum)
+            else:
+                # All assets at cap → uniform at cap, renorm below
+                break
         total = w.sum()
         if not np.isfinite(total) or total <= 0:
             return _equal()

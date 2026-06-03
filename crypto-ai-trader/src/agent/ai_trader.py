@@ -59,6 +59,11 @@ class AITrader:
         self._daily_pnl: float = 0.0
         self._daily_reset_date: str = ""
 
+        # Dry-run: paper trade without hitting the exchange
+        self._dry_run: bool = bool(settings.get("trading", "dry_run", default=False))
+        # Kill switch: halts all new trades when activated
+        self._killed: bool  = False
+
         # Signal funnel + agent activity (dashboard)
         self._signal_stats: Dict[str, object] = {
             "date": "", "analyzed": 0, "signals": 0, "approved": 0, "rejected": 0
@@ -423,7 +428,23 @@ class AITrader:
                     return False
                 amount = pos_bal.free
 
-            order = await self._exchange.create_order(symbol, signal.action.lower(), amount)
+            if self._dry_run:
+                import uuid
+                from ..exchanges.base import Order as _Order
+                order = _Order(
+                    id=f"dry_{uuid.uuid4().hex[:8]}",
+                    symbol=symbol,
+                    side=signal.action.lower(),
+                    type="market",
+                    price=analysis.price,
+                    amount=amount,
+                    cost=analysis.price * amount,
+                    status="closed",
+                )
+                logger.info("[DRY-RUN] Paper %s %s %.6f @ %.4f",
+                            signal.action, symbol, amount, analysis.price)
+            else:
+                order = await self._exchange.create_order(symbol, signal.action.lower(), amount)
 
             trade_data = {
                 "symbol":            symbol,
@@ -506,12 +527,28 @@ class AITrader:
         trade = self._open_trades[symbol]
         entry = trade["price"]
         try:
-            base    = symbol.split("/")[0]
-            balances = await self._exchange.get_balance()
-            bal      = balances.get(base)
-            if not bal or bal.free <= 0:
-                return {}
-            order    = await self._exchange.create_order(symbol, "sell", bal.free)
+            base = symbol.split("/")[0]
+            if self._dry_run:
+                import uuid
+                from ..exchanges.base import Order as _Order
+                amt = trade.get("amount", 0.0)
+                order = _Order(
+                    id=f"dry_{uuid.uuid4().hex[:8]}",
+                    symbol=symbol,
+                    side="sell",
+                    type="market",
+                    price=price,
+                    amount=amt,
+                    cost=price * amt,
+                    status="closed",
+                )
+                logger.info("[DRY-RUN] Paper CLOSE %s @ %.4f (%s)", symbol, price, reason)
+            else:
+                balances = await self._exchange.get_balance()
+                bal      = balances.get(base)
+                if not bal or bal.free <= 0:
+                    return {}
+                order = await self._exchange.create_order(symbol, "sell", bal.free)
             pnl      = (order.price - entry) * order.amount
             pnl_pct  = (order.price - entry) / entry * 100
 
@@ -619,6 +656,9 @@ class AITrader:
 
     async def run_cycle(self):
         self._ensure_today()
+        if self._killed:
+            logger.warning("Kill switch active — trading cycle skipped")
+            return
         symbols = settings.symbols
 
         # Refresh correlation-aware HRP weights from last cycle's price history
@@ -729,6 +769,24 @@ class AITrader:
 
     def stop(self):
         self._running = False
+
+    def kill(self):
+        """Activate kill switch — no new trades until resume() is called."""
+        self._killed = True
+        logger.warning("KILL SWITCH ACTIVATED — all new trading halted")
+
+    def resume(self):
+        """Deactivate kill switch — allow trading to resume."""
+        self._killed = False
+        logger.info("Kill switch deactivated — trading resumed")
+
+    @property
+    def dry_run(self) -> bool:
+        return self._dry_run
+
+    @property
+    def killed(self) -> bool:
+        return self._killed
 
     # ── Properties (back-compat) ──────────────────────────────────────────
 

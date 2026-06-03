@@ -38,7 +38,7 @@ def _half_life(spread: np.ndarray) -> Optional[float]:
     return float(hl)
 
 
-def test_cointegration(price_a: np.ndarray, price_b: np.ndarray) -> dict:
+def check_cointegration(price_a: np.ndarray, price_b: np.ndarray) -> dict:
     """Engle-Granger cointegration test on two price series (equal length, >= 50)."""
     try:
         a = np.asarray(price_a, dtype=float)
@@ -65,7 +65,7 @@ def test_cointegration(price_a: np.ndarray, price_b: np.ndarray) -> dict:
             "half_life": hl,
         }
     except Exception as exc:  # noqa: BLE001
-        logger.warning("test_cointegration failed: %s", exc)
+        logger.warning("check_cointegration failed: %s", exc)
         return {
             "cointegrated": False,
             "p_value": None,
@@ -155,7 +155,7 @@ def find_cointegrated_pairs(
                         continue
                     a = raw_a[-n:]
                     b = raw_b[-n:]
-                    res = test_cointegration(a, b)
+                    res = check_cointegration(a, b)
                     p = res.get("p_value")
                     if p is None or p >= threshold:
                         continue

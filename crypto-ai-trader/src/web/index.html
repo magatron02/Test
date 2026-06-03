@@ -559,6 +559,37 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
   <!-- Price ticker row -->
   <div class="row g-2 mb-4" id="priceCardsRow"></div>
 
+  <!-- Kill Switch + Dry-Run Controls -->
+  <div class="row g-3 mb-3">
+    <div class="col-12">
+      <div class="card" style="border-color:rgba(220,53,69,0.3)">
+        <div class="card-header d-flex justify-content-between align-items-center" style="background:rgba(220,53,69,0.08)">
+          <span><i class="bi bi-power me-2 text-danger"></i>Trading Controls <span class="text-muted" style="font-size:0.7rem;font-weight:400">— Kill Switch &amp; Dry-Run</span></span>
+          <div class="d-flex gap-2 align-items-center">
+            <span id="killStatusBadge" class="badge bg-success" style="font-size:0.65rem">TRADING ACTIVE</span>
+            <span id="dryRunBadge" class="badge bg-secondary d-none" style="font-size:0.65rem">DRY-RUN</span>
+          </div>
+        </div>
+        <div class="card-body py-2 px-3">
+          <div class="d-flex flex-wrap gap-3 align-items-center">
+            <button id="killSwitchBtn" class="btn btn-danger btn-sm px-4" onclick="activateKillSwitch()">
+              <i class="bi bi-stop-circle me-1"></i>Activate Kill Switch
+            </button>
+            <button id="resumeTradeBtn" class="btn btn-success btn-sm px-4 d-none" onclick="deactivateKillSwitch()">
+              <i class="bi bi-play-circle me-1"></i>Resume Trading
+            </button>
+            <div class="vr"></div>
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" id="dryRunToggle" onchange="toggleDryRun(this.checked)">
+              <label class="form-check-label small" for="dryRunToggle">Paper Trade (Dry-Run)</label>
+            </div>
+            <span class="text-muted" style="font-size:0.7rem" id="killSwitchNote">Kill switch immediately stops all new orders. Existing positions remain open.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Market Intelligence Row: Regime + Risk + Patterns -->
   <div class="row g-3 mb-3" id="marketIntelRow">
     <!-- Market Regime -->
@@ -4394,6 +4425,62 @@ async function init() {
   setInterval(() => fetchSentiment(Object.keys(allPrices)[0] || 'BTC/USDT'), 300000); // 5 min
   // E: Chart auto-refresh every 15 minutes
   setInterval(updateTradingChart, 15 * 60 * 1000);
+  await fetchKillSwitchStatus();
+  setInterval(fetchKillSwitchStatus, 10000);
+}
+
+// ── Kill Switch + Dry-Run controls ───────────────────────────────────────
+async function fetchKillSwitchStatus() {
+  try {
+    const d = await fetch('/api/trading/kill-switch').then(r => r.json());
+    _applyKillState(d.killed, d.dry_run);
+  } catch (_) {}
+}
+
+function _applyKillState(killed, dryRun) {
+  const badge    = document.getElementById('killStatusBadge');
+  const drBadge  = document.getElementById('dryRunBadge');
+  const killBtn  = document.getElementById('killSwitchBtn');
+  const resumBtn = document.getElementById('resumeTradeBtn');
+  const toggle   = document.getElementById('dryRunToggle');
+  if (killed) {
+    badge.textContent = 'TRADING HALTED';
+    badge.className   = 'badge bg-danger';
+    killBtn.classList.add('d-none');
+    resumBtn.classList.remove('d-none');
+  } else {
+    badge.textContent = 'TRADING ACTIVE';
+    badge.className   = 'badge bg-success';
+    killBtn.classList.remove('d-none');
+    resumBtn.classList.add('d-none');
+  }
+  if (drBadge) drBadge.classList.toggle('d-none', !dryRun);
+  if (toggle)  toggle.checked = !!dryRun;
+}
+
+async function activateKillSwitch() {
+  if (!confirm('Activate kill switch? All new trades will be halted immediately.')) return;
+  const d = await fetch('/api/trading/kill-switch?action=activate', { method: 'POST' }).then(r => r.json());
+  _applyKillState(d.killed, undefined);
+  _addNotif({ type: 'warning', message: 'Kill switch activated — trading halted', ts: new Date().toISOString() });
+}
+
+async function deactivateKillSwitch() {
+  const d = await fetch('/api/trading/kill-switch?action=deactivate', { method: 'POST' }).then(r => r.json());
+  _applyKillState(d.killed, undefined);
+  _addNotif({ type: 'info', message: 'Kill switch deactivated — trading resumed', ts: new Date().toISOString() });
+}
+
+async function toggleDryRun(enabled) {
+  const d = await fetch(`/api/trading/dry-run?enabled=${enabled}`, { method: 'POST' }).then(r => r.json());
+  const drBadge = document.getElementById('dryRunBadge');
+  if (drBadge) drBadge.classList.toggle('d-none', !d.dry_run);
+}
+
+function _addNotif(item) {
+  // Lightweight local notification push (websocket handles persistence)
+  const panel = document.getElementById('notificationsPanel');
+  if (!panel) return;
 }
 
 init();

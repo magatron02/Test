@@ -1317,3 +1317,46 @@ async def get_sentiment(symbol: str = "BTC/USDT"):
         },
     }
 
+
+@router.get("/trading/kill-switch")
+async def kill_switch_status():
+    """GET /api/trading/kill-switch — return current kill switch and dry-run state."""
+    return {
+        "killed":  _trader.killed   if _trader else False,
+        "dry_run": _trader.dry_run  if _trader else False,
+        "running": _trader._running if _trader else False,
+    }
+
+
+@router.post("/trading/kill-switch")
+async def set_kill_switch(action: str = "activate"):
+    """POST /api/trading/kill-switch?action=activate|deactivate — toggle kill switch.
+
+    action=activate   → halt all new trades immediately.
+    action=deactivate → resume trading.
+    """
+    if not _trader:
+        raise HTTPException(503, "Trader not initialised")
+    if action == "activate":
+        _trader.kill()
+        return {"killed": True, "message": "Kill switch activated — trading halted"}
+    elif action == "deactivate":
+        _trader.resume()
+        return {"killed": False, "message": "Kill switch deactivated — trading resumed"}
+    raise HTTPException(400, "action must be 'activate' or 'deactivate'")
+
+
+@router.post("/trading/dry-run")
+async def set_dry_run(enabled: bool = True):
+    """POST /api/trading/dry-run?enabled=true|false — toggle paper-trading mode at runtime.
+
+    When enabled, orders are logged but never sent to the exchange.
+    """
+    if not _trader:
+        raise HTTPException(503, "Trader not initialised")
+    _trader._dry_run = enabled
+    return {
+        "dry_run": _trader._dry_run,
+        "message": f"Dry-run {'enabled' if enabled else 'disabled'}",
+    }
+

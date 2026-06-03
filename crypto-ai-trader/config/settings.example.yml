@@ -52,8 +52,13 @@ exchanges:
     virtual_balance_thb: 350000.0   # THB เสมือน (สำหรับ Bitkub)
     data_source: "binance"          # ดึงข้อมูลตลาดจาก exchange ไหน
 
+backtest:
+  fee_pct: 0.001        # Commission per side (0.001 = 0.1% — Binance taker)
+  slippage_pct: 0.0005  # Market-impact slippage per fill (0.05%)
+
 trading:
-  mode: "demo"              # demo | live
+  dry_run: false        # true = log orders but never send to exchange
+  mode: "demo"          # demo | live
   symbols:
     - "BTC/USDT"
     - "ETH/USDT"
