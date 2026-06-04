@@ -1,12 +1,12 @@
 @echo off
 cd /d "%~dp0"
-title Aiterra v1.0.24 - Update
+title Aiterra v1.2.0 - Update
 color 0B
 
 cls
 echo.
 echo  ============================================================
-echo   Aiterra v1.0.24  --  Update
+echo   Aiterra v1.2.0  --  Update
 echo  ============================================================
 echo.
 echo   Upgrades the program and brings your data into this version.

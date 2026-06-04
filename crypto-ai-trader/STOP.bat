@@ -5,7 +5,7 @@ color 0C
 
 echo.
 echo  ============================================================
-echo   Aiterra v1.0.0  --  Stopping...
+echo   Aiterra v1.2.0  --  Stopping...
 echo  ============================================================
 echo.
 
@@ -16,7 +16,7 @@ for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":8888 " ^| findstr "LISTENIN
 )
 
 REM Also try by window title
-taskkill /FI "WINDOWTITLE eq Aiterra v1.0.0*" /F >nul 2>&1
+taskkill /FI "WINDOWTITLE eq Aiterra v1.2.0*" /F >nul 2>&1
 
 echo  [OK] Aiterra stopped.
 echo.
