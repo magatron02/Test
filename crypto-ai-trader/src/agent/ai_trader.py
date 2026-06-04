@@ -7,9 +7,11 @@ from .claude_analyzer import ClaudeAnalyzer
 from .exit_manager import ExitManager
 from .market_analyzer import MarketAnalysis, analyze
 from .market_regime import RegimeResult, detect_regime
+from .narrative import build_narrative
 from .risk_engine import RiskEngine
 from .position_sizer import PositionSizer
 from .rl_trainer import ModelBandit, RLTrainer
+from .signal_cache import SignalCache
 from .strategy_manager import StrategyManager, TradingSignal
 from .trainer import AITrainer
 from ..core.config import settings
@@ -51,10 +53,13 @@ class AITrader:
         self._rl          = RLTrainer(models_dir=settings.models_dir)
         self._model_bandit = ModelBandit(models_dir=settings.models_dir)  # F2.1
         self._exit_mgr    = ExitManager()                                   # F2.2
+        # Fingerprint cache: skip the costly Claude call when the market is unchanged
+        self._signal_cache = SignalCache(settings.get("ai", "signal_cache", default={}) or {})
 
         self._running     = False
         self._analyses:   Dict[str, MarketAnalysis] = {}
         self._regimes:    Dict[str, RegimeResult]   = {}
+        self._narratives: Dict[str, str]            = {}   # symbol → plain-language summary
         self._open_trades: Dict[str, dict] = {}
         self._price_history: Dict[str, list] = {}   # symbol → recent closes (HRP/pairs)
         self._hrp_weights:   Dict[str, float] = {}  # symbol → correlation-aware weight
@@ -160,6 +165,7 @@ class AITrader:
             "risk":               self._risk.summary(),
             "rl_stats":           self._rl.stats,
             "model_bandit_stats": self._model_bandit.get_stats(),   # F2.1
+            "signal_cache":       self._signal_cache.stats,
         }
 
     async def _broadcast(self, event: str, data: dict):
@@ -334,6 +340,20 @@ class AITrader:
 
     # ── Signal generation ─────────────────────────────────────────────────
 
+    async def _claude_signal_cached(
+        self, analysis: MarketAnalysis, portfolio: dict, regime: RegimeResult,
+    ) -> TradingSignal:
+        """Run the Claude analyst, reusing the last decision when the market
+        state for this symbol is materially unchanged (saves API tokens)."""
+        cached = self._signal_cache.get(analysis.symbol, analysis, regime)
+        if cached is not None:
+            self._set_agent("analyzer", "idle",
+                            f"{analysis.symbol}: ใช้ผลวิเคราะห์เดิม (ตลาดนิ่ง)")
+            return cached
+        sig = await self._claude.analyze(analysis, portfolio)
+        self._signal_cache.put(analysis.symbol, analysis, regime, sig)
+        return sig
+
     async def _get_final_signal(
         self,
         analysis: MarketAnalysis,
@@ -366,7 +386,7 @@ class AITrader:
 
         chosen = ai_model
         if ai_model == "claude":
-            sig = await self._claude.analyze(analysis, portfolio)
+            sig = await self._claude_signal_cached(analysis, portfolio, regime)
             _capture("claude", sig)
             chosen = "claude"
         elif ai_model == "rule_based":
@@ -393,7 +413,7 @@ class AITrader:
 
             if bandit_model == "claude" and settings.claude_api_key:
                 try:
-                    claude_sig = await self._claude.analyze(analysis, portfolio)
+                    claude_sig = await self._claude_signal_cached(analysis, portfolio, regime)
                     _capture("claude", claude_sig)
                     sig, chosen = claude_sig, "claude"
                 except Exception:
@@ -620,6 +640,9 @@ class AITrader:
                 risk_amount = order.cost * signal.stop_loss_pct
                 self._risk.register_open_trade(symbol, risk_amount)
 
+            # Position state changed → drop cached decision so next cycle is fresh
+            self._signal_cache.invalidate(symbol)
+
             await self._broadcast("trade_executed", {
                 "symbol":      symbol,
                 "side":        signal.action,
@@ -703,6 +726,7 @@ class AITrader:
 
             self._daily_pnl += pnl
             del self._open_trades[symbol]
+            self._signal_cache.invalidate(symbol)   # context changed after exit
 
             await self._broadcast("trade_closed", {
                 "symbol":      symbol,
@@ -839,6 +863,10 @@ class AITrader:
                 "attribution": self._signal_attribution,
             }
 
+            # Plain-language market narrative (rule-based, zero-cost)
+            narrative = build_narrative(analysis, regime, signal)
+            self._narratives[symbol] = narrative
+
             await self._broadcast("analysis_update", {
                 "symbol":      symbol,
                 "price":       analysis.price,
@@ -846,6 +874,7 @@ class AITrader:
                 "signal":      signal.action,
                 "confidence":  signal.confidence,
                 "reasoning":   signal.reasoning,
+                "narrative":   narrative,
                 "rsi":         analysis.rsi,
                 "macd_hist":   analysis.macd_hist,
                 "bb_position": analysis.bb_position,
@@ -998,6 +1027,10 @@ class AITrader:
     @property
     def regimes(self) -> Dict[str, RegimeResult]:
         return self._regimes
+
+    @property
+    def narratives(self) -> Dict[str, str]:
+        return self._narratives
 
     @property
     def risk_summary(self) -> dict:

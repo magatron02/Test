@@ -1424,6 +1424,14 @@ async def get_market_regimes():
     }
 
 
+@router.get("/narratives")
+async def get_narratives():
+    """GET /api/narratives — plain-language market summary for each tracked symbol."""
+    if not _trader:
+        return {}
+    return dict(_trader.narratives)
+
+
 @router.get("/risk")
 async def get_risk_state():
     """GET /api/risk — portfolio risk engine state (drawdown, heat, circuit breaker)."""

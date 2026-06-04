@@ -22,6 +22,11 @@ ai:
     min_training_samples: 30  # เริ่ม train เมื่อมี trade ครบจำนวนนี้
     retrain_interval: 50      # retrain ทุก N trades
   hourly_train_interval: 3600  # ดึงข้อมูลจริงจาก Binance ทุก N วินาที (3600 = 1 ชั่วโมง)
+  # Incremental analysis cache — ข้ามการเรียก Claude ซ้ำเมื่อตลาดยังนิ่ง (ประหยัดค่า API)
+  signal_cache:
+    enabled: true
+    price_threshold_pct: 0.5   # ถ้าราคาขยับน้อยกว่านี้ + สัญญาณเดิม → ใช้ผลวิเคราะห์เดิม
+    max_age_sec: 1800          # บังคับวิเคราะห์ใหม่ทุก 30 นาทีเสมอ (กันผลเก่าค้าง)
 
 exchanges:
   active: "binance"         # live exchange to trade on when mode=live

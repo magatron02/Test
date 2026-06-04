@@ -699,6 +699,7 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
             </div>
           </div>
           <div class="text-muted mt-2 text-center" style="font-size:0.7rem;font-family:var(--font-mono)" id="funLastSignal">รอสัญญาณ...</div>
+          <div class="text-muted text-center" style="font-size:0.68rem;font-family:var(--font-mono)" id="funCacheSaved"></div>
         </div>
       </div>
     </div>
@@ -2300,6 +2301,18 @@ async function fetchRiskState() {
   } catch {}
 }
 
+// Hydrate market narratives so they show on load (not just after a fresh cycle)
+async function fetchNarratives() {
+  try {
+    const r = await fetch('/api/narratives');
+    const data = await r.json();
+    for (const [sym, narrative] of Object.entries(data)) {
+      allAnalyses[sym] = { ...(allAnalyses[sym] || {}), narrative };
+    }
+    if (currentSymbol && allAnalyses[currentSymbol]) updateAIPanel(currentSymbol);
+  } catch {}
+}
+
 async function fetchPatterns(symbol) {
   const sym = symbol || (Object.keys(allPrices)[0]) || 'BTC/USDT';
   try {
@@ -2752,19 +2765,27 @@ function updateAIPanel(sym) {
   const a = allAnalyses[sym];
   if (!a) return;
   const signalColor = a.signal === 'BUY' ? '#A8FF53' : a.signal === 'SELL' ? '#ff6b35' : '#555555';
-  document.getElementById('aiAnalysisPanel').innerHTML = `
+  const narrativeBlock = a.narrative
+    ? `<div class="small mb-2 p-2" style="background:rgba(168,255,83,0.07);border-left:3px solid ${signalColor};border-radius:6px;line-height:1.5">
+         <i class="bi bi-chat-left-text me-1"></i>${a.narrative}
+       </div>`
+    : '';
+  // On cold load only the narrative may exist (no analysis cycle yet) — show it alone.
+  const hasSignal = a.signal != null;
+  const header = hasSignal ? `
     <div class="d-flex justify-content-between mb-2">
       <strong style="color:${signalColor}">${a.signal}</strong>
       <span class="text-muted small">${((a.confidence||0)*100).toFixed(0)}% confidence</span>
-    </div>
+    </div>` : '';
+  const indicators = hasSignal ? `
     <div class="small text-muted mb-2">${a.reasoning || ''}</div>
     <div class="indicator-row"><span>EMA Trend</span><span class="${a.ema_trend==='BULLISH'?'price-up':a.ema_trend==='BEARISH'?'price-down':'text-muted'}">${a.ema_trend||'—'}</span></div>
     <div class="indicator-row"><span>Volatility</span><span>${a.volatility||'—'}</span></div>
     <div class="indicator-row"><span>BB Position</span>
       <span>${((a.bb_position||0.5)*100).toFixed(0)}%
         <span class="indicator-bar"><span class="indicator-fill" style="width:${(a.bb_position||0.5)*100}%;background:#A8FF53"></span></span>
-      </span></div>
-  `;
+      </span></div>` : '';
+  document.getElementById('aiAnalysisPanel').innerHTML = header + narrativeBlock + indicators;
 }
 
 function updateOpenPositions(positions) {
@@ -4216,6 +4237,14 @@ function renderDashboardState(d) {
   }
   const op = document.getElementById('pnlOpenPos');
   if (op && d.open_positions != null) op.textContent = d.open_positions;
+  // Signal cache savings (incremental analysis)
+  if (d.signal_cache) {
+    const sc = d.signal_cache;
+    const el = document.getElementById('funCacheSaved');
+    if (el) el.textContent = (sc.enabled && sc.calls_saved > 0)
+      ? `⚡ ประหยัด Claude API ${sc.calls_saved} ครั้ง (hit ${(sc.hit_rate*100).toFixed(0)}%)`
+      : '';
+  }
   // Agents
   if (d.agents) renderAgents(d.agents);
   // Risk state embedded in dashboard update
@@ -4610,6 +4639,7 @@ async function init() {
   await refreshNotifications();
   await fetchRegimes();
   await fetchRiskState();
+  await fetchNarratives();
   await fetchPatterns(Object.keys(allPrices)[0] || 'BTC/USDT');
   await fetchAnalytics();
   await fetchSentiment(Object.keys(allPrices)[0] || 'BTC/USDT');
@@ -4624,6 +4654,7 @@ async function init() {
   setInterval(refreshNotifications, 30000);
   setInterval(fetchRegimes, 15000);
   setInterval(fetchRiskState, 10000);
+  setInterval(fetchNarratives, 30000);
   setInterval(fetchAnalytics, 60000);
   setInterval(() => fetchSentiment(Object.keys(allPrices)[0] || 'BTC/USDT'), 300000); // 5 min
   // E: Chart auto-refresh every 15 minutes
