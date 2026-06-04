@@ -69,6 +69,46 @@ def test_simulate_returns_empty_bars():
     assert len(rets) >= 0   # no crash
 
 
+def test_simulate_returns_overbought_triggers_exit():
+    """Regression: rsi_overbought must actually drive the exit (was unused)."""
+    bars = [
+        {"close": 100.0, "rsi": 25.0, "atr_pct": 0.02, "signal_confidence": 1.0},
+        {"close": 110.0, "rsi": 72.0, "atr_pct": 0.02, "signal_confidence": 1.0},
+        {"close": 105.0, "rsi": 50.0, "atr_pct": 0.02, "signal_confidence": 1.0},
+    ]
+    # overbought=70 → exit at bar1 (rsi 72) locking in +10%
+    rets_tp = _simulate_returns(bars, rsi_oversold=30, rsi_overbought=70,
+                                atr_sl_mult=5.0, min_confidence=0.5)
+    # overbought=80 → no overbought exit; trade rides to mark-to-market at bar2 (+5%)
+    rets_hold = _simulate_returns(bars, rsi_oversold=30, rsi_overbought=80,
+                                  atr_sl_mult=5.0, min_confidence=0.5)
+    assert rets_tp[0] == pytest.approx(0.10, abs=1e-6)
+    assert rets_hold[0] == pytest.approx(0.05, abs=1e-6)
+
+
+def test_simulate_returns_confidence_gate_blocks_entry():
+    """min_confidence must gate entries (low conf → no trade)."""
+    bars = [
+        {"close": 100.0, "rsi": 20.0, "atr_pct": 0.01, "signal_confidence": 0.40},
+        {"close": 105.0, "rsi": 75.0, "atr_pct": 0.01, "signal_confidence": 0.40},
+    ]
+    rets = _simulate_returns(bars, rsi_oversold=30, rsi_overbought=70,
+                             atr_sl_mult=2.0, min_confidence=0.60)
+    # conf 0.40 < 0.60 → never enters → no real trade returns
+    assert np.allclose(rets, 0.0)
+
+
+def test_simulate_returns_stop_loss_caps_loss():
+    bars = [
+        {"close": 100.0, "rsi": 20.0, "atr_pct": 0.01, "signal_confidence": 1.0},
+        {"close": 90.0,  "rsi": 50.0, "atr_pct": 0.01, "signal_confidence": 1.0},
+    ]
+    # sl_pct = 0.01 * 2 = 0.02; -10% move trips the 2% stop
+    rets = _simulate_returns(bars, rsi_oversold=30, rsi_overbought=70,
+                             atr_sl_mult=2.0, min_confidence=0.5)
+    assert rets[0] == pytest.approx(-0.02, abs=1e-6)
+
+
 # ── walk_forward_splits ───────────────────────────────────────────────────────
 
 def test_wf_splits_count():
@@ -91,6 +131,23 @@ def test_wf_splits_too_small():
     splits = walk_forward_splits(bars, n_splits=3)
     # may return fewer splits than requested for tiny data
     assert isinstance(splits, list)
+
+
+def test_wf_splits_no_degenerate_test_window():
+    """Regression: the final fold must not be a 1-bar test window."""
+    bars = _make_bars(120)
+    splits = walk_forward_splits(bars, n_splits=3, min_chunk=5)
+    for _, test in splits:
+        assert len(test) >= 5
+
+
+def test_wf_splits_expanding_train_window():
+    """Train window should expand monotonically across folds."""
+    bars = _make_bars(160)
+    splits = walk_forward_splits(bars, n_splits=4)
+    train_lens = [len(tr) for tr, _ in splits]
+    assert train_lens == sorted(train_lens)
+    assert len(set(train_lens)) == len(train_lens)   # strictly increasing
 
 
 # ── grid_search ───────────────────────────────────────────────────────────────

@@ -8,6 +8,7 @@ from .exit_manager import ExitManager
 from .market_analyzer import MarketAnalysis, analyze
 from .market_regime import RegimeResult, detect_regime
 from .narrative import build_narrative
+from .param_optimizer import ParamOptimizer
 from .risk_engine import RiskEngine
 from .position_sizer import PositionSizer
 from .rl_trainer import ModelBandit, RLTrainer
@@ -53,6 +54,12 @@ class AITrader:
         self._rl          = RLTrainer(models_dir=settings.models_dir)
         self._model_bandit = ModelBandit(models_dir=settings.models_dir)  # F2.1
         self._exit_mgr    = ExitManager()                                   # F2.2
+        # F5.1 — walk-forward optimized params (loaded from best_params.json)
+        self._param_opt   = ParamOptimizer(models_dir=settings.models_dir)
+        _bp = self._param_opt.best_params or {}
+        self._opt_min_conf: Optional[float] = (
+            float(_bp["min_confidence"]) if "min_confidence" in _bp else None
+        )
         # Fingerprint cache: skip the costly Claude call when the market is unchanged
         self._signal_cache = SignalCache(settings.get("ai", "signal_cache", default={}) or {})
 
@@ -166,6 +173,7 @@ class AITrader:
             "rl_stats":           self._rl.stats,
             "model_bandit_stats": self._model_bandit.get_stats(),   # F2.1
             "signal_cache":       self._signal_cache.stats,
+            "param_opt":          self._param_opt.summary(),        # F5.1
         }
 
     async def _broadcast(self, event: str, data: dict):
@@ -442,8 +450,14 @@ class AITrader:
             else:
                 sig, chosen = rule_sig, f"rule:{rl_strategy}"
 
-        # In crash/volatile regimes, require higher confidence bar
+        # Base confidence bar. The walk-forward optimizer (F5.1) may only
+        # *tighten* the gate — it can raise min_conf above the configured
+        # default but never loosen it below, so auto-tuning can't make the
+        # bot trade more recklessly than the operator allows. Regime
+        # escalation (CRASH/VOLATILE) still applies on top.
         min_conf = float(settings.get("trading", "min_confidence", default=0.60))
+        if self._opt_min_conf is not None:
+            min_conf = max(min_conf, self._opt_min_conf)
         if regime.regime == "CRASH":
             min_conf = max(min_conf, 0.85)
         elif regime.regime == "VOLATILE":

@@ -255,6 +255,30 @@ class AITrainer:
             logger.warning("Drift detected — scheduling retrain")
             self.train()
 
+    def score(self, features: Dict) -> float:
+        """
+        Side-effect-free model confidence in [0, 1] for a single feature row.
+
+        Unlike :meth:`predict` this does NOT accumulate drift statistics or build
+        a TradingSignal — it is meant for batch/offline use (e.g. the param
+        optimizer scoring many historical candles). Returns 0.5 when no model
+        is ready.
+        """
+        if self._gbm is not None and self._gbm.ready:
+            try:
+                pred = self._gbm.predict(np.array(self._extract_gbm_features(features)))
+                if pred:
+                    return float(pred.get("confidence", 0.5))
+            except Exception:
+                pass
+        if self._model is not None:
+            try:
+                feat_vec = np.array([self._extract_features(features)])
+                return float(max(self._model.predict_proba(feat_vec)[0]))
+            except Exception:
+                pass
+        return 0.5
+
     def predict(self, features: Dict) -> Optional[TradingSignal]:
         # ── Primary: LightGBM with SHAP-backed reasoning ────────────────────
         if self._gbm is not None and self._gbm.ready:

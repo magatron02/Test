@@ -29,8 +29,9 @@ DEFAULT_GRID: Dict[str, List[Any]] = {
     "rsi_overbought":     [65, 70, 75],
     # ATR SL multiplier (exit_manager regime defaults act as baseline)
     "atr_sl_mult":        [1.5, 2.0, 2.5],
-    # Signal confidence gate
-    "min_confidence":     [0.50, 0.55, 0.60],
+    # Signal confidence gate — spans below and above the usual 0.60 default so
+    # the optimizer can recommend a *tighter* bar when the data supports it.
+    "min_confidence":     [0.50, 0.55, 0.60, 0.65, 0.70],
 }
 
 _BEST_PARAMS_FILE = "best_params.json"
@@ -54,52 +55,64 @@ def _simulate_returns(
     rsi_overbought: float,
     atr_sl_mult: float,
     min_confidence: float,
+    max_hold: int = 20,
 ) -> np.ndarray:
     """
-    Simplified simulation on a bar sequence; returns daily P&L fractions.
+    Lightweight price-driven simulation; returns per-trade P&L fractions.
 
-    Each bar dict must have: close, rsi, atr_pct, signal_confidence, label
-    where label ∈ {1=BUY, -1=SELL, 0=HOLD}.
+    Each bar dict should have: close, rsi, atr_pct, signal_confidence
+    (``label`` is accepted but optional / unused — entries are derived from
+    RSI + confidence, not look-ahead labels, so this stays leak-free).
 
-    This is intentionally lightweight — the goal is relative ranking of
-    param combos, not tick-level accuracy.
+    Trade lifecycle
+    ---------------
+    * Enter long when flat and ``rsi <= rsi_oversold`` and
+      ``signal_confidence >= min_confidence``.
+    * Exit on the first of:
+        - stop-loss   : unrealised P&L <= -(atr_pct × atr_sl_mult)
+        - take-profit : ``rsi >= rsi_overbought`` (momentum exhausted)
+        - time-stop   : held for ``max_hold`` bars
+    * Any position still open on the last bar is marked-to-market and closed.
+
+    The goal is *relative* ranking of param combos, not tick-accurate P&L —
+    every grid dimension (oversold, overbought, atr_sl_mult, min_confidence)
+    now measurably affects the outcome.
     """
-    equity = 1.0
-    returns = []
+    returns: List[float] = []
     in_trade = False
     entry_price = 0.0
     sl_pct = 0.0
+    bars_held = 0
 
     for bar in ohlcv:
         close = float(bar.get("close", 1.0))
         rsi   = float(bar.get("rsi", 50.0))
         atr   = float(bar.get("atr_pct", 0.01))
-        conf  = float(bar.get("signal_confidence", 0.0))
-        label = int(bar.get("label", 0))
+        conf  = float(bar.get("signal_confidence", 1.0))
 
         if in_trade:
-            pnl = (close - entry_price) / entry_price
-            # Stop-loss check
-            if pnl <= -sl_pct:
+            bars_held += 1
+            pnl = (close - entry_price) / entry_price if entry_price else 0.0
+            if pnl <= -sl_pct:                       # stop-loss
                 returns.append(-sl_pct)
-                equity *= 1 - sl_pct
                 in_trade = False
-                continue
-            # Take-profit / exit signal
-            if label == -1:
+            elif rsi >= rsi_overbought:              # take-profit
                 returns.append(pnl)
-                equity *= 1 + pnl
+                in_trade = False
+            elif bars_held >= max_hold:              # time-stop
+                returns.append(pnl)
                 in_trade = False
         else:
-            buy_signal = (
-                label == 1
-                and conf >= min_confidence
-                and rsi <= rsi_oversold
-            )
-            if buy_signal:
+            if rsi <= rsi_oversold and conf >= min_confidence:
                 entry_price = close
-                sl_pct = atr * atr_sl_mult
+                sl_pct = max(atr * atr_sl_mult, 1e-4)
+                bars_held = 0
                 in_trade = True
+
+    # Mark-to-market any still-open position on the final bar
+    if in_trade and ohlcv:
+        last_close = float(ohlcv[-1].get("close", entry_price))
+        returns.append((last_close - entry_price) / entry_price if entry_price else 0.0)
 
     return np.array(returns) if returns else np.zeros(1)
 
@@ -108,21 +121,28 @@ def _simulate_returns(
 
 def walk_forward_splits(
     data: List[Dict[str, float]],
-    train_frac: float = 0.70,
+    train_frac: float = 0.70,   # retained for API compatibility
     n_splits: int = 3,
+    min_chunk: int = 5,
 ) -> List[Tuple[List, List]]:
     """
-    Returns n_splits (train, test) slices over `data` using expanding train window.
+    Expanding-window walk-forward split.
+
+    Divides `data` into ``n_splits + 1`` equal contiguous chunks; for split *i*
+    the model trains on chunks ``[0..i)`` and is evaluated out-of-sample on
+    chunk *i*. Chunks smaller than ``min_chunk`` bars are dropped so the final
+    fold is never a degenerate 1-bar window.
     """
     n = len(data)
+    chunk = n // (n_splits + 1)
+    if chunk < min_chunk:
+        return []
     splits = []
-    step = n // (n_splits + 1)
     for i in range(1, n_splits + 1):
-        train_end = step * (i + 1) if i < n_splits else int(n * train_frac) + step * i
-        train_end = min(train_end, n - 1)
-        test_end  = min(train_end + step, n)
-        if test_end > train_end:
-            splits.append((data[:train_end], data[train_end:test_end]))
+        train = data[: chunk * i]
+        test  = data[chunk * i: chunk * (i + 1)]
+        if len(train) >= min_chunk and len(test) >= min_chunk:
+            splits.append((train, test))
     return splits
 
 
