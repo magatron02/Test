@@ -990,7 +990,7 @@ class ChatHandler:
                 trade_ctx = ", ".join(f"{t.symbol} {t.side} {t.pnl_pct:+.2f}%" for t in recent if t.pnl_pct is not None) or "ยังไม่มี"
             finally:
                 db.close()
-            sys_prompt = f"คุณคือ AI trading assistant ของ Lunai ตอบสั้น กระชับ เป็นภาษาไทย recent trades: {trade_ctx}"
+            sys_prompt = f"คุณคือ AI trading assistant ของ Aiterra ตอบสั้น กระชับ เป็นภาษาไทย recent trades: {trade_ctx}"
             resp = await client.messages.create(
                 model=settings.claude_model, max_tokens=512,
                 system=sys_prompt,
@@ -1057,7 +1057,7 @@ async def test_exchanges():
 @router.post("/notifications/test")
 async def test_notifications(data: Dict[str, Any] = None):
     """Send a test message to configured LINE / Telegram channels."""
-    msg = "🧪 Lunai — การแจ้งเตือนทดสอบ / Test notification ✅"
+    msg = "🧪 Aiterra — การแจ้งเตือนทดสอบ / Test notification ✅"
     results = {}
 
     # LINE Messaging API
