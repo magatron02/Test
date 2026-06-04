@@ -1,5 +1,4 @@
 import asyncio
-import copy
 import csv
 import io
 import logging
@@ -8,80 +7,37 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from ..core.config import settings
-from ..core.database import ModelVersion, Portfolio, Trade, TrainingRecord, get_db, SessionLocal
+from ..core.database import Portfolio, Trade, TrainingRecord, get_db, SessionLocal
 from .websocket import get_notifications, clear_notifications
 from ..notifications import line_notify, telegram_notify
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
 
-# Whitelist of (section → allowed keys) for POST /api/settings.
-# The 'app' section is intentionally absent — api_token must never be writable via API.
-_SETTINGS_WHITELIST: Dict[str, set] = {
-    "trading": {
-        "take_profit_pct", "stop_loss_pct", "min_confidence",
-        "analysis_interval", "risk_per_trade_pct", "max_daily_loss_pct",
-        "max_open_trades",
-    },
-    "ai": {"default_model", "claude"},
-    "exchanges": {"binance", "binance_th", "bitkub", "okx", "demo"},
-    "notifications": {"line", "telegram", "notify_on"},
-}
+# ── Rate limiting (slowapi) ───────────────────────────────────────────────────
+try:
+    from slowapi import Limiter
+    from slowapi.util import get_remote_address
+    _limiter = Limiter(key_func=get_remote_address, default_limits=[])
+except ImportError:
+    _limiter = None
 
-# For nested dict values, further restrict which sub-keys may be written.
-_NESTED_KEY_WHITELIST: Dict[str, Dict[str, set]] = {
-    "ai": {
-        "claude": {"api_key", "model"},
-    },
-    "exchanges": {
-        "binance":    {"api_key", "api_secret", "enabled", "testnet"},
-        "binance_th": {"api_key", "api_secret", "enabled"},
-        "bitkub":     {"api_key", "api_secret", "enabled"},
-        "okx":        {"api_key", "api_secret", "passphrase", "enabled", "testnet"},
-        "demo":       {"enabled", "data_source", "virtual_balance_usdt", "virtual_balance_thb"},
-    },
-    "notifications": {
-        "line":      {"channel_id", "channel_secret", "user_id", "enabled"},
-        "telegram":  {"bot_token", "chat_id", "enabled"},
-        "notify_on": {"trade_open", "trade_close", "stop_loss", "take_profit", "training_complete"},
-    },
-}
+
+def _rate_limit(limit_string: str):
+    """Dependency that applies a rate limit when slowapi is available."""
+    if _limiter is None:
+        return Depends(lambda: None)
+    return Depends(_limiter.limit(limit_string))
 
 # Reference to trader injected at startup
 _trader = None
 _training_loop = None
 _hourly_trainer = None
-_chat_lock: Optional[asyncio.Lock] = None
-
-
-def _get_chat_lock() -> asyncio.Lock:
-    """Lazy-initialise the chat lock inside the running event loop."""
-    global _chat_lock
-    if _chat_lock is None:
-        _chat_lock = asyncio.Lock()
-    return _chat_lock
-
-
-# ── Auth ───────────────────────────────────────────────────────
-async def _require_auth(x_api_token: str = Header(default="", alias="X-API-Token")):
-    """Dependency: require a valid X-API-Token on mutating endpoints."""
-    if x_api_token != settings.api_token:
-        raise HTTPException(status_code=401, detail="Unauthorized — invalid or missing X-API-Token")
-
-_AUTH = Depends(_require_auth)
-
-
-@router.get("/auth/token")
-async def get_auth_token():
-    """Return the local API token for the in-browser frontend.
-    External sites can't read this response due to the browser same-origin policy.
-    """
-    return {"token": settings.api_token}
 
 
 def set_trader(trader):
@@ -182,6 +138,7 @@ async def get_portfolio():
 
 @router.get("/trades")
 async def get_trades(limit: int = 50, db: Session = Depends(get_db)):
+    limit = max(1, min(limit, 1000))   # cap unbounded reads
     trades = db.query(Trade).order_by(Trade.opened_at.desc()).limit(limit).all()
     return [
         {
@@ -239,20 +196,6 @@ async def get_dashboard_state():
     return await _trader.get_dashboard_state()
 
 
-@router.get("/signals/market")
-async def get_market_signals():
-    """GET /api/signals/market — Fear & Greed index + funding rates (cached 1 h)."""
-    from ..agent.market_signals import get_fear_greed, get_funding_rates, cache_status
-    symbols = settings.symbols
-    fg, fr = await get_fear_greed(), await get_funding_rates(symbols)
-    return {
-        "fear_greed": fg,
-        "funding_rates": fr,
-        "cache": cache_status(),
-        "ext_signals": _trader._ext_signals if _trader else {},
-    }
-
-
 @router.get("/training")
 async def get_training_stats():
     if not _trader:
@@ -261,68 +204,138 @@ async def get_training_stats():
 
 
 @router.post("/training/trigger")
-async def trigger_training(_=_AUTH):
+async def trigger_training(request: Request):
     if not _trader:
         raise HTTPException(503, "Trader not running")
     success = _trader._trainer.train()
     return {"success": success, "stats": _trader.trainer_stats}
 
 
-@router.get("/ai/model/history")
-async def get_model_history(limit: int = 30):
+@router.get("/ml/feature-importance")
+async def ml_feature_importance():
+    """Global SHAP feature importance from the LightGBM signal model (ML4T Ch.12)."""
     if not _trader:
         raise HTTPException(503, "Trader not running")
-    return _trader._trainer.model_history(limit=limit)
+    try:
+        importance = _trader._trainer.feature_importance()
+        stats = _trader.trainer_stats
+        return {
+            "model_type": stats.get("model_type", "none"),
+            "accuracy":   stats.get("accuracy"),
+            "features":   importance[:20],
+        }
+    except Exception as e:
+        return {"model_type": "none", "features": [], "error": str(e)}
+
+
+@router.get("/portfolio/hrp")
+async def portfolio_hrp():
+    """Hierarchical Risk Parity weights across tracked symbols (ML4T Ch.13)."""
+    if not _trader:
+        raise HTTPException(503, "Trader not running")
+    try:
+        _trader._update_hrp_weights()
+        weights = _trader._hrp_weights or {}
+        n = len(weights)
+        equal = 1.0 / n if n else 0.0
+        rows = [
+            {
+                "symbol":     s,
+                "weight":     round(w, 4),
+                "vs_equal":   round((w / equal) if equal else 1.0, 2),
+                "multiplier": round(_trader._hrp_multiplier(s), 2),
+            }
+            for s, w in sorted(weights.items(), key=lambda kv: -kv[1])
+        ]
+        return {"equal_weight": round(equal, 4), "weights": rows}
+    except Exception as e:
+        return {"weights": [], "error": str(e)}
+
+
+@router.get("/pairs/cointegration")
+async def pairs_cointegration():
+    """Cointegrated pairs for statistical-arbitrage signals (ML4T Ch.9)."""
+    if not _trader:
+        raise HTTPException(503, "Trader not running")
+    try:
+        pairs = _trader.cointegration_pairs()
+        return {"pairs": pairs, "count": len(pairs)}
+    except Exception as e:
+        return {"pairs": [], "count": 0, "error": str(e)}
 
 
 @router.get("/settings")
 async def get_settings():
-    # Deep copy — a shallow copy shares the nested dicts with settings._cfg, so
-    # masking below would overwrite the real in-memory keys with "****" and a
-    # later settings.save() would persist that corruption (losing saved API keys).
-    cfg = copy.deepcopy(settings._cfg)
+    cfg = settings._cfg.copy()
     # mask API keys
     for ex in cfg.get("exchanges", {}).values():
         if isinstance(ex, dict):
             if "api_key" in ex and ex["api_key"]:
-                ex["api_key"] = ex["api_key"][:4] + "****"
+                ex["api_key"] = "****"          # full mask — even first chars leak entropy
             if "api_secret" in ex and ex["api_secret"]:
                 ex["api_secret"] = "****"
-    if "ai" in cfg and "claude" in cfg["ai"]:
-        key = cfg["ai"]["claude"].get("api_key", "")
-        cfg["ai"]["claude"]["api_key"] = key[:8] + "****" if key else ""
-    # Never expose the auth token in the settings dump. The frontend reads it
-    # via the same-origin GET /api/auth/token endpoint instead.
-    if isinstance(cfg.get("app"), dict) and cfg["app"].get("api_token"):
-        cfg["app"]["api_token"] = "****"
+            if "api_secret" in ex and ex["api_secret"]:
+                ex["api_secret"] = "****"
+    if "ai" in cfg:
+        for provider in ("claude", "openai", "gemini"):
+            if provider in cfg["ai"] and isinstance(cfg["ai"][provider], dict):
+                key = cfg["ai"][provider].get("api_key", "")
+                cfg["ai"][provider]["api_key"] = key[:8] + "****" if key else ""
     return cfg
 
 
+_SETTINGS_ALLOWLIST: Dict[str, set] = {
+    "trading": {
+        "take_profit_pct", "stop_loss_pct", "min_confidence",
+        "analysis_interval", "risk_per_trade_pct", "max_daily_loss_pct",
+        "max_open_trades", "max_position_pct", "dry_run",
+    },
+    "strategy": {
+        "primary", "roi_table", "trailing_stop",
+    },
+    "risk": {
+        "max_drawdown_pct", "max_daily_loss_pct",
+        "max_portfolio_heat", "max_position_pct",
+    },
+    "ai": {
+        "default_model",
+    },
+    "notifications": {
+        "line", "telegram", "notify_on",
+    },
+    "exchanges": {
+        # allow writing api_key/secret only — not enabled/testnet flags
+        "binance", "binance_th", "bitkub", "okx",
+    },
+    "backtest": {"fee_pct", "slippage_pct"},
+    "position_sizer": {
+        "kelly_fraction", "min_trade_usdt", "max_trade_usdt",
+        "fallback_risk_pct", "target_atr_pct",
+    },
+}
+
+
 @router.post("/settings")
-async def update_settings(data: Dict[str, Any], _=_AUTH):
+async def update_settings(data: Dict[str, Any]):
     for section, values in data.items():
-        if section not in _SETTINGS_WHITELIST:
-            raise HTTPException(400, f"Section '{section}' cannot be modified via this endpoint")
-        if not isinstance(values, dict):
-            continue
-        allowed_keys = _SETTINGS_WHITELIST[section]
-        for key, val in values.items():
-            if key not in allowed_keys:
-                raise HTTPException(400, f"Key '{section}.{key}' cannot be modified via this endpoint")
-            if isinstance(val, dict) and section in _NESTED_KEY_WHITELIST and key in _NESTED_KEY_WHITELIST[section]:
-                allowed_sub = _NESTED_KEY_WHITELIST[section][key]
-                existing = settings.get(section, key) or {}
-                filtered = {sk: sv for sk, sv in val.items() if sk in allowed_sub}
-                settings.set({**existing, **filtered}, section, key)
-            else:
+        allowed_keys = _SETTINGS_ALLOWLIST.get(section)
+        if allowed_keys is None:
+            raise HTTPException(400, f"Section '{section}' is not writable via API")
+        if isinstance(values, dict):
+            for key, val in values.items():
+                if key not in allowed_keys:
+                    raise HTTPException(400, f"Key '{section}.{key}' is not writable via API")
                 settings.set(val, section, key)
+        else:
+            # scalar top-level key
+            settings.set(values, section)
     settings.save()
     settings.reload()
     return {"success": True}
 
 
 @router.post("/mode")
-async def set_mode(data: Dict[str, str], _=_AUTH):
+async def set_mode(data: Dict[str, str]):
     mode = data.get("mode", "demo")
     if mode not in ("demo", "live"):
         raise HTTPException(400, "Mode must be 'demo' or 'live'")
@@ -332,7 +345,7 @@ async def set_mode(data: Dict[str, str], _=_AUTH):
 
 
 @router.post("/strategy")
-async def set_strategy(data: Dict[str, str], _=_AUTH):
+async def set_strategy(data: Dict[str, str]):
     strategy = data.get("strategy", "hybrid")
     if strategy not in ("dca", "trend", "mean_reversion", "hybrid"):
         raise HTTPException(400, "Invalid strategy")
@@ -342,9 +355,9 @@ async def set_strategy(data: Dict[str, str], _=_AUTH):
 
 
 @router.post("/ai-model")
-async def set_ai_model(data: Dict[str, str], _=_AUTH):
+async def set_ai_model(data: Dict[str, str]):
     model = data.get("model", "hybrid")
-    valid = ("claude", "rule_based", "ml", "hybrid")
+    valid = ("claude", "rule_based", "ml", "hybrid", "multi_model")
     if model not in valid:
         raise HTTPException(400, f"Model must be one of {valid}")
     settings.set(model, "ai", "default_model")
@@ -353,12 +366,13 @@ async def set_ai_model(data: Dict[str, str], _=_AUTH):
 
 
 @router.post("/demo/reset")
-async def reset_demo(_=_AUTH):
+async def reset_demo():
     if not _trader or not _trader._exchange.is_demo:
         raise HTTPException(400, "Not in demo mode")
     _trader._exchange.reset()
     _trader._open_trades.clear()
     return {"success": True}
+
 
 
 @router.get("/trades/export")
@@ -404,17 +418,7 @@ async def get_advanced_stats(db: Session = Depends(get_db)):
 
     eq = np.array(equity, dtype=float)
     rets = np.diff(eq) / np.where(eq[:-1] != 0, eq[:-1], 1)
-
-    # Annualize using the actual average time between consecutive trade closes
-    # rather than a fixed 252-trading-day assumption.
-    trade_dates = [t.closed_at for t in closed if t.closed_at]
-    if len(trade_dates) >= 2:
-        span_days = (max(trade_dates) - min(trade_dates)).total_seconds() / 86400
-        avg_days_per_obs = span_days / max(len(trade_dates) - 1, 1)
-        ann_factor = math.sqrt(365 / avg_days_per_obs) if avg_days_per_obs > 0 else math.sqrt(252)
-    else:
-        ann_factor = math.sqrt(252)
-    sharpe = float((rets.mean() / rets.std()) * ann_factor) if rets.std() > 0 else 0.0
+    sharpe = float((rets.mean() / rets.std()) * math.sqrt(252)) if rets.std() > 0 else 0.0
 
     run_max = np.maximum.accumulate(eq)
     max_dd  = float(((eq - run_max) / np.where(run_max != 0, run_max, 1)).min() * 100)
@@ -433,20 +437,13 @@ async def get_advanced_stats(db: Session = Depends(get_db)):
     if len(snapshots) >= 2:
         equity_curve = [{"t": s.recorded_at.isoformat(), "v": round(s.total_value_usdt, 2)}
                         for s in snapshots]
+        # Recompute drawdown from snapshots
         eq_snap = np.array([s.total_value_usdt for s in snapshots])
         run_max_snap = np.maximum.accumulate(eq_snap)
         max_dd = float(((eq_snap - run_max_snap) / np.where(run_max_snap != 0, run_max_snap, 1)).min() * 100)
         rets_snap = np.diff(eq_snap) / np.where(eq_snap[:-1] != 0, eq_snap[:-1], 1)
         if rets_snap.std() > 0:
-            # Annualize from the actual average snapshot interval
-            snap_dates = [s.recorded_at for s in snapshots if s.recorded_at]
-            if len(snap_dates) >= 2:
-                snap_span = (max(snap_dates) - min(snap_dates)).total_seconds() / 86400
-                snap_avg  = snap_span / max(len(snap_dates) - 1, 1)
-                snap_ann  = math.sqrt(365 / snap_avg) if snap_avg > 0 else math.sqrt(252 * 288)
-            else:
-                snap_ann = math.sqrt(252 * 288)
-            sharpe = float((rets_snap.mean() / rets_snap.std()) * snap_ann)
+            sharpe = float((rets_snap.mean() / rets_snap.std()) * math.sqrt(252 * 288))  # 5-min intervals
     else:
         equity_curve = [{"i": i, "v": v} for i, v in enumerate(equity)]
 
@@ -530,10 +527,82 @@ async def get_mtf_analysis(symbol: str = "BTC/USDT"):
     }
 
 
+@router.post("/backtest")
+async def run_backtest(request: Request, data: Dict[str, Any]):
+    """POST /api/backtest — Backtest with Market Regime + Chart Patterns + Kelly Sizing.
+
+    Body:
+      symbol:          BTC/USDT (default)
+      days:            7-365    (default 30)
+      tp_pct:          take-profit fraction (default 0.04)
+      sl_pct:          stop-loss  fraction  (default 0.02)
+      initial_capital: starting capital USDT (default 10000)
+
+    Response includes:
+      - Primary metrics from autotrade AI stack
+      - comparison.basic / comparison.hybrid / comparison.autotrade
+      - regime_stats: performance breakdown per detected regime
+      - pattern_stats: best/worst chart patterns by PnL
+      - equity_curve + last 50 annotated trades
+    """
+    from ..agent.backtest import run_backtest_real as _run
+    symbol  = str(data.get("symbol", "BTC/USDT"))
+    days    = int(data.get("days", 30))
+    tp_pct  = float(data.get("tp_pct", 0.04))
+    sl_pct  = float(data.get("sl_pct", 0.02))
+    capital = float(data.get("initial_capital", 10_000.0))
+    if days < 7 or days > 365:
+        raise HTTPException(400, "days must be 7-365")
+    if not (0.001 <= tp_pct <= 0.50):
+        raise HTTPException(400, "tp_pct must be between 0.1% and 50%")
+    if not (0.001 <= sl_pct <= 0.50):
+        raise HTTPException(400, "sl_pct must be between 0.1% and 50%")
+    if capital < 100 or capital > 10_000_000:
+        raise HTTPException(400, "initial_capital must be 100 – 10,000,000")
+    try:
+        result = await _run(symbol, days=days, tp_pct=tp_pct, sl_pct=sl_pct,
+                            initial_capital=capital)
+        return result
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@router.get("/backtest/walkforward")
+async def backtest_walkforward(
+    request: Request,
+    symbol: str = "BTC/USDT",
+    days: int = 90,
+    folds: int = 3,
+    tp_pct: float = 0.04,
+    sl_pct: float = 0.02,
+    initial_capital: float = 10000.0,
+):
+    """Walk-forward validation: Jesse-style rolling IS/OOS parameter optimisation."""
+    from ..agent.backtest import run_walkforward
+    if days < 14 or days > 365:
+        raise HTTPException(400, "days must be 14-365")
+    if folds < 2 or folds > 10:
+        raise HTTPException(400, "folds must be 2-10")
+    if not (0.001 <= tp_pct <= 0.50):
+        raise HTTPException(400, "tp_pct must be between 0.1% and 50%")
+    if not (0.001 <= sl_pct <= 0.50):
+        raise HTTPException(400, "sl_pct must be between 0.1% and 50%")
+    if initial_capital < 100 or initial_capital > 10_000_000:
+        raise HTTPException(400, "initial_capital must be 100 – 10,000,000")
+    try:
+        result = await run_walkforward(
+            symbol=symbol, days=days, folds=folds,
+            tp_pct=tp_pct, sl_pct=sl_pct, initial_capital=initial_capital,
+        )
+        return result
+    except Exception as e:
+        return {"error": str(e), "symbol": symbol}
+
+
 # ─── Training Loop Routes ──────────────────────────────────────
 
 @router.post("/training/loop/start")
-async def start_training_loop(data: Dict[str, Any] = None, _=_AUTH):
+async def start_training_loop(data: Dict[str, Any] = None):
     if not _training_loop:
         raise HTTPException(503, "Training loop not available")
     d = data or {}
@@ -599,18 +668,22 @@ async def get_open_positions():
 
 
 @router.post("/trade/manual")
-async def manual_trade(data: Dict[str, Any], _=_AUTH):
+async def manual_trade(request: Request, data: Dict[str, Any]):
     """POST /api/trade/manual — manually open or close a position (demo-safe override).
     Body: {"action":"BUY"|"SELL"|"CLOSE", "symbol":"BTC/USDT", "amount_usdt": 200}
     Bypasses the AI signal so users can test the full trade pipeline.
     """
     if not _trader:
         raise HTTPException(503, "Trader not running")
-    action  = (data.get("action") or "").upper()
-    symbol  = data.get("symbol") or "BTC/USDT"
+    action   = (data.get("action") or "").upper()
+    symbol   = str(data.get("symbol") or "BTC/USDT")
     amt_usdt = float(data.get("amount_usdt") or 0)
     if action not in ("BUY", "SELL", "CLOSE"):
         raise HTTPException(400, "action must be BUY, SELL, or CLOSE")
+    if symbol not in settings.symbols:
+        raise HTTPException(400, f"symbol must be one of: {settings.symbols}")
+    if amt_usdt < 0 or amt_usdt > 1_000_000:
+        raise HTTPException(400, "amount_usdt must be 0 – 1,000,000")
 
     analysis = await _trader.analyze_symbol(symbol)
     if not analysis:
@@ -620,11 +693,10 @@ async def manual_trade(data: Dict[str, Any], _=_AUTH):
         if symbol not in _trader.open_trades:
             raise HTTPException(400, f"No open trade for {symbol}")
         trade = _trader.open_trades[symbol]
+        side  = trade["side"]
         price = analysis.price
         amount = trade.get("amount", 0)
-        # The bot only opens long (BUY) positions and _close_trade always sells
-        # the base balance, so PnL is always computed long-close.
-        pnl   = (price - trade["price"]) * amount
+        pnl   = (price - trade["price"]) * amount if side == "BUY" else (trade["price"] - price) * amount
         pnl_pct = pnl / (trade["price"] * amount) * 100 if trade["price"] and amount else 0
         result = await _trader._close_trade(symbol, price, "manual_close")
         if not result:
@@ -636,6 +708,7 @@ async def manual_trade(data: Dict[str, Any], _=_AUTH):
 
     # BUY / SELL
     from ..agent.strategy_manager import TradingSignal
+    from ..agent.market_regime import RegimeResult
     portfolio = await _trader._get_portfolio_summary()
     avail = portfolio.get("available_usdt", 0)
     if amt_usdt <= 0:
@@ -649,7 +722,9 @@ async def manual_trade(data: Dict[str, Any], _=_AUTH):
                            strategy="manual",
                            stop_loss_pct=0.02,
                            take_profit_pct=0.04)
-    executed = await _trader._execute_trade(symbol, signal, analysis, force=True)
+    # Use cached regime or default
+    regime = _trader.regimes.get(symbol) or RegimeResult("RANGING", 0.5, 20.0, 2.0, 0.0, "manual")
+    executed = await _trader._execute_trade(symbol, signal, analysis, regime, force=True)
     if executed:
         return {"ok": True, "action": action, "symbol": symbol,
                 "price": round(analysis.price, 6), "amount": round(amount, 6),
@@ -658,7 +733,7 @@ async def manual_trade(data: Dict[str, Any], _=_AUTH):
 
 
 @router.post("/training/loop/stop")
-async def stop_training_loop(_=_AUTH):
+async def stop_training_loop():
     if not _training_loop:
         raise HTTPException(503, "Training loop not available")
     _training_loop.stop()
@@ -674,7 +749,7 @@ async def hourly_train_status():
 
 
 @router.post("/training/hourly/run")
-async def hourly_train_run(_=_AUTH):
+async def hourly_train_run():
     """POST /api/training/hourly/run — trigger an immediate training run."""
     if not _hourly_trainer:
         raise HTTPException(503, "Hourly trainer not available")
@@ -685,91 +760,49 @@ async def hourly_train_run(_=_AUTH):
 # ─── Chat Bot ──────────────────────────────────────────────────
 
 class ChatHandler:
-    """
-    Smart chat handler with Claude-powered intent routing and tool use.
-
-    Fast-path keywords handle obvious commands without API calls.
-    For ambiguous or open-ended messages, Claude is invoked with:
-      - Live market data for all tracked symbols
-      - AI model version and accuracy stats
-      - Recent trade history
-      - Conversation memory (last N turns)
-      - Tools: analyze_symbol, get_portfolio, get_performance_report
-    """
-
-    # Extended symbol map — full English names + Thai names
-    _SYMBOL_MAP: Dict[str, str] = {
-        "btc": "BTC/USDT",   "bitcoin": "BTC/USDT",    "บิทคอยน์": "BTC/USDT",
-        "บิท": "BTC/USDT",
-        "eth": "ETH/USDT",   "ethereum": "ETH/USDT",   "อีเธอร์": "ETH/USDT",
-        "อีเธอ": "ETH/USDT",
-        "bnb": "BNB/USDT",   "binance coin": "BNB/USDT",
-        "sol": "SOL/USDT",   "solana": "SOL/USDT",     "โซลาน่า": "SOL/USDT",
-        "โซล": "SOL/USDT",
-        "xrp": "XRP/USDT",   "ripple": "XRP/USDT",     "ริปเปิล": "XRP/USDT",
+    _SYMBOLS = {
+        "btc": "BTC/USDT", "eth": "ETH/USDT", "bnb": "BNB/USDT",
+        "sol": "SOL/USDT", "xrp": "XRP/USDT",
     }
-
-    # Conversation history — class-level, shared across requests (single-user app)
-    _history: List[Dict] = []
-    MAX_HISTORY = 12        # keep last 12 messages (6 full turns)
-    MAX_TOOL_STEPS = 3      # max tool-call rounds per request
-
-    # Fast-path keyword sets (only very obvious, unambiguous patterns)
-    _TRAIN_KW    = {"train", "เทรน", "retrain", "ฝึก", "เรียน", "improve model", "อัพเดต model"}
-    _REPORT_KW   = {"รายงานผล", "สรุปผล", "ดูผล", "win rate", "pnl report", "performance report"}
-    _PORTFOLIO_KW = {"พอร์ตฉัน", "ดูพอร์ต", "my portfolio", "my balance", "ยอดเงินฉัน"}
-    _BUY_KW      = {"ซื้อ ", "buy btc", "buy eth", "buy sol", "buy bnb", "buy xrp", "long "}
-    _SELL_KW     = {"ขาย ", "sell btc", "sell eth", "sell sol", "sell bnb", "sell xrp", "short "}
-    _ANALYZE_KW  = {"วิเคราะห์ ", "analyze ", "analysis of"}
+    _TRAIN_KW    = ["train", "เทรน", "retrain", "ฝึก", "เรียน", "improve", "learn", "อัพเดต", "update model"]
+    _REPORT_KW   = ["report", "รายงาน", "stats", "สถิติ", "ผล", "performance", "สรุป", "win rate", "กำไร", "ขาดทุน", "pnl"]
+    _PORTFOLIO_KW= ["portfolio", "พอร์ต", "balance", "ยอด", "เงิน", "holdings", "position", "wallet"]
+    _BUY_KW      = ["buy", "ซื้อ", "long", "เปิด"]
+    _SELL_KW     = ["sell", "ขาย", "short", "ปิด"]
+    _ANALYZE_KW  = ["analyze", "วิเคราะห์", "analysis", "check", "ดู", "how is", "สัญญาณ"]
 
     def __init__(self, trader, hourly_trainer):
         self._trader = trader
         self._hourly_trainer = hourly_trainer
 
-    def _extract_symbol(self, text: str) -> Optional[str]:
-        """Extract trading pair, checking longest keys first to avoid substring collisions."""
-        for key in sorted(self._SYMBOL_MAP, key=len, reverse=True):
-            if key in text:
-                return self._SYMBOL_MAP[key]
-        return None
-
-    def _fast_intent(self, m: str) -> Optional[str]:
-        if any(kw in m for kw in self._TRAIN_KW):      return "train"
-        if any(kw in m for kw in self._REPORT_KW):     return "report"
-        if any(kw in m for kw in self._PORTFOLIO_KW):  return "portfolio"
-        if any(kw in m for kw in self._ANALYZE_KW):    return "analyze"
-        if any(kw in m for kw in self._BUY_KW):        return "buy"
-        if any(kw in m for kw in self._SELL_KW):       return "sell"
-        return None
-
     async def handle(self, message: str) -> dict:
         m = message.lower().strip()
-        symbol = self._extract_symbol(m)
-        intent = self._fast_intent(m)
+        symbol = next((v for k, v in self._SYMBOLS.items() if k in m), None)
 
-        if intent == "train":     return await self._handle_train()
-        if intent == "report":    return await self._handle_report()
-        if intent == "portfolio": return await self._handle_portfolio()
-        if intent == "analyze":   return await self._handle_analyze(symbol or "BTC/USDT")
-        if intent == "buy":       return await self._handle_trade("BUY",  symbol, message)
-        if intent == "sell":      return await self._handle_trade("SELL", symbol, message)
+        if any(kw in m for kw in self._TRAIN_KW):
+            return await self._handle_train()
+        if any(kw in m for kw in self._REPORT_KW):
+            return await self._handle_report()
+        if any(kw in m for kw in self._PORTFOLIO_KW):
+            return await self._handle_portfolio()
+        if any(kw in m for kw in self._ANALYZE_KW):
+            return await self._handle_analyze(symbol or "BTC/USDT")
+        if any(kw in m for kw in self._BUY_KW):
+            return await self._handle_trade("BUY", symbol, message)
+        if any(kw in m for kw in self._SELL_KW):
+            return await self._handle_trade("SELL", symbol, message)
+        return await self._handle_general(message)
 
-        # Claude-powered: contextual routing + tool-use response
-        return await self._handle_with_claude(message, symbol)
-
-    # ── specialized handlers (unchanged logic, same as before) ───
     async def _handle_train(self) -> dict:
         if not self._hourly_trainer:
             if self._trader:
                 ok = self._trader._trainer.train()
-                return {"type": "train", "reply": f"เทรน ML model {'สำเร็จ ✓' if ok else 'ไม่สำเร็จ — ต้องการข้อมูลเพิ่ม'}"}
+                return {"type": "train", "reply": f"เทรน ML model {'สำเร็จ' if ok else 'ไม่สำเร็จ — ต้องการข้อมูลเพิ่ม'}"}
             return {"type": "error", "reply": "Trainer ไม่พร้อมใช้งาน"}
         try:
             result = await self._hourly_trainer.run_now()
-            added = result.get("last_samples", 0)
-            acc = result.get("model_accuracy")
-            acc_str = f" | Acc: {acc*100:.1f}%" if acc else ""
-            return {"type": "train", "reply": f"เทรน AI สำเร็จ ✓\nเพิ่มข้อมูล {added} samples{acc_str}"}
+            added = result.get("samples_added", 0)
+            return {"type": "train", "reply": f"เทรน AI สำเร็จ ✓\nเพิ่มข้อมูล {added} samples\n{result.get('message', '')}"}
         except Exception as e:
             return {"type": "error", "reply": f"เทรนไม่สำเร็จ: {e}"}
 
@@ -828,12 +861,17 @@ class ChatHandler:
         if not analysis:
             return {"type": "error", "reply": f"วิเคราะห์ {symbol} ไม่ได้"}
         portfolio = await self._trader._get_portfolio_summary()
-        signal = await self._trader._get_final_signal(analysis, portfolio)
+        from ..agent.market_regime import RegimeResult
+        regime = self._trader.regimes.get(symbol) or RegimeResult("RANGING", 0.5, 20.0, 2.0, 0.0, "")
+        signal = await self._trader._get_final_signal(analysis, portfolio, regime)
+        pat_text = ""
+        if getattr(analysis, "patterns", None):
+            pat_text = "\nPattern: " + ", ".join(p.name_th for p in analysis.patterns[:2])
         reply = (
-            f"วิเคราะห์ {symbol}\n"
+            f"วิเคราะห์ {symbol} [{regime.regime}]\n"
             f"ราคา: ${analysis.price:.4f} ({analysis.change_24h:+.2f}%)\n"
             f"RSI: {analysis.rsi:.1f} | EMA: {analysis.ema_trend} | MACD: {analysis.macd_trend}\n"
-            f"Bollinger: {analysis.bb_signal} | Volatility: {analysis.volatility}\n"
+            f"Bollinger: {analysis.bb_signal} | Volatility: {analysis.volatility}{pat_text}\n"
             f"สัญญาณ: {signal.action} (conf {signal.confidence:.0%})\n"
             f"เหตุผล: {signal.reasoning[:220]}"
         )
@@ -843,287 +881,44 @@ class ChatHandler:
         if not self._trader:
             return {"type": "error", "reply": "Trader ไม่พร้อมใช้งาน"}
         if not symbol:
-            return {"type": "info", "reply": f"กรุณาระบุเหรียญ เช่น '{action.lower()} BTC'"}
+            return {"type": "info", "reply": f"กรุณาระบุ symbol เช่น '{action.lower()} BTC'"}
         analysis = await self._trader.analyze_symbol(symbol)
         if not analysis:
             return {"type": "error", "reply": f"ดึงข้อมูล {symbol} ไม่ได้"}
         portfolio = await self._trader._get_portfolio_summary()
-        signal = await self._trader._get_final_signal(analysis, portfolio)
+        from ..agent.market_regime import RegimeResult
+        regime = self._trader.regimes.get(symbol) or RegimeResult("RANGING", 0.5, 20.0, 2.0, 0.0, "")
+        signal = await self._trader._get_final_signal(analysis, portfolio, regime)
         if signal.action == action:
-            executed = await self._trader._execute_trade(symbol, signal, analysis)
+            executed = await self._trader._execute_trade(symbol, signal, analysis, regime)
             if executed:
                 return {"type": "trade", "reply": f"✓ ส่งคำสั่ง {action} {symbol} @ ${analysis.price:.4f} (conf {signal.confidence:.0%})\n{signal.reasoning[:180]}"}
             return {"type": "info", "reply": f"AI เห็นด้วยกับ {action} {symbol} แต่ไม่ execute (ติด risk limit / เงินไม่พอ / มี position อยู่แล้ว)"}
-        return {"type": "info", "reply": f"AI แนะนำ {signal.action} สำหรับ {symbol} (conf {signal.confidence:.0%})\nไม่ตรงกับ {action} — จึงไม่ execute\nเหตุผล: {signal.reasoning[:180]}"}
+        return {"type": "info", "reply": f"AI แนะนำ {signal.action} สำหรับ {symbol} (conf {signal.confidence:.0%})\nไม่ตรงกับคำสั่ง {action} จึงไม่ execute\nเหตุผล: {signal.reasoning[:180]}"}
 
-    # ── Claude-powered handler ───────────────────────────────────
-    async def _build_market_context(self) -> dict:
-        """Snapshot of live market data + model stats for Claude's system prompt."""
-        ctx: dict = {"market": {}, "model": {}, "recent_trades": [], "mode": "demo"}
-        if not self._trader:
-            return ctx
-        try:
-            ctx["mode"] = getattr(self._trader._exchange, "name", "demo")
-            for sym, analysis in self._trader.analyses.items():
-                ctx["market"][sym] = {
-                    "price":     round(analysis.price, 4),
-                    "change_24h": round(analysis.change_24h, 2),
-                    "rsi":       round(analysis.rsi, 1) if analysis.rsi else None,
-                    "signal":    analysis.overall_signal,
-                    "ema_trend": analysis.ema_trend,
-                }
-            stats = self._trader._trainer.stats
-            ctx["model"] = {
-                "version":      stats.get("model_version", 0),
-                "cv_accuracy":  stats.get("accuracy"),
-                "val_accuracy": stats.get("val_accuracy"),
-                "samples":      stats.get("total_records", 0),
-                "ready":        stats.get("model_ready", False),
-            }
-        except Exception:
-            pass
-        db = SessionLocal()
-        try:
-            recent = (
-                db.query(Trade)
-                .filter(Trade.status == "closed")
-                .order_by(Trade.opened_at.desc())
-                .limit(5)
-                .all()
-            )
-            ctx["recent_trades"] = [
-                {"symbol": t.symbol, "side": t.side, "pnl_pct": t.pnl_pct}
-                for t in recent if t.pnl_pct is not None
-            ]
-        finally:
-            db.close()
-        return ctx
-
-    _CHAT_TOOLS = [
-        {
-            "name": "analyze_symbol",
-            "description": (
-                "วิเคราะห์เหรียญ crypto แบบละเอียด: ราคา, RSI, MACD, EMA, Bollinger, "
-                "ความผันผวน และสัญญาณ AI สำหรับการซื้อขาย"
-            ),
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "symbol": {
-                        "type": "string",
-                        "description": "Trading pair เช่น BTC/USDT, ETH/USDT, SOL/USDT"
-                    }
-                },
-                "required": ["symbol"],
-            },
-        },
-        {
-            "name": "get_performance_report",
-            "description": "ดูสถิติผลการเทรดทั้งหมด: win rate, กำไร/ขาดทุน, ประวัติ",
-            "input_schema": {"type": "object", "properties": {}},
-        },
-        {
-            "name": "get_portfolio",
-            "description": "ดูยอดเงินปัจจุบันและ position ที่ถืออยู่ในพอร์ต",
-            "input_schema": {"type": "object", "properties": {}},
-        },
-    ]
-
-    async def _exec_chat_tool(self, name: str, params: dict) -> dict:
-        if name == "analyze_symbol":
-            symbol = params.get("symbol", "BTC/USDT")
-            if not self._trader:
-                return {"error": "Trader ไม่พร้อม"}
-            analysis = await self._trader.analyze_symbol(symbol)
-            if not analysis:
-                return {"error": f"วิเคราะห์ {symbol} ไม่ได้"}
-            portfolio = await self._trader._get_portfolio_summary()
-            signal = await self._trader._get_final_signal(analysis, portfolio)
-            return {
-                "symbol":     symbol,
-                "price":      round(analysis.price, 4),
-                "change_24h": round(analysis.change_24h, 2),
-                "rsi":        round(analysis.rsi, 1) if analysis.rsi else None,
-                "ema_trend":  analysis.ema_trend,
-                "macd_trend": analysis.macd_trend,
-                "bb_signal":  analysis.bb_signal,
-                "volatility": analysis.volatility,
-                "signal":     signal.action,
-                "confidence": round(signal.confidence, 3),
-                "reasoning":  signal.reasoning[:300],
-            }
-
-        if name == "get_performance_report":
-            db = SessionLocal()
-            try:
-                closed = db.query(Trade).filter(Trade.status == "closed").all()
-                if not closed:
-                    return {"message": "ยังไม่มีการเทรดที่ปิดแล้ว"}
-                wins = [t for t in closed if (t.pnl or 0) > 0]
-                total_pnl = sum(t.pnl or 0 for t in closed)
-                win_rate  = len(wins) / len(closed) * 100
-                avg_pct   = sum(t.pnl_pct or 0 for t in closed) / len(closed)
-                recent    = sorted(closed, key=lambda t: t.closed_at or datetime.min, reverse=True)[:5]
-                return {
-                    "total_trades": len(closed),
-                    "wins":         len(wins),
-                    "win_rate_pct": round(win_rate, 1),
-                    "total_pnl":    round(total_pnl, 2),
-                    "avg_pnl_pct":  round(avg_pct, 2),
-                    "recent":       [{"symbol": t.symbol, "side": t.side, "pnl_pct": t.pnl_pct} for t in recent if t.pnl_pct is not None],
-                }
-            finally:
-                db.close()
-
-        if name == "get_portfolio":
-            if not self._trader:
-                return {"error": "Trader ไม่พร้อม"}
-            try:
-                quote    = self._trader._exchange.quote_currency
-                balances = await self._trader._exchange.get_balance()
-                cash_bal = balances.get(quote)
-                cash     = float(cash_bal.free) if cash_bal else 0.0
-                positions = []
-                for sym, analysis in self._trader.analyses.items():
-                    base = sym.split("/")[0]
-                    bal  = balances.get(base)
-                    if bal and bal.total > 0:
-                        positions.append({
-                            "asset":    base,
-                            "amount":   round(bal.total, 6),
-                            "value":    round(bal.total * analysis.price, 2),
-                            "currency": quote,
-                        })
-                return {"cash": round(cash, 2), "currency": quote, "positions": positions}
-            except Exception as e:
-                return {"error": str(e)}
-
-        return {"error": f"Unknown tool: {name}"}
-
-    async def _handle_with_claude(self, message: str, hint_symbol: Optional[str]) -> dict:
-        """Invoke Claude with live context, conversation memory, and tool use."""
-        import json
+    async def _handle_general(self, message: str) -> dict:
         api_key = settings.claude_api_key
         if not api_key:
-            return {
-                "type": "info",
-                "reply": (
-                    "คำสั่งที่รองรับ:\n"
-                    "• ซื้อ/ขาย BTC ETH SOL XRP BNB\n"
-                    "• วิเคราะห์ BTC\n"
-                    "• รายงานผล / สรุปผล\n"
-                    "• พอร์ตฉัน\n"
-                    "• เทรนตัวเอง\n\n"
-                    "ตั้งค่า Claude API key ใน Settings → AI เพื่อเปิดการสนทนาอัจฉริยะ"
-                ),
-            }
-
-        # Serialise concurrent requests so history append→read→write stays consistent.
-        async with _get_chat_lock():
+            return {"type": "info", "reply": "คำสั่งที่รองรับ:\n• ซื้อ/ขาย BTC ETH SOL XRP BNB\n• วิเคราะห์ BTC\n• รายงานผล / สรุปผล\n• พอร์ตฉัน\n• เทรนตัวเอง"}
+        try:
+            import anthropic
+            client = anthropic.AsyncAnthropic(api_key=api_key)
+            db = SessionLocal()
             try:
-                import anthropic
-                client = anthropic.AsyncAnthropic(api_key=api_key)
-                ctx = await self._build_market_context()
-
-                market_lines = "\n".join(
-                    f"  {sym}: ${d['price']} ({d['change_24h']:+.2f}%) RSI={d['rsi']} signal={d['signal']}"
-                    for sym, d in ctx["market"].items()
-                ) or "  (ยังไม่มีข้อมูล)"
-
-                trade_lines = "\n".join(
-                    f"  {t['symbol']} {t['side']} {t['pnl_pct']:+.2f}%"
-                    for t in ctx["recent_trades"]
-                ) or "  (ยังไม่มี)"
-
-                m = ctx["model"]
-                model_line = (
-                    f"v{m['version']} | CV={m['cv_accuracy'] or '—'} | "
-                    f"Val={m['val_accuracy'] or '—'} | samples={m['samples']} | "
-                    f"ready={'✓' if m['ready'] else '✗'}"
-                )
-
-                sys_prompt = (
-                    "คุณคือ Aiterra AI Trading Assistant — ผู้ช่วยการเทรด Crypto ที่ฉลาดและเป็นมืออาชีพ\n"
-                    "ตอบเป็นภาษาไทยเสมอ กระชับ ชัดเจน ไม่ใช้ markdown symbols (* # _)\n"
-                    "ถ้าผู้ใช้ถามเรื่องเหรียญหรือตลาด ให้เรียก tool analyze_symbol เพื่อดูข้อมูลล่าสุดก่อนตอบ\n\n"
-                    f"=== ข้อมูลตลาด ณ ตอนนี้ ===\n{market_lines}\n\n"
-                    f"=== AI Model ===\n{model_line}\n\n"
-                    f"=== การเทรดล่าสุด ===\n{trade_lines}\n\n"
-                    f"=== Exchange ===\n{ctx['mode']}"
-                )
-
-                # Append user turn to history
-                ChatHandler._history.append({"role": "user", "content": message})
-                if len(ChatHandler._history) > self.MAX_HISTORY:
-                    ChatHandler._history = ChatHandler._history[-self.MAX_HISTORY:]
-
-                # Working copy for this request's tool-call loop
-                loop_msgs = list(ChatHandler._history)
-
-                for _step in range(self.MAX_TOOL_STEPS):
-                    resp = await client.messages.create(
-                        model=settings.claude_model,
-                        max_tokens=1024,
-                        system=sys_prompt,
-                        tools=self._CHAT_TOOLS,
-                        messages=loop_msgs,
-                    )
-
-                    tool_uses = [b for b in resp.content if b.type == "tool_use"]
-
-                    if resp.stop_reason == "end_turn" or not tool_uses:
-                        text = " ".join(b.text for b in resp.content if b.type == "text").strip()
-                        if text:
-                            ChatHandler._history.append({"role": "assistant", "content": text})
-                            if len(ChatHandler._history) > self.MAX_HISTORY:
-                                ChatHandler._history = ChatHandler._history[-self.MAX_HISTORY:]
-                        return {"type": "ai", "reply": text or "—"}
-
-                    # Build serialisable assistant content (tool_use blocks)
-                    assistant_content = []
-                    for b in resp.content:
-                        if b.type == "text":
-                            assistant_content.append({"type": "text", "text": b.text})
-                        elif b.type == "tool_use":
-                            assistant_content.append({
-                                "type": "tool_use",
-                                "id":    b.id,
-                                "name":  b.name,
-                                "input": b.input,
-                            })
-
-                    # Execute tools and collect results
-                    tool_results = []
-                    for tu in tool_uses:
-                        result = await self._exec_chat_tool(tu.name, tu.input)
-                        tool_results.append({
-                            "type":        "tool_result",
-                            "tool_use_id": tu.id,
-                            "content":     json.dumps(result, ensure_ascii=False, default=str),
-                        })
-
-                    loop_msgs.append({"role": "assistant", "content": assistant_content})
-                    loop_msgs.append({"role": "user",      "content": tool_results})
-
-                return {"type": "info", "reply": "ไม่สามารถตอบได้ในขณะนี้ กรุณาลองใหม่"}
-
-            except Exception as e:
-                logger.warning(f"Chat Claude error: {e}")
-                return {
-                    "type": "info",
-                    "reply": (
-                        "คำสั่งที่รองรับ:\n"
-                        "• ซื้อ/ขาย BTC ETH SOL XRP BNB\n"
-                        "• วิเคราะห์ BTC\n"
-                        "• รายงานผล\n"
-                        "• พอร์ตฉัน\n"
-                        "• เทรนตัวเอง"
-                    ),
-                }
-
-    @classmethod
-    def clear_history(cls):
-        cls._history.clear()
+                recent = db.query(Trade).filter(Trade.status == "closed").order_by(Trade.opened_at.desc()).limit(5).all()
+                trade_ctx = ", ".join(f"{t.symbol} {t.side} {t.pnl_pct:+.2f}%" for t in recent if t.pnl_pct is not None) or "ยังไม่มี"
+            finally:
+                db.close()
+            sys_prompt = f"คุณคือ AI trading assistant ของ Aiterra ตอบสั้น กระชับ เป็นภาษาไทย recent trades: {trade_ctx}"
+            resp = await client.messages.create(
+                model=settings.claude_model, max_tokens=512,
+                system=sys_prompt,
+                messages=[{"role": "user", "content": message}],
+            )
+            reply = resp.content[0].text if resp.content else "ไม่มีคำตอบ"
+            return {"type": "ai", "reply": reply}
+        except Exception:
+            return {"type": "info", "reply": "คำสั่งที่รองรับ:\n• ซื้อ/ขาย BTC ETH SOL XRP BNB\n• วิเคราะห์ BTC\n• รายงานผล\n• พอร์ตฉัน\n• เทรนตัวเอง"}
 
 
 @router.post("/chat")
@@ -1134,13 +929,6 @@ async def chat_endpoint(data: Dict[str, Any]):
         raise HTTPException(400, "message required")
     handler = ChatHandler(_trader, _hourly_trainer)
     return await handler.handle(message)
-
-
-@router.post("/chat/clear")
-async def chat_clear():
-    """POST /api/chat/clear — Clear conversation history."""
-    ChatHandler.clear_history()
-    return {"ok": True}
 
 
 @router.get("/exchanges/test")
@@ -1256,7 +1044,7 @@ async def test_notifications(data: Dict[str, Any] = None):
 # ─── Live Mode Hot-Swap ────────────────────────────────────────
 
 @router.post("/mode/swap")
-async def hot_swap_mode(data: Dict[str, str], _=_AUTH):
+async def hot_swap_mode(data: Dict[str, str]):
     """POST /api/mode/swap — switch demo↔live without restarting the server.
 
     For live mode the first *enabled* exchange with an api_key is used.
@@ -1334,7 +1122,7 @@ async def get_active_exchange():
 
 
 @router.post("/exchange/active")
-async def set_active_exchange(data: Dict[str, str], _=_AUTH):
+async def set_active_exchange(data: Dict[str, str]):
     """POST /api/exchange/active — choose which live exchange to trade on.
     Body: {"exchange": "binance"|"binance_th"|"bitkub"|"okx"}
     Does not switch mode; call /api/mode/swap to go live.
@@ -1348,159 +1136,226 @@ async def set_active_exchange(data: Dict[str, str], _=_AUTH):
     return {"active": name}
 
 
-# ─── One-click live trading (guarded) ──────────────────────────
+# ─── Autotrade Intelligence Endpoints ─────────────────────────
 
-@router.post("/live/start")
-async def live_start(data: Dict[str, Any], _=_AUTH):
-    """POST /api/live/start — one-click "Start AI Live Trading" with guardrails.
-
-    Body: {"confirm": "LIVE", "budget_usdt": <number>}
-
-    Steps, in order, aborting on the first failure:
-      1. Require the user to type LIVE  (typo guard)
-      2. Require a positive budget cap   (spending guard)
-      3. Test the live exchange connection (keys + connectivity)
-      4. Apply the budget cap, hot-swap to live, un-pause auto-trading
-    """
+@router.get("/regimes")
+async def get_market_regimes():
+    """GET /api/regimes — current market regime for each tracked symbol."""
     if not _trader:
-        raise HTTPException(503, "Trader not running")
-
-    # 1) typed confirmation
-    if str(data.get("confirm", "")).strip().upper() != "LIVE":
-        raise HTTPException(400, 'Type LIVE to confirm real-money trading.')
-
-    # 2) budget cap (initial spending limit)
-    try:
-        budget = float(data.get("budget_usdt", 0))
-    except (TypeError, ValueError):
-        budget = 0.0
-    if budget < 10:
-        raise HTTPException(400, "Set a starting budget of at least 10 USDT.")
-
-    from ..exchanges import create_live_exchange_strict, LiveExchangeError
-
-    # 3) build + TEST the live exchange before committing anything
-    try:
-        new_exchange, exchange_name = create_live_exchange_strict()
-    except LiveExchangeError as e:
-        raise HTTPException(400, str(e))
-
-    try:
-        balances = await new_exchange.get_balance()
-        quote = new_exchange.quote_currency
-        cash = balances.get(quote)
-        free_cash = float(cash.free) if cash else 0.0
-    except Exception as e:
-        try:
-            if hasattr(new_exchange, "close"):
-                await new_exchange.close()
-        except Exception:
-            pass
-        raise HTTPException(400, f"Connection test failed for {exchange_name}: {e}")
-
-    # Refuse to abandon real open positions on the current live exchange.
-    if not _trader._exchange.is_demo and _trader._open_trades:
-        raise HTTPException(
-            409,
-            f"Close your {len(_trader._open_trades)} open live position(s) first."
-        )
-
-    # 4) commit: budget cap → swap → un-pause
-    settings.set(budget, "trading", "live_max_budget_usdt")
-    settings.set("live", "trading", "mode")
-    settings.save()
-
-    old_exchange = _trader._exchange
-    try:
-        if hasattr(old_exchange, "close"):
-            await old_exchange.close()
-    except Exception:
-        pass
-
-    _trader._exchange = new_exchange
-    _trader._claude.set_exchange(new_exchange)
-    _trader._analyses.clear()
-    _trader._open_trades.clear()
-    _trader._daily_pnl = 0.0
-    _trader._paused = False
-
-    logger.warning(f"LIVE trading started on {exchange_name} (budget cap {budget} USDT)")
-    await _trader._broadcast("mode_changed", {"mode": "live", "exchange": exchange_name})
-
+        return {}
     return {
-        "ok": True,
-        "mode": "live",
-        "exchange": exchange_name,
-        "budget_usdt": budget,
-        "free_cash": round(free_cash, 2),
-        "quote": quote,
+        sym: {
+            "regime":     r.regime,
+            "confidence": round(r.confidence, 2),
+            "adx":        round(r.adx, 1),
+            "atr_pct":    round(r.atr_pct, 2),
+            "trend_slope": round(r.trend_slope, 4),
+            "detail":     r.detail,
+        }
+        for sym, r in _trader.regimes.items()
     }
 
 
-@router.post("/live/stop")
-async def live_stop(_=_AUTH):
-    """POST /api/live/stop — KILL SWITCH.
+@router.get("/risk")
+async def get_risk_state():
+    """GET /api/risk — portfolio risk engine state (drawdown, heat, circuit breaker)."""
+    if not _trader:
+        return {}
+    return _trader.risk_summary
 
-    Immediately pauses all new entries, then returns to demo mode if no live
-    positions are open. Protective exits (SL/TP/trailing) on any remaining
-    live positions keep running; close them manually to fully exit.
-    """
+
+@router.get("/rl/stats")
+async def get_rl_stats():
+    """GET /api/rl/stats — Reinforcement Learning bandit state per regime."""
+    if not _trader:
+        return {}
+    stats = _trader._rl.stats
+    arm_data = {}
+    for regime in ["BULL_TREND", "BEAR_TREND", "RANGING", "VOLATILE", "CRASH"]:
+        arm_data[regime] = _trader._rl.get_arm_stats(regime)
+        arm_data[regime]["best_strategy"] = _trader._rl.select_strategy(regime)
+    return {**stats, "arms": arm_data}
+
+
+@router.get("/patterns")
+async def get_chart_patterns(symbol: str = "BTC/USDT"):
+    """GET /api/patterns?symbol=BTC/USDT — detected chart patterns for symbol."""
     if not _trader:
         raise HTTPException(503, "Trader not running")
-
-    # Pause first — this always takes effect instantly, blocking new BUYs.
-    _trader._paused = True
-
-    open_live = (not _trader._exchange.is_demo) and bool(_trader._open_trades)
-    swapped = False
-    if not open_live:
-        from ..exchanges import DemoExchange
-        old_exchange = _trader._exchange
-        try:
-            if hasattr(old_exchange, "close"):
-                await old_exchange.close()
-        except Exception:
-            pass
-        _trader._exchange = DemoExchange()
-        _trader._claude.set_exchange(_trader._exchange)
-        _trader._analyses.clear()
-        _trader._open_trades.clear()
-        _trader._daily_pnl = 0.0
-        settings.set("demo", "trading", "mode")
-        settings.save()
-        swapped = True
-        # Back on safe (virtual) demo money — let normal demo auto-trading resume.
-        _trader._paused = False
-        await _trader._broadcast("mode_changed", {"mode": "demo", "exchange": "demo"})
-
-    logger.warning("KILL SWITCH activated — live entries halted" +
-                   (" and switched back to demo" if swapped else " (live positions still open)"))
+    analysis = _trader.analyses.get(symbol)
+    if not analysis:
+        analysis = await _trader.analyze_symbol(symbol)
+    if not analysis:
+        raise HTTPException(503, f"No data for {symbol}")
+    patterns = getattr(analysis, "patterns", [])
     return {
-        "ok": True,
-        "paused": True,
-        "mode": settings.trading_mode,
-        "switched_to_demo": swapped,
-        "open_live_positions": len(_trader._open_trades) if open_live else 0,
+        "symbol":  symbol,
+        "count":   len(patterns),
+        "summary": getattr(analysis, "pattern_summary", ""),
+        "patterns": [
+            {
+                "name":           p.name,
+                "name_th":        p.name_th,
+                "type":           p.pattern_type,
+                "signal":         p.signal,
+                "confidence":     round(p.confidence, 2),
+                "description":    p.description,
+                "description_th": p.description_th,
+            }
+            for p in patterns
+        ],
     }
 
 
-@router.get("/live/status")
-async def live_status():
-    """GET /api/live/status — live-trading state for the dashboard control."""
-    from ..exchanges import resolve_live_exchange, has_credentials
-    deployed = 0.0
+@router.get("/sizer/stats")
+async def get_sizer_stats():
+    """GET /api/sizer/stats — Kelly Criterion win-rate stats per symbol."""
+    if not _trader:
+        return {}
+    symbols = settings.symbols
+    return {sym: _trader._sizer.stats_for(sym) for sym in symbols}
+
+
+@router.get("/analytics")
+async def get_analytics(symbol: Optional[str] = None, days: int = 30):
+    """GET /api/analytics — Sharpe, Sortino, Calmar, VaR, streaks from DB trade history."""
+    from ..agent.risk_analytics import compute_metrics
+
+    with SessionLocal() as db:
+        q = db.query(Trade).filter(Trade.status == "closed", Trade.pnl_pct.isnot(None))
+        if symbol:
+            q = q.filter(Trade.symbol == symbol)
+        cutoff = datetime.utcnow() - timedelta(days=days)
+        q = q.filter(Trade.closed_at >= cutoff)
+        trades_db = q.order_by(Trade.opened_at).all()
+
+    if not trades_db:
+        from ..agent.risk_analytics import _empty
+        return {**_empty(), "symbol": symbol, "days": days, "source": "db", "note": "no closed trades"}
+
+    trade_dicts = [{"pnl_pct": t.pnl_pct, "win": (t.pnl_pct or 0) > 0} for t in trades_db]
+
+    # Approximate equity curve from trade outcomes
+    initial = 10_000.0
+    equity  = [initial]
+    for t in trades_db:
+        last    = equity[-1]
+        equity.append(last * (1 + (t.pnl_pct or 0) / 100))
+
+    metrics = compute_metrics(trade_dicts, equity, initial)
+    return {**metrics, "symbol": symbol, "days": days, "source": "db"}
+
+
+@router.get("/sentiment")
+async def get_sentiment(symbol: str = "BTC/USDT"):
+    """GET /api/sentiment — Fear & Greed index, funding rate, and open interest.
+
+    symbol: crypto pair, e.g. BTC/USDT (used for funding rate fetch)
+    """
+    from ..data.sentiment import get_fear_greed, get_funding_rate, get_open_interest
+
+    binance_symbol = symbol.replace("/", "")  # BTC/USDT → BTCUSDT
+
+    exchange = _trader._exchange if _trader else None
+
+    # Current price (for OI contracts → USDT notional)
+    mark_price = None
     if _trader:
-        deployed = sum(t.get("cost", 0) or 0 for t in _trader._open_trades.values())
-    resolved = resolve_live_exchange()
+        a = _trader.analyses.get(symbol)
+        if a:
+            mark_price = a.price
+
+    # Gather concurrently; funding rate needs the exchange client
+    fng_task = get_fear_greed()
+    oi_task  = get_open_interest(binance_symbol, mark_price=mark_price)
+
+    if exchange:
+        funding_task = get_funding_rate(exchange, symbol)
+        fng, oi, funding = await asyncio.gather(fng_task, oi_task, funding_task, return_exceptions=True)
+    else:
+        fng, oi = await asyncio.gather(fng_task, oi_task, return_exceptions=True)
+        funding = {"symbol": symbol, "funding_rate": None, "error": "exchange unavailable"}
+
+    fng     = fng     if not isinstance(fng,     Exception) else {"value": None, "label": None, "error": str(fng)}
+    oi      = oi      if not isinstance(oi,      Exception) else {"open_interest_usdt": None, "error": str(oi)}
+    funding = funding if not isinstance(funding, Exception) else {"funding_rate": None, "error": str(funding)}
+
+    # Derive trading bias from Fear & Greed
+    fng_value = fng.get("value")
+    if fng_value is None:
+        bias = "NEUTRAL"
+    elif fng_value <= 25:
+        bias = "CONTRARIAN_BUY"
+    elif fng_value <= 45:
+        bias = "CAUTIOUS_BUY"
+    elif fng_value <= 55:
+        bias = "NEUTRAL"
+    elif fng_value <= 75:
+        bias = "CAUTIOUS_SELL"
+    else:
+        bias = "CONTRARIAN_SELL"
+
     return {
-        "mode": settings.trading_mode,
-        "is_live": bool(_trader and not _trader._exchange.is_demo) if _trader else False,
-        "paused": bool(_trader._paused) if _trader else False,
-        "running": bool(_trader._running) if _trader else False,
-        "budget_usdt": float(settings.get("trading", "live_max_budget_usdt", default=0) or 0),
-        "deployed_usdt": round(deployed, 2),
-        "open_positions": len(_trader._open_trades) if _trader else 0,
-        "resolved_exchange": resolved,
-        "live_ready": bool(resolved and has_credentials(resolved)),
+        "symbol": symbol,
+        "fear_greed": {
+            "value":        fng.get("value"),
+            "label":        fng.get("label"),
+            "trading_bias": bias,
+            "error":        fng.get("error"),
+        },
+        "funding_rate": {
+            "rate":         funding.get("funding_rate"),
+            "rate_pct":     funding.get("funding_rate_pct"),
+            "next_funding": funding.get("next_funding_time"),
+            "error":        funding.get("error"),
+        },
+        "open_interest": {
+            "usdt":      oi.get("open_interest_usdt"),
+            "contracts": oi.get("open_interest_contracts"),
+            "error":     oi.get("error"),
+        },
+    }
+
+
+@router.get("/trading/kill-switch")
+async def kill_switch_status():
+    """GET /api/trading/kill-switch — return current kill switch and dry-run state."""
+    return {
+        "killed":  _trader.killed   if _trader else False,
+        "dry_run": _trader.dry_run  if _trader else False,
+        "running": _trader._running if _trader else False,
+    }
+
+
+@router.post("/trading/kill-switch")
+async def set_kill_switch(action: str = "activate"):
+    """POST /api/trading/kill-switch?action=activate|deactivate — toggle kill switch.
+
+    action=activate   → halt all new trades immediately.
+    action=deactivate → resume trading.
+    """
+    if not _trader:
+        raise HTTPException(503, "Trader not initialised")
+    if action == "activate":
+        _trader.kill()
+        return {"killed": True, "message": "Kill switch activated — trading halted"}
+    elif action == "deactivate":
+        _trader.resume()
+        return {"killed": False, "message": "Kill switch deactivated — trading resumed"}
+    raise HTTPException(400, "action must be 'activate' or 'deactivate'")
+
+
+@router.post("/trading/dry-run")
+async def set_dry_run(enabled: bool = True):
+    """POST /api/trading/dry-run?enabled=true|false — toggle paper-trading mode at runtime.
+
+    When enabled, orders are logged but never sent to the exchange.
+    """
+    if not _trader:
+        raise HTTPException(503, "Trader not initialised")
+    _trader._dry_run = enabled
+    return {
+        "dry_run": _trader._dry_run,
+        "message": f"Dry-run {'enabled' if enabled else 'disabled'}",
     }
 

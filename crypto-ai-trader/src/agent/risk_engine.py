@@ -1,0 +1,165 @@
+"""
+Advanced Risk Engine — portfolio-level risk management with dynamic limits.
+
+Tracks:
+  - High-water mark & current drawdown
+  - Portfolio heat (total open risk as % of equity)
+  - Per-symbol risk budget
+  - Circuit-breaker: halts all new trades on limit breach
+
+Regime multipliers reduce/increase allowed risk based on detected market state.
+"""
+import logging
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class RiskState:
+    equity: float = 0.0
+    high_water_mark: float = 0.0
+    current_drawdown_pct: float = 0.0
+    portfolio_heat_pct: float = 0.0   # sum of open risk as % of equity
+    daily_pnl: float = 0.0
+    daily_pnl_pct: float = 0.0
+    regime: str = "RANGING"
+    circuit_open: bool = False
+    circuit_reason: str = ""
+
+
+class RiskEngine:
+    """
+    Call update() on every trading cycle to keep the risk state current,
+    then call can_trade() before opening any new position.
+    """
+
+    # Risk multipliers per regime (fraction of base position size)
+    _REGIME_MULT: Dict[str, float] = {
+        "BULL_TREND": 1.00,
+        "BEAR_TREND": 0.50,
+        "RANGING":    0.80,
+        "VOLATILE":   0.40,
+        "CRASH":      0.10,
+    }
+
+    def __init__(self, config: dict = None):
+        cfg = config or {}
+        self._max_drawdown_pct   = float(cfg.get("max_drawdown_pct",   0.10))
+        self._max_daily_loss_pct = float(cfg.get("max_daily_loss_pct", 0.05))
+        self._max_portfolio_heat = float(cfg.get("max_portfolio_heat", 0.20))
+        self._max_position_pct   = float(cfg.get("max_position_pct",   0.10))
+
+        self._high_water_mark: float = 0.0
+        self._equity_history: List[Tuple[datetime, float]] = []
+        self._state = RiskState()
+        self._open_risks: Dict[str, float] = {}   # symbol → risk in quote currency
+
+    # ── State update ──────────────────────────────────────────────────────
+
+    def update(
+        self,
+        equity: float,
+        daily_pnl: float,
+        open_trades: dict,
+        regime: str = "RANGING",
+    ):
+        self._state.equity    = equity
+        self._state.daily_pnl = daily_pnl
+        self._state.regime    = regime
+
+        if equity > self._high_water_mark:
+            self._high_water_mark = equity
+        self._state.high_water_mark = self._high_water_mark
+
+        if self._high_water_mark > 0:
+            self._state.current_drawdown_pct = (
+                (self._high_water_mark - equity) / self._high_water_mark
+            )
+
+        if equity > 0:
+            self._state.daily_pnl_pct = daily_pnl / equity
+
+        heat = sum(self._open_risks.values()) / equity if equity > 0 else 0.0
+        self._state.portfolio_heat_pct = heat
+
+        # Rolling equity history (7-day window)
+        now = datetime.utcnow()
+        self._equity_history.append((now, equity))
+        cutoff = now - timedelta(days=7)
+        self._equity_history = [(t, e) for t, e in self._equity_history if t > cutoff]
+
+        self._check_circuit_breaker()
+
+    def _check_circuit_breaker(self):
+        s = self._state
+        if s.current_drawdown_pct >= self._max_drawdown_pct:
+            s.circuit_open = True
+            s.circuit_reason = (
+                f"Max drawdown {s.current_drawdown_pct:.1%} exceeded "
+                f"{self._max_drawdown_pct:.1%}"
+            )
+        elif s.equity > 0 and (s.daily_pnl / s.equity) <= -self._max_daily_loss_pct:
+            s.circuit_open = True
+            s.circuit_reason = (
+                f"Daily loss limit {s.daily_pnl_pct:.1%} reached "
+                f"(limit={self._max_daily_loss_pct:.1%})"
+            )
+        else:
+            s.circuit_open = False
+            s.circuit_reason = ""
+
+    # ── Trade gating ──────────────────────────────────────────────────────
+
+    def can_trade(self, new_trade_risk: float = 0.0) -> Tuple[bool, str]:
+        """Returns (allowed, reason). Call before executing any new BUY."""
+        if self._state.circuit_open:
+            return False, f"Circuit breaker: {self._state.circuit_reason}"
+
+        equity = self._state.equity or 1.0
+        projected_heat = (sum(self._open_risks.values()) + new_trade_risk) / equity
+        if projected_heat > self._max_portfolio_heat:
+            return False, (
+                f"Portfolio heat {projected_heat:.1%} would exceed "
+                f"{self._max_portfolio_heat:.1%}"
+            )
+
+        return True, ""
+
+    # ── Position tracking ─────────────────────────────────────────────────
+
+    def register_open_trade(self, symbol: str, risk_amount: float):
+        """risk_amount = quote-currency value at risk for this position."""
+        self._open_risks[symbol] = risk_amount
+
+    def deregister_trade(self, symbol: str):
+        self._open_risks.pop(symbol, None)
+
+    # ── Helpers ───────────────────────────────────────────────────────────
+
+    def get_regime_multiplier(self, regime: str) -> float:
+        return self._REGIME_MULT.get(regime, 0.80)
+
+    @property
+    def state(self) -> RiskState:
+        return self._state
+
+    @property
+    def max_position_pct(self) -> float:
+        return self._max_position_pct
+
+    def summary(self) -> dict:
+        s = self._state
+        return {
+            "equity":           round(s.equity, 2),
+            "high_water_mark":  round(s.high_water_mark, 2),
+            "drawdown_pct":     round(s.current_drawdown_pct, 4),
+            "portfolio_heat":   round(s.portfolio_heat_pct, 4),
+            "daily_pnl":        round(s.daily_pnl, 2),
+            "daily_pnl_pct":    round(s.daily_pnl_pct, 4),
+            "circuit_open":     s.circuit_open,
+            "circuit_reason":   s.circuit_reason,
+            "regime":           s.regime,
+        }

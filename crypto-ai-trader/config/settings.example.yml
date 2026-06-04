@@ -1,15 +1,23 @@
 app:
   name: "Aiterra v1.0.24"
   port: 8888
+  host: "127.0.0.1"    # localhost only by default; set "0.0.0.0" to expose over LAN
   open_browser: true
   log_level: "INFO"
 
 ai:
-  default_model: "hybrid"   # options: claude, rule_based, ml, hybrid
+  default_model: "hybrid"   # options: claude, rule_based, ml, hybrid, multi_model
   claude:
     api_key: ""             # ใส่ Claude API key ที่นี่
     model: "claude-sonnet-4-6"  # claude-opus-4-8 | claude-sonnet-4-6 | claude-haiku-4-5-20251001
     max_tokens: 2048            # agentic loop: tool use + multi-step reasoning needs headroom
+  openai:
+    api_key: ""             # GPT-4 key สำหรับ multi-model consensus (ไม่ใส่ก็ได้)
+  gemini:
+    api_key: ""             # Gemini key สำหรับ multi-model consensus (ไม่ใส่ก็ได้)
+  supermemory:
+    api_key: ""             # https://supermemory.ai — เปิด AI long-term memory (ไม่ใส่ก็ได้)
+    enabled: false
   rule_based:
     enabled: true
   ml:
@@ -48,8 +56,13 @@ exchanges:
     virtual_balance_thb: 350000.0   # THB เสมือน (สำหรับ Bitkub)
     data_source: "binance"          # ดึงข้อมูลตลาดจาก exchange ไหน
 
+backtest:
+  fee_pct: 0.001        # Commission per side (0.001 = 0.1% — Binance taker)
+  slippage_pct: 0.0005  # Market-impact slippage per fill (0.05%)
+
 trading:
-  mode: "demo"              # demo | live
+  dry_run: false        # true = log orders but never send to exchange
+  mode: "demo"          # demo | live
   symbols:
     - "BTC/USDT"
     - "ETH/USDT"
@@ -97,6 +110,15 @@ strategy:
     bb_period: 20
     bb_std: 2.0
     rsi_period: 14
+  roi_table:              # Time-based take profit: minutes_open → min_profit_%
+    "0": 0.06             # Immediately: 6% profit → close
+    "300": 0.04           # After 5 min: 4% → close
+    "600": 0.025          # After 10 min: 2.5% → close
+    "1800": 0.01          # After 30 min: 1% → close
+  trailing_stop:
+    enabled: false
+    pct: 0.02             # Trail 2% below high-water mark
+    activate_pct: 0.01    # Start trailing after 1% unrealized profit
   indicators:
     rsi_period: 14
     macd_fast: 12
@@ -107,14 +129,20 @@ strategy:
     atr_period: 14
     vwap_enabled: true
 
-thai:
-  sec_api_key: ""           # ลงทะเบียนฟรีที่ api-portal.sec.or.th
-  # watch_stocks:           # หุ้นที่ติดตาม (default = SET50 ทั้งหมด)
-  #   - "PTT.BK"
-  #   - "KBANK.BK"
-  # watch_funds:            # กองทุนที่ติดตาม
-  #   - "KFSDIV"
-  #   - "KT-PRECIOUS"
+# ── Advanced Risk Management ─────────────────────────────────────────────────
+risk:
+  max_drawdown_pct:   0.10   # หยุดเทรดถ้า portfolio ลดจาก peak เกิน 10%
+  max_daily_loss_pct: 0.05   # หยุดเทรดถ้าขาดทุนเกิน 5% ต่อวัน
+  max_portfolio_heat: 0.20   # สูงสุด 20% ของ portfolio เป็น open risk
+  max_position_pct:   0.10   # สูงสุด 10% ของ portfolio ต่อ 1 position
+
+# ── Smart Position Sizing (Kelly Criterion) ────────────────────────────────
+position_sizer:
+  kelly_fraction:    0.25   # Fractional Kelly (0.25 = 25% of full Kelly)
+  min_trade_usdt:    10.0   # ขั้นต่ำต่อ trade
+  max_trade_usdt:    5000.0 # สูงสุดต่อ trade
+  fallback_risk_pct: 0.02   # ใช้ 2% ถ้ายังไม่มีประวัติ trade
+  target_atr_pct:    2.0    # ATR% ที่ถือว่า "ปกติ" (สูงกว่า = ลด size)
 
 notifications:
   line:

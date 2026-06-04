@@ -8,6 +8,7 @@ from typing import Dict, List, Optional
 import aiohttp
 
 from .base import Balance, BaseExchange, OHLCV, Order, Ticker
+from .retry import with_retry
 from ..core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -50,6 +51,7 @@ class BitkubExchange(BaseExchange):
         if self._session and not self._session.closed:
             await self._session.close()
 
+    @with_retry()
     async def get_ticker(self, symbol: str) -> Ticker:
         mkt = SYMBOL_MAP.get(symbol, f"THB_{symbol.split('/')[0]}")
         session = await self._get_session()
@@ -69,6 +71,7 @@ class BitkubExchange(BaseExchange):
             low_24h=float(result.get("lowestAsk", 0)),
         )
 
+    @with_retry()
     async def get_ohlcv(self, symbol: str, timeframe: str = "5m", limit: int = 100) -> List[OHLCV]:
         mkt = SYMBOL_MAP.get(symbol, f"THB_{symbol.split('/')[0]}")
         tf_map = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 14400, "1d": 86400}
@@ -98,6 +101,7 @@ class BitkubExchange(BaseExchange):
             for i in range(len(data["t"]))
         ]
 
+    @with_retry()
     async def get_balance(self) -> Dict[str, Balance]:
         ts = int(time.time() * 1000)
         payload = {"ts": ts}
@@ -118,6 +122,7 @@ class BitkubExchange(BaseExchange):
             if float(amt) > 0
         }
 
+    @with_retry(max_attempts=2)
     async def create_order(self, symbol: str, side: str, amount: float, price: Optional[float] = None) -> Order:
         mkt = SYMBOL_MAP.get(symbol, f"THB_{symbol.split('/')[0]}")
         ts = int(time.time() * 1000)
