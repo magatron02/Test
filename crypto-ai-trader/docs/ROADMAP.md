@@ -7,6 +7,8 @@
 > ระดับความยาก / acceptance criteria — หยิบไปทำตามทีหลังได้ทันที
 >
 > หลักการจัดลำดับ: **Impact ต่อ P&L** มาก่อน **Effort** — เริ่มจากของที่ได้ผลเยอะแต่ทำไม่ยาก
+>
+> 📅 ดูแผน **release ตามเวอร์ชั่น** (feature ตัวไหนลงเวอร์ชั่นไหน + KPI + release gate) ที่ [`LUNAI_ROADMAP.md`](./LUNAI_ROADMAP.md)
 
 ---
 

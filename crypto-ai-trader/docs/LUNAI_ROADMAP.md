@@ -1,0 +1,234 @@
+# Lunai — Release Roadmap 🌙
+
+> **Lunai** คือ AI autotrade engine ที่อยู่ภายใน **Aiterra** (โปรแกรมหลัก)
+> เอกสารนี้คือ **แผน release ตามเวอร์ชั่น** ของ Lunai — จับ feature แต่ละตัวลงเวอร์ชั่น
+> พร้อมธีม, เป้าหมายวัดผล (KPI), และเกณฑ์ผ่านก่อนปล่อย (release gate)
+>
+> 📋 รายละเอียดแต่ละ feature (สเปก/ไฟล์/acceptance) อยู่ใน [`ROADMAP.md`](./ROADMAP.md) — อ้างอิงด้วยรหัส `F1.1`, `F2.1`, …
+> เอกสารนี้ตอบคำถาม **"ปล่อยอะไร เวอร์ชั่นไหน และวัดความสำเร็จยังไง"**
+
+---
+
+## 🎯 North Star — Lunai มีไว้ทำอะไร
+
+> **"AI ที่เทรดเองได้อย่างมีวินัย เรียนรู้จากผลจริงตลอดเวลา และอยู่รอดในตลาดทุกสภาพ"**
+
+3 เสาหลักที่ทุกเวอร์ชั่นต้องไม่ทำให้แย่ลง:
+
+| เสา | ความหมาย | ตัววัดหลัก |
+|-----|----------|-----------|
+| **Edge** | ตัดสินใจดีกว่าสุ่ม/buy-and-hold อย่างมีนัยสำคัญ | Sharpe ratio, Profit Factor |
+| **Survival** | ไม่ระเบิดพอร์ตในเหตุการณ์รุนแรง | Max Drawdown, Calmar |
+| **Learning** | เก่งขึ้นเมื่อมีข้อมูลมากขึ้น | Win-rate trend, OOS stability |
+
+---
+
+## 📐 Versioning Philosophy (Semantic)
+
+| ระดับ | เมื่อไหร่ | ตัวอย่าง |
+|-------|---------|---------|
+| **MAJOR** (x.0.0) | เปลี่ยนสถาปัตยกรรมการตัดสินใจ / เพิ่ม trading paradigm ใหม่ | v1 → v2 (เพิ่ม market-neutral) |
+| **MINOR** (1.x.0) | เพิ่ม capability ใหม่ที่ backward-compatible | v1.0 → v1.1 (เพิ่ม data/decision) |
+| **PATCH** (1.0.x) | แก้บั๊ก, จูน parameter, ไม่เพิ่ม capability | v1.0.0 → v1.0.1 |
+
+**กฎเหล็ก:** ทุก MINOR/MAJOR ต้องผ่าน [Release Gate](#release-gate) ก่อนขึ้น live เสมอ
+
+---
+
+## 🗺️ Release Timeline — ภาพรวม
+
+```
+v1.0.0 ──► v1.1.0 ──► v1.2.0 ──► v1.3.0 ──► v1.4.0 ──────────► v2.0.0
+Foundation  Awareness  Judgment  Perception  Resilience       Autonomy
+(ปัจจุบัน)   มองเห็น+    ตัดสินใจ   เห็นสิ่งที่    อยู่รอด+         เทรดเอง
+            อธิบายได้    ดีขึ้น     spot ไม่เห็น  ตรวจสอบตัวเอง   หลายกลยุทธ์
+```
+
+| เวอร์ชั่น | ธีม | Features | เป้าหมายหลัก | ระยะ |
+|----------|-----|----------|-------------|------|
+| **v1.0.0** ✅ | Foundation | (มีอยู่แล้ว) | baseline ที่เทรดได้จริง | — |
+| **v1.1.0** | Awareness | F3.2, F5.4, F1.4 | เห็นความเสี่ยง + อธิบายการตัดสินใจได้ | 2 สัปดาห์ |
+| **v1.2.0** | Judgment | F2.1, F2.2 | เลือก model + จัดการ exit ฉลาดขึ้น | 2 สัปดาห์ |
+| **v1.3.0** | Perception | F1.1, F1.2, F1.3 | ข้อมูลที่ตลาด spot มองไม่เห็น | 3 สัปดาห์ |
+| **v1.4.0** | Resilience | F3.4, F5.1, F3.3 | self-validate + tail-risk control | 3 สัปดาห์ |
+| **v2.0.0** | Autonomy | F3.1, F5.3, F2.3, F2.4 | multi-strategy + self-managing | 4–6 สัปดาห์ |
+| _backlog_ | Advanced | F4.1–F4.4, F5.2 | ของเสริม ทำเมื่อ ROI คุ้ม | — |
+
+---
+
+## v1.0.0 — "Foundation" ✅ (ปัจจุบัน)
+
+**ธีม:** ฐานที่เทรดได้จริง มี safety ครบ
+
+**สิ่งที่มีในเวอร์ชั่นนี้:**
+- Signal funnel: 40+ indicators → regime → model → confidence gate → risk → sizing
+- 4 models: Rule-based (5 strategy), LightGBM+SHAP, Claude agentic, Hybrid
+- RL UCB1 bandit (strategy × regime), Kelly sizing + ATR/GARCH/HRP
+- Risk engine: drawdown guard, daily-loss circuit breaker, portfolio heat
+- Sentiment: Fear & Greed, Funding rate, Open Interest
+- Backtest: walk-forward + fee/slippage, per-regime/pattern breakdown
+- Safety: dry-run, kill switch, allowlist, rate limit, localhost bind
+
+**KPI baseline:** เก็บค่าจริงจาก dry-run/paper เพื่อใช้เป็นจุดอ้างอิงทุกเวอร์ชั่นถัดไป
+> ⚠️ ก่อนเริ่ม v1.1 ต้อง **lock baseline** — รัน dry-run ≥ 2 สัปดาห์ บันทึก Sharpe / Max DD / Win-rate / Profit Factor
+
+---
+
+## v1.1.0 — "Awareness" 👁️
+
+**ธีม:** Lunai เห็นความเสี่ยงรอบตัว และอธิบายได้ว่าทำไมถึงเทรด
+
+**ทำไมเวอร์ชั่นนี้ก่อน:** quick wins ที่ใช้ infra เดิม + `F5.4` ทำให้ debug ทุกเวอร์ชั่นถัดไปง่ายขึ้น (เห็นว่าใครพาเข้าเทรด)
+
+| Feature | สิ่งที่ได้ | Effort |
+|---------|-----------|--------|
+| `F3.2` Correlation Guard | กัน over-concentration (ไม่ stack BTC+ETH+BNB ที่ corr 0.8+) | S |
+| `F5.4` Attribution Logging | ทุกเทรดบอกได้ว่ามาจาก signal ไหน น้ำหนักเท่าไร | S |
+| `F1.4` Derivatives Depth | long/short ratio, OI skew, liquidation cluster | S |
+
+**🎯 เป้าหมายวัดผล:**
+- Max Drawdown ลดลง ≥ 10% จาก baseline (จาก correlation guard)
+- ทุกเทรดมี attribution breakdown ครบ 100%
+- ไม่มี regression: Sharpe ไม่ต่ำกว่า baseline
+
+**🚪 Exit gate:** ผ่าน [Release Gate](#release-gate) + correlation guard บล็อกได้จริงใน paper test
+
+---
+
+## v1.2.0 — "Judgment" 🧠
+
+**ธีม:** Lunai ตัดสินใจดีขึ้น — เลือก model ที่เหมาะกับสถานการณ์ + จัดการ exit เป็น
+
+| Feature | สิ่งที่ได้ | Effort |
+|---------|-----------|--------|
+| `F2.1` Meta-Ensemble ⭐ | RL เลือกว่า model ไหน (rule/ml/claude) เก่งต่อ regime+symbol | M |
+| `F2.2` Adaptive SL/TP | SL/TP เป็น ATR/structure-based แทน fixed % + trailing | M |
+
+**ทำไมสำคัญ:** นี่คือ upgrade สมองที่ใช้ของเดิม (UCB1) — ผลกระทบต่อ P&L สูงสุดโดยไม่ต้องเพิ่ม data
+
+**🎯 เป้าหมายวัดผล:**
+- Profit Factor เพิ่ม ≥ 15% (meta-selection ชนะ best fixed model)
+- Win-rate ใน VOLATILE regime ดีขึ้น (จาก adaptive SL ลดโดน stop-hunt)
+- Avg winning trade เพิ่มขึ้น (จาก let-winner-run ใน BULL)
+
+**🚪 Exit gate:** backtest พิสูจน์ meta-ensemble ≥ best single model บน **OOS** (ไม่ใช่ in-sample)
+
+---
+
+## v1.3.0 — "Perception" 📡
+
+**ธีม:** Lunai เห็นสิ่งที่ตลาด spot มองไม่เห็น — edge จากข้อมูล ไม่ใช่แค่ราคา
+
+| Feature | สิ่งที่ได้ | Effort |
+|---------|-----------|--------|
+| `F1.1` On-chain Metrics | exchange netflow, whale transfers, MVRV | M |
+| `F1.2` Order Book Microstructure | bid/ask imbalance, wall detection (execution filter) | M |
+| `F1.3` Social Sentiment | mention volume + sentiment divergence | M |
+
+**🎯 เป้าหมายวัดผล:**
+- เพิ่ม feature ทีละตัว เทียบ Sharpe before/after — เก็บเฉพาะตัวที่ทำให้ดีขึ้น
+- Entry timing ดีขึ้น (slippage จริง vs คาดการณ์ ลดลง จาก order book filter)
+- On-chain feature ติด top-10 SHAP importance (พิสูจน์ว่ามีประโยชน์จริง)
+
+**🚪 Exit gate:** feature ใดที่ไม่เพิ่ม OOS Sharpe → **ถอดออก** ไม่เก็บไว้เพิ่ม complexity
+
+---
+
+## v1.4.0 — "Resilience" 🛡️
+
+**ธีม:** Lunai ตรวจสอบตัวเองได้ และอยู่รอดในเหตุการณ์รุนแรง
+
+| Feature | สิ่งที่ได้ | Effort |
+|---------|-----------|--------|
+| `F3.4` Drift Detection + Auto Re-validate | จับ model เสื่อม → retrain + OOS validate ก่อน deploy | M |
+| `F5.1` Param Optimization (Optuna) | จูน parameter อัตโนมัติบน walk-forward (กัน overfit) | M |
+| `F3.3` VaR / CVaR + Monte Carlo | tail-risk เชิงปริมาณ (proactive แทน reactive) | M |
+
+**🎯 เป้าหมายวัดผล:**
+- Model ใหม่ deploy เฉพาะเมื่อ OOS Sharpe ≥ ตัวเดิม (champion/challenger)
+- 95% VaR คำนวณได้ + เตือนก่อน position ดัน risk เกิน budget
+- Monte Carlo max-DD distribution สอดคล้องกับ realized DD (model สมจริง)
+
+**🚪 Exit gate:** simulate crash scenario (เช่น -30% ใน 1 วัน) → circuit breaker + VaR ทำงานถูกต้อง
+
+---
+
+## v2.0.0 — "Autonomy" 🚀 (MAJOR)
+
+**ธีม:** Lunai กลายเป็น engine หลายกลยุทธ์ที่จัดการตัวเอง — ไม่ใช่แค่ directional bot
+
+> เป็น MAJOR เพราะเพิ่ม **trading paradigm ใหม่** (market-neutral) + ระบบ promote model อัตโนมัติ
+
+| Feature | สิ่งที่ได้ | Effort |
+|---------|-----------|--------|
+| `F3.1` Active Pairs Trading | cointegration → market-neutral long/short (return ไม่ขึ้นกับทิศตลาด) | L |
+| `F5.3` Shadow / Champion-Challenger | รัน model ใหม่ paper คู่ live, promote อัตโนมัติเมื่อชนะ | M |
+| `F2.3` Trade Journal / Memory | Lunai สรุปบทเรียนเอง + ดึงมา reason (learning แบบ compounding) | M |
+| `F2.4` Adaptive Meta-Parameters | kelly/confidence ปรับตาม rolling Sharpe เอง | M |
+
+**🎯 เป้าหมายวัดผล:**
+- Pairs strategy มี return stream ที่ correlation ต่ำกับ directional (< 0.3)
+- Champion/challenger สลับ model ได้เองโดยไม่ต้องคนสั่ง
+- Lunai เทรดได้กำไรแม้ในตลาด sideways (ที่ directional bot ทำไม่ได้)
+
+**🚪 Exit gate:** market-neutral + directional รวมกันให้ Calmar สูงกว่า directional เดี่ยว
+
+---
+
+<a name="release-gate"></a>
+## 🚪 Release Gate — เกณฑ์ผ่านก่อนปล่อยทุกเวอร์ชั่น
+
+ทุก MINOR/MAJOR ต้องผ่าน **ทั้งหมด** ก่อนขึ้น live:
+
+- [ ] **Backtest** ครอบคลุม ≥ 180 วัน ผ่าน ≥ 2 regime (รวมช่วง crash)
+- [ ] **Walk-forward OOS:** Sharpe ≥ baseline — optimize บน in-sample, รายงานบน out-of-sample เท่านั้น
+- [ ] **ไม่ regression:** Max Drawdown ไม่แย่กว่า baseline
+- [ ] **Dry-run / paper** ≥ 2 สัปดาห์ ไม่มี critical bug
+- [ ] **Attribution logs** ตรวจแล้ว — ทุก decision อธิบายได้
+- [ ] **Safety verified:** kill switch + circuit breaker + correlation guard ทำงานจริง
+- [ ] **Single-feature isolation:** เพิ่ม feature ทีละตัว วัด before/after แยกได้
+
+> ❌ ถ้าข้อใดไม่ผ่าน → ไม่ขึ้น live, กลับไปแก้ หรือถอด feature นั้นออก
+
+---
+
+## 📊 KPI Framework — วัดความสำเร็จของ Lunai ยังไง
+
+| Metric | นิยาม | ทำไมสำคัญ | ทิศทางที่ดี |
+|--------|-------|----------|-----------|
+| **Sharpe Ratio** | return / volatility | edge ที่ปรับความเสี่ยงแล้ว (เสาหลัก) | ↑ สูงขึ้น |
+| **Max Drawdown** | ดิ่งจาก peak มากสุด | ความอยู่รอด | ↓ ต่ำลง |
+| **Calmar Ratio** | return / max DD | กำไรเทียบความเจ็บ | ↑ สูงขึ้น |
+| **Profit Factor** | gross profit / gross loss | คุณภาพ edge | ↑ > 1.5 |
+| **Win Rate** | % เทรดที่กำไร | ความสม่ำเสมอ | ↑ (ดูคู่ R:R) |
+| **Recovery Factor** | net profit / max DD | ฟื้นตัวเร็วแค่ไหน | ↑ สูงขึ้น |
+| **OOS Stability** | Sharpe(OOS) / Sharpe(IS) | ไม่ overfit | → ใกล้ 1.0 |
+
+**กฎทอง:** เปรียบเทียบทุกเวอร์ชั่นกับ **baseline v1.0.0** เสมอ — feature ที่ทำให้ Sharpe แย่ลง = ถอดออก
+
+---
+
+## ⚠️ Risk Register — ความเสี่ยงของ roadmap
+
+| ความเสี่ยง | ผลกระทบ | การรับมือ |
+|-----------|---------|----------|
+| Overfitting จากเพิ่ม feature เยอะ | model ดีใน backtest แต่เจ๊งจริง | OOS-only reporting, single-feature isolation |
+| Complexity creep | bug surface บาน, debug ยาก | release gate เข้ม, ถอด feature ที่ไม่คุ้ม |
+| Data source ล่ม (on-chain/social API) | signal หาย, ตัดสินใจพลาด | graceful fallback ทุก fetcher (มี pattern แล้วใน sentiment.py) |
+| Feature ใหม่ปรับ aggressiveness พร้อมกัน | overshoot risk (F2.2 + F2.4 ชนกัน) | ปล่อยคนละเวอร์ชั่น, วัดทีละตัว |
+| Exchange ไม่ support short (F3.1) | pairs trading ทำไม่ได้ | เช็ค capability ก่อน, fallback spot-only |
+
+---
+
+## 🧭 หลักการตลอด roadmap
+
+1. **วัดผลทุก feature** — Sharpe แย่ลง = ถอด ไม่ใช่เก็บ
+2. **เพิ่มทีละตัว** — แยกแยะผลได้ ไม่ batch
+3. **OOS เท่านั้น** — optimize in-sample, report out-of-sample
+4. **dry-run ก่อน live** — ทุกเวอร์ชั่น
+5. **ความซับซ้อนมีต้นทุน** — edge 0.1% แต่ bug เยอะ = ไม่คุ้ม
+
+---
+
+*อัปเดตล่าสุด: 2026-06-04 · Lunai v1.0.0 (engine) ภายใน Aiterra v1.1.0 (platform)*
+*Feature spec: [`ROADMAP.md`](./ROADMAP.md)*
