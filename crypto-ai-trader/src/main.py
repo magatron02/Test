@@ -33,6 +33,7 @@ app = FastAPI(title=settings.app_name, version="1.0.0")
 APP_VERSION = "1.1.0"
 APP_NAME    = "Aiterra"
 AI_NAME     = "Lunai"
+AI_VERSION  = "1.0.0"
 
 # Attach slowapi rate-limiter state so @limiter.limit decorators work.
 try:
@@ -175,7 +176,7 @@ async def shutdown():
 def main():
     print(f"""
 ╔══════════════════════════════════════════╗
-║           Aiterra v1.1.0 - Starting...     ║
+║    Aiterra v1.1.0  |  Lunai v1.0.0          ║
 ║  Mode: {settings.trading_mode.upper():<10} Model: {settings.ai_model:<12}║
 ║  Port: {settings.app_port:<10} URL: http://localhost:{settings.app_port} ║
 ╚══════════════════════════════════════════╝
