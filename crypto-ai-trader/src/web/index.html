@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Aiterra v1.1.0</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/apexcharts@3.49.0/dist/apexcharts.min.js"></script>
+<title>Aiterra v1.2.0</title>
+<link href="/static/css/bootstrap.min.css" rel="stylesheet">
+<link href="/static/css/bootstrap-icons.min.css" rel="stylesheet">
+<script src="/static/js/apexcharts.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/countup.js@2.8.3/dist/countUp.umd.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Finlandica:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Finlandica:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Noto+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
 :root {
   --bg-dark:   #000000;
@@ -28,15 +28,15 @@
   --accent-purple: #A8FF53;
   --font-mono:     'Space Mono', 'Courier New', monospace;
   --font-headline: 'Finlandica', sans-serif;
-  --font-thai:     'Noto Sans Thai', sans-serif;
+  --font-body:     'Noto Sans', sans-serif;
 }
 * { box-sizing: border-box; }
 
-/* Base: Noto Sans Thai for body copy (Thai+Latin fallback) */
+/* Base: Noto Sans for body copy (Latin + Unicode fallback) */
 body {
   background: var(--bg-dark);
   color: var(--text-main);
-  font-family: var(--font-thai), sans-serif;
+  font-family: var(--font-body), sans-serif;
   margin: 0;
   font-size: 14px;
   line-height: 1.55;
@@ -108,7 +108,7 @@ body {
 .pat-neu  { background: rgba(100,100,100,0.12); color: #888;    border: 1px solid rgba(100,100,100,0.2); }
 
 /* ── Table ── */
-.table { color: var(--text-main); font-family: var(--font-thai); }
+.table { color: var(--text-main); font-family: var(--font-body); }
 .table td, .table th { border-color: var(--border); font-size: 0.82rem; vertical-align: middle; padding: 8px 12px; }
 .table thead th {
   color: var(--text-muted); font-weight: 600; background: var(--bg-card2);
@@ -126,13 +126,13 @@ body {
 .price-down { color: var(--accent-red); font-weight: 600; }
 
 /* ── Indicators ── */
-.indicator-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(34,34,34,0.8); font-size: 0.8rem; font-family: var(--font-thai); }
+.indicator-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(34,34,34,0.8); font-size: 0.8rem; font-family: var(--font-body); }
 .indicator-row:last-child { border-bottom: none; }
 .indicator-bar { width: 60px; height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 6px; }
 .indicator-fill { height: 100%; transition: width 0.5s; }
 
 /* ── Activity feed ── */
-.activity-item { padding: 8px 14px; border-bottom: 1px solid var(--border); font-size: 0.82rem; font-family: var(--font-thai); line-height: 1.5; }
+.activity-item { padding: 8px 14px; border-bottom: 1px solid var(--border); font-size: 0.82rem; font-family: var(--font-body); line-height: 1.5; }
 .activity-item:last-child { border-bottom: none; }
 
 /* ── Mode badge ── */
@@ -144,7 +144,7 @@ body {
 .form-control, .form-select {
   background: var(--bg-card2); border: 1px solid var(--border2);
   color: var(--text-main); border-radius: 4px;
-  font-family: var(--font-thai); font-size: 0.85rem;
+  font-family: var(--font-body); font-size: 0.85rem;
 }
 .form-control:focus, .form-select:focus {
   background: var(--bg-card2); border-color: var(--accent);
@@ -310,13 +310,12 @@ a:hover { color: #C6FF80; }
 /* ── Typography helpers ── */
 h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
 .font-headline { font-family: var(--font-headline); }
-.font-thai     { font-family: var(--font-thai); }
 .font-mono     { font-family: var(--font-mono); }
 
-/* Thai text blocks: looser line-height for readability */
-.text-thai, .thai-text, ol.small, ul.small, .small.text-muted,
-#sec-thai-market, #sec-settings, .activity-item, .card-body p,
-.alert, .form-check-label { font-family: var(--font-thai); line-height: 1.65; }
+/* Body text blocks: looser line-height for readability */
+ol.small, ul.small, .small.text-muted,
+#sec-settings, .activity-item, .card-body p,
+.alert, .form-check-label { font-family: var(--font-body); line-height: 1.65; }
 
 /* Numbers and prices always Space Mono */
 .fw-bold.mt-1, .price-card .fw-bold,
@@ -362,7 +361,7 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
 .chat-msg.chat-user { flex-direction:row-reverse; }
 .chat-bubble {
   max-width:82%; padding:9px 13px; border-radius:12px;
-  font-size:0.82rem; font-family:var(--font-thai); line-height:1.65;
+  font-size:0.82rem; font-family:var(--font-body); line-height:1.65;
   word-break:break-word;
 }
 .chat-ai .chat-bubble {
@@ -376,7 +375,7 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
 .chat-quick {
   background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.08);
   color:var(--text-muted); border-radius:100px; padding:3px 11px;
-  font-size:0.72rem; cursor:pointer; font-family:var(--font-thai);
+  font-size:0.72rem; cursor:pointer; font-family:var(--font-body);
   transition:all 0.15s; white-space:nowrap;
 }
 .chat-quick:hover { background:rgba(168,255,83,0.12); border-color:rgba(168,255,83,0.35); color:var(--accent); }
@@ -384,7 +383,7 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
 #chatInput {
   flex:1; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1);
   border-radius:10px; padding:8px 12px; color:var(--text-main);
-  font-family:var(--font-thai); font-size:0.85rem; outline:none;
+  font-family:var(--font-body); font-size:0.85rem; outline:none;
   transition:border-color 0.15s;
 }
 #chatInput:focus { border-color:rgba(168,255,83,0.5); }
@@ -487,7 +486,7 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
   </button>
   <a class="brand-wrap" href="#">
     <div class="brand-icon">AT</div>
-    <span class="brand-name">Aiterra <small>v1.1.0</small></span>
+    <span class="brand-name">Aiterra <small>v1.2.0</small></span>
   </a>
 
   <div class="topnav-pills">
@@ -499,7 +498,6 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
     <a class="pill-link nav-link" onclick="showSection('positions',this)">Positions</a>
     <a class="pill-link nav-link" onclick="showSection('alerts',this)" id="navAlerts">Alerts</a>
     <a class="pill-link nav-link" onclick="showSection('notifications',this)" id="navNotifications">Notifications</a>
-    <a class="pill-link nav-link" onclick="showSection('thai-market',this)">ตลาดไทย</a>
     <a class="pill-link nav-link" onclick="showSection('settings',this)">Settings</a>
   </div>
 
@@ -538,7 +536,7 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
         <span id="totalValue">$0.00</span>
         <span id="totalPnlPct" class="ms-3" style="font-size:1.1rem;color:var(--accent);vertical-align:middle;font-family:var(--font-mono);letter-spacing:0">+0.00%</span>
       </div>
-      <div class="text-muted mt-1" style="font-size:0.85rem;font-family:var(--font-thai)">Available: <strong id="cashValue" style="color:var(--text-main)">$0.00</strong>&nbsp;&nbsp;|&nbsp;&nbsp;<span id="positionCount">0 positions</span></div>
+      <div class="text-muted mt-1" style="font-size:0.85rem;font-family:var(--font-body)">Available: <strong id="cashValue" style="color:var(--text-main)">$0.00</strong>&nbsp;&nbsp;|&nbsp;&nbsp;<span id="positionCount">0 positions</span></div>
       <div class="d-flex gap-2 mt-3">
         <button class="btn btn-sm px-3" style="background:var(--accent);color:#000;font-weight:700;border:none;border-radius:100px" onclick="showSection('trading',document.querySelector('.pill-link:nth-child(2)'))">
           Buy / Sell ↑
@@ -659,73 +657,6 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
         </div>
         <div class="card-body p-2" id="analyticsPanel">
           <div class="text-muted text-center small py-2">รอข้อมูล...</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Resilience Row (v1.4.0/v2.0.0) — Tail Risk · Model Drift · Param Opt · ML Champion -->
-  <div class="row g-3 mb-3" id="resilienceRow">
-    <!-- Tail Risk -->
-    <div class="col-md-3">
-      <div class="card h-100">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-activity me-2"></i>Tail Risk <span class="text-muted" style="font-size:0.65rem;font-weight:400">VaR · CVaR · MC</span></span>
-          <span id="varCircuitBadge" style="display:none;font-size:0.65rem;font-weight:700;color:#ff4d6d">⚡ VaR HALT</span>
-        </div>
-        <div class="card-body p-2" id="tailRiskPanel">
-          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
-        </div>
-      </div>
-    </div>
-    <!-- Model Drift -->
-    <div class="col-md-3">
-      <div class="card h-100">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-arrow-repeat me-2"></i>Model Drift <span class="text-muted" style="font-size:0.65rem;font-weight:400">PSI</span></span>
-          <span id="driftBadge" style="display:none;font-size:0.65rem;font-weight:700;color:#ffc107">⚠ DRIFT</span>
-        </div>
-        <div class="card-body p-2" id="driftPanel">
-          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
-        </div>
-      </div>
-    </div>
-    <!-- Param Optimizer -->
-    <div class="col-md-3">
-      <div class="card h-100">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-sliders me-2"></i>Param Opt <span class="text-muted" style="font-size:0.65rem;font-weight:400">Walk-forward</span></span>
-          <span id="paramChampBadge" style="display:none;font-size:0.65rem;font-weight:700;color:#39d98a">✓ NEW</span>
-        </div>
-        <div class="card-body p-2" id="paramOptPanel">
-          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
-        </div>
-      </div>
-    </div>
-    <!-- ML Champion/Challenger -->
-    <div class="col-md-3">
-      <div class="card h-100">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-trophy me-2"></i>ML Model <span class="text-muted" style="font-size:0.65rem;font-weight:400">Champion/Challenger</span></span>
-          <span id="mlChampBadge" style="display:none;font-size:0.65rem;font-weight:700;color:#39d98a">↑ PROMOTED</span>
-        </div>
-        <div class="card-body p-2" id="mlChampPanel">
-          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Trade Memory Row (v2.0.0 F2.3) — learned setup performance -->
-  <div class="row g-3 mb-3" id="memoryRow">
-    <div class="col-12">
-      <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-journal-bookmark me-2"></i>Trade Memory <span class="text-muted" style="font-size:0.65rem;font-weight:400">เรียนรู้จากผลเทรดจริง · regime × strategy × confidence × RSI</span></span>
-          <span id="memoryStatBadge" class="text-muted" style="font-size:0.65rem;font-weight:600"></span>
-        </div>
-        <div class="card-body p-2" id="tradeJournalPanel">
-          <div class="text-muted text-center small py-2">ยังไม่มีประวัติเทรดที่ปิดแล้ว</div>
         </div>
       </div>
     </div>
@@ -1492,96 +1423,6 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
   </div>
 </section>
 
-<!-- THAI MARKET -->
-<section id="sec-thai-market" class="section">
-
-  <!-- Tabs -->
-  <div class="d-flex gap-2 mb-3">
-    <button class="tab-btn active" id="tabStocks" onclick="thaiTab('stocks',this)">
-      <i class="bi bi-bar-chart me-1"></i>หุ้นไทย (SET)
-    </button>
-    <button class="tab-btn" id="tabFunds" onclick="thaiTab('funds',this)">
-      <i class="bi bi-piggy-bank me-1"></i>กองทุนรวม
-    </button>
-    <div class="ms-auto d-flex align-items-center gap-2">
-      <span class="badge" style="background:rgba(168,255,83,0.18);color:#A8FF53;border:1px solid rgba(168,255,83,0.25)" id="thaiDataSource">simulation</span>
-      <button class="btn btn-outline-secondary btn-sm" onclick="refreshThaiData()">
-        <i class="bi bi-arrow-clockwise"></i>
-      </button>
-    </div>
-  </div>
-
-  <!-- หุ้นไทย panel -->
-  <div id="panel-stocks">
-    <div class="row g-3 mb-3">
-      <div class="col-md-8">
-        <div class="card">
-          <div class="card-header d-flex justify-content-between">
-            <span><i class="bi bi-graph-up me-2"></i>SET Stock Chart (Daily)</span>
-            <select class="form-select form-select-sm" style="width:auto" id="setChartSymbol" onchange="loadSetChart(this.value)"></select>
-          </div>
-          <div class="card-body p-2">
-            <div class="chart-container"><canvas id="setChart"></canvas></div>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-4">
-        <div class="card h-100">
-          <div class="card-header"><i class="bi bi-cpu me-2"></i>Technical Analysis</div>
-          <div class="card-body" id="setAnalysisPanel">
-            <div class="text-muted small text-center py-3">เลือกหุ้น</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="row g-2" id="setStockCards">
-      <div class="col-12 text-muted text-center py-4">
-        <div class="spinner-border spinner-border-sm text-secondary me-2"></div>กำลังโหลดข้อมูล...
-      </div>
-    </div>
-  </div>
-
-  <!-- กองทุน panel -->
-  <div id="panel-funds" style="display:none">
-    <div class="row g-3 mb-3">
-      <div class="col-md-8">
-        <div class="card">
-          <div class="card-header d-flex justify-content-between">
-            <span><i class="bi bi-graph-up me-2"></i>NAV History</span>
-            <select class="form-select form-select-sm" style="width:auto" id="fundChartSelect" onchange="loadFundChart(this.value)"></select>
-          </div>
-          <div class="card-body p-2">
-            <div class="chart-container"><canvas id="fundChart"></canvas></div>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-4">
-        <div class="card h-100">
-          <div class="card-header"><i class="bi bi-info-circle me-2"></i>Fund Info</div>
-          <div class="card-body" id="fundInfoPanel">
-            <div class="text-muted small text-center py-3">เลือกกองทุน</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="row g-2" id="fundCards">
-      <div class="col-12 text-muted text-center py-4">
-        <div class="spinner-border spinner-border-sm text-secondary me-2"></div>กำลังโหลด...
-      </div>
-    </div>
-
-    <!-- SEC API key notice -->
-    <div class="alert mt-3" style="background:rgba(168,255,83,0.06);border:1px solid rgba(168,255,83,0.18);border-radius:8px">
-      <i class="bi bi-info-circle me-2" style="color:#A8FF53"></i>
-      <strong style="color:#A8FF53">ข้อมูล NAV จริง:</strong>
-      ต้องลงทะเบียนรับ API key ฟรีที่
-      <a href="https://api-portal.sec.or.th" target="_blank" style="color:#A8FF53">api-portal.sec.or.th</a>
-      แล้วใส่ใน Settings → Thai Market → SEC API Key
-    </div>
-  </div>
-
-</section>
-
 <!-- BACKTEST inner content (inside analytics anl-backtest-section div) -->
 <section id="sec-analytics-backtest" class="section active" style="display:block">
   <div class="row g-3 mb-3">
@@ -2028,16 +1869,6 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
         </div>
       </div>
 
-      <div class="card mb-3">
-        <div class="card-header"><i class="bi bi-flag me-2"></i>Thai Market</div>
-        <div class="card-body">
-          <label class="form-label small mb-1">SEC Thailand API Key</label>
-          <small class="text-muted d-block mb-2">ลงทะเบียนฟรีที่ api-portal.sec.or.th</small>
-          <input type="password" class="form-control form-control-sm mb-2" id="secApiKey" placeholder="xxxxxxxxxxxxxxxx">
-          <button class="btn btn-primary btn-sm" onclick="saveThaiSettings()"><i class="bi bi-save me-1"></i>Save</button>
-        </div>
-      </div>
-
       <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
           <span><i class="bi bi-bell me-2"></i>Notifications</span>
@@ -2221,7 +2052,6 @@ function showSection(name, el) {
   if (name === 'portfolio') refreshPortfolio();
   if (name === 'trade-history') refreshHistory();
   if (name === 'analytics') { refreshTraining(); refreshLoopStatus(); refreshHourlyTrainer(); }
-  if (name === 'thai-market') loadThaiStocks();
   if (name === 'settings') loadSettings();
   if (name === 'trading' && currentSymbol) loadMTF();
   if (name === 'positions') refreshPositions();
@@ -2676,19 +2506,6 @@ function renderRiskPanel() {
 
   if (badge) { badge.style.display = rs.circuit_open ? '' : 'none'; }
 
-  // Determine circuit type for colour coding
-  const reason = (rs.circuit_reason || '').toLowerCase();
-  const circuitColor = reason.includes('var') || reason.includes('ruin') ? '#c084fc'
-                     : reason.includes('drawdown') ? '#ff4d6d' : '#ff6b35';
-
-  // VaR inline summary (from tail_risk block)
-  const tr = rs.tail_risk || {};
-  const varPct  = tr.var_pct  != null ? (tr.var_pct  * 100).toFixed(1) : null;
-  const cvarPct = tr.cvar_pct != null ? (tr.cvar_pct * 100).toFixed(1) : null;
-  const limVar  = rs.limits   ? (rs.limits.max_var_pct * 100).toFixed(0) : '5';
-  const varColor = varPct && parseFloat(varPct) > parseFloat(limVar) * 0.8 ? '#ff4d6d'
-                 : varPct && parseFloat(varPct) > parseFloat(limVar) * 0.5 ? '#ffc107' : '#39d98a';
-
   panel.innerHTML = `
     <div class="mb-2">
       <div class="d-flex justify-content-between mb-1">
@@ -2708,11 +2525,7 @@ function renderRiskPanel() {
       <span>HWM: <strong style="color:var(--text-main)">$${(rs.high_water_mark||0).toFixed(0)}</strong></span>
       <span>Daily PnL: <strong style="color:${rs.daily_pnl>=0?'var(--accent-buy)':'var(--accent-red)'}">${rs.daily_pnl>=0?'+':''}${(rs.daily_pnl||0).toFixed(2)}</strong></span>
     </div>
-    ${varPct ? `<div class="mt-2 d-flex justify-content-between" style="font-size:0.7rem;color:var(--text-muted)">
-      <span>95% VaR: <strong style="color:${varColor};font-family:var(--font-mono)">${varPct}%</strong> <span style="color:var(--text-muted)">(lim ${limVar}%)</span></span>
-      ${cvarPct ? `<span>CVaR: <strong style="font-family:var(--font-mono);color:${varColor}">${cvarPct}%</strong></span>` : ''}
-    </div>` : ''}
-    ${rs.circuit_open ? `<div class="mt-2 text-center" style="font-size:0.72rem;font-weight:700;color:${circuitColor};animation:pulse 1.2s infinite">⚡ ${rs.circuit_reason}</div>` : ''}`;
+    ${rs.circuit_open ? `<div class="mt-2 text-center circuit-open" style="font-size:0.72rem">⚡ ${rs.circuit_reason}</div>` : ''}`;
 }
 
 function renderPatternPanel(sym) {
@@ -2753,7 +2566,7 @@ async function fetchPortfolioStats() {
     // Sync preset currency labels
     ['presetCurLabel','presetCurSuffix','liveBudgetCurLabel'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent=cur; });
     const sym = cur === 'USDT' ? '$' : '';
-    const initial = 10000;   // demo virtual baseline; PnL-vs-initial is meaningful in demo
+    const initial = d.initial_balance || (cur === 'THB' ? 350000 : 10000);   // demo virtual baseline; PnL-vs-initial is meaningful in demo
     animateNum('totalValue', d.total_value, sym, sym ? '' : ' ' + cur, 2);
     animateNum('cashValue',  d.cash_usdt,   sym, sym ? '' : ' ' + cur, 2);
     document.getElementById('positionCount').textContent = d.positions.length + ' positions';
@@ -2835,7 +2648,7 @@ function renderPriceCards() {
           <strong class="small">${sym.split('/')[0]}</strong>
           <span class="badge-signal ${d.signal==='BUY'?'signal-buy':d.signal==='SELL'?'signal-sell':'signal-hold'}">${d.signal}</span>
         </div>
-        <div class="fw-bold mt-1">$${formatPrice(d.price)}</div>
+        <div class="fw-bold mt-1">${formatPrice(d.price)} ${sym.split('/')[1] || _quoteCur}</div>
         <div class="d-flex justify-content-between align-items-center">
           <div class="small ${up?'price-up':'price-down'}">${up?'+':''}${d.change_24h.toFixed(2)}%</div>
           ${regimeBadge}
@@ -2947,11 +2760,11 @@ function updateOpenPositions(positions) {
       const tp = p.take_profit || p.take_profit_price;
       return `<tr>
         <td class="fw-bold">${p.symbol}</td>
-        <td class="font-monospace">$${formatPrice(p.entry_price)}</td>
-        <td class="font-monospace">$${formatPrice(p.current_price || p.price)}</td>
+        <td class="font-monospace">${formatPrice(p.entry_price)} ${_quoteCur}</td>
+        <td class="font-monospace">${formatPrice(p.current_price || p.price)} ${_quoteCur}</td>
         <td class="${p.pnl_pct>=0?'text-success':'text-danger'}">${p.pnl_pct>=0?'+':''}${p.pnl_pct.toFixed(2)}%</td>
-        <td class="text-danger" style="font-size:0.7rem">${sl?'$'+formatPrice(sl):'—'}</td>
-        <td class="text-success" style="font-size:0.7rem">${tp?'$'+formatPrice(tp):'—'}</td>
+        <td class="text-danger" style="font-size:0.7rem">${sl?formatPrice(sl)+' '+_quoteCur:'—'}</td>
+        <td class="text-success" style="font-size:0.7rem">${tp?formatPrice(tp)+' '+_quoteCur:'—'}</td>
       </tr>`;
     }).join('')}
     </tbody></table>`;
@@ -2967,9 +2780,9 @@ function updateHoldings(positions, cash, total, cur) {
     rows += `<tr>
       <td>${p.symbol.split('/')[0]}</td>
       <td>${p.amount.toFixed(6)}</td>
-      <td>$${formatPrice(p.price)}</td>
-      <td>$${p.value.toFixed(2)}</td>
-      <td>$${formatPrice(p.entry_price)}</td>
+      <td>${formatPrice(p.price)} ${_quoteCur}</td>
+      <td>${p.value.toFixed(2)} ${_quoteCur}</td>
+      <td>${formatPrice(p.entry_price)} ${_quoteCur}</td>
       <td class="${p.pnl_pct>=0?'text-success':'text-danger'}">${p.pnl_pct>=0?'+':''}${p.pnl_pct.toFixed(2)}%</td>
     </tr>`;
   }
@@ -3615,266 +3428,6 @@ function setChartRange(range, el) {
 }
 
 // ============================================================
-// Thai Market
-// ============================================================
-let thaiStocksData = [];
-let thaiFundsData  = [];
-let setChartObj    = null;
-let fundChartObj   = null;
-
-function thaiTab(tab, el) {
-  document.getElementById('panel-stocks').style.display = tab === 'stocks' ? '' : 'none';
-  document.getElementById('panel-funds').style.display  = tab === 'funds'  ? '' : 'none';
-  document.querySelectorAll('#sec-thai-market .tab-btn').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
-  if (tab === 'stocks' && !thaiStocksData.length) loadThaiStocks();
-  if (tab === 'funds'  && !thaiFundsData.length)  loadThaiFunds();
-}
-
-async function refreshThaiData() {
-  thaiStocksData = []; thaiFundsData = [];
-  if (document.getElementById('panel-stocks').style.display !== 'none') await loadThaiStocks();
-  else await loadThaiFunds();
-}
-
-async function loadThaiStocks() {
-  document.getElementById('setStockCards').innerHTML =
-    '<div class="col-12 text-muted text-center py-4"><div class="spinner-border spinner-border-sm text-secondary me-2"></div>กำลังวิเคราะห์...</div>';
-  try {
-    const r = await fetch('/api/thai/stocks');
-    thaiStocksData = await r.json();
-    renderSetCards(thaiStocksData);
-    // populate chart selector
-    const sel = document.getElementById('setChartSymbol');
-    sel.innerHTML = '';
-    thaiStocksData.forEach(s => {
-      const o = document.createElement('option');
-      o.value = s.symbol; o.textContent = `${s.name} (${s.symbol.replace('.BK','')})`;
-      sel.appendChild(o);
-    });
-    if (thaiStocksData.length) loadSetChart(thaiStocksData[0].symbol);
-    const src = thaiStocksData[0]?.analysis ? 'yfinance' : 'simulation';
-    document.getElementById('thaiDataSource').textContent = src;
-  } catch(e) { document.getElementById('setStockCards').innerHTML = '<div class="col-12 text-danger p-3">โหลดไม่ได้: '+e.message+'</div>'; }
-}
-
-function renderSetCards(stocks) {
-  const container = document.getElementById('setStockCards');
-  container.innerHTML = '';
-  const sectorColor = {
-    'พลังงาน':'rgba(210,153,34,0.15)', 'การเงิน':'rgba(56,139,253,0.12)',
-    'สื่อสาร':'rgba(163,113,247,0.12)', 'ขนส่ง':'rgba(46,160,67,0.12)',
-    'สุขภาพ':'rgba(248,81,73,0.1)', 'พาณิชย์':'rgba(88,166,255,0.12)',
-    'อุตสาหกรรม':'rgba(139,148,158,0.12)', 'ท่องเที่ยว':'rgba(63,185,80,0.1)',
-    'เกษตร':'rgba(57,217,138,0.08)',
-  };
-  stocks.forEach(s => {
-    const a = s.analysis || {};
-    const up = s.change_1d >= 0;
-    const sigCls = a.signal === 'BUY' ? 'signal-buy' : a.signal === 'SELL' ? 'signal-sell' : 'signal-hold';
-    const bgCol = sectorColor[s.sector] || 'rgba(48,54,61,0.3)';
-    const col = document.createElement('div');
-    col.className = 'col-6 col-md-4 col-lg-3 col-xl-2';
-    col.innerHTML = `
-      <div class="price-card" onclick="selectSetStock('${s.symbol}')" style="background:${bgCol};cursor:pointer">
-        <div class="d-flex justify-content-between align-items-start mb-1">
-          <div>
-            <strong class="small">${s.name}</strong><br>
-            <span style="font-size:0.65rem;color:var(--text-muted)">${s.sector}</span>
-          </div>
-          ${a.signal ? `<span class="badge-signal ${sigCls}">${a.signal}</span>` : ''}
-        </div>
-        <div class="fw-bold">฿${s.price?.toFixed(2)}</div>
-        <div class="small ${up?'price-up':'price-down'}">${up?'+':''}${s.change_1d?.toFixed(2)}%</div>
-        ${a.rsi ? `<div style="font-size:0.65rem;color:var(--text-muted);margin-top:3px">RSI ${a.rsi}</div>` : ''}
-      </div>`;
-    container.appendChild(col);
-  });
-}
-
-function selectSetStock(symbol) {
-  document.getElementById('setChartSymbol').value = symbol;
-  loadSetChart(symbol);
-}
-
-async function loadSetChart(symbol) {
-  if (!symbol) return;
-  const stock = thaiStocksData.find(s => s.symbol === symbol);
-  try {
-    const r = await fetch(`/api/thai/stocks/${encodeURIComponent(symbol)}/history?days=60`);
-    const history = await r.json();
-    if (!history.length) return;
-
-    const labels = history.map(h => h.date);
-    const closes = history.map(h => h.close);
-    const gridColor = 'rgba(34,34,34,0.8)';
-
-    if (!setChartObj) {
-      setChartObj = new ApexCharts(document.getElementById('setChart'), {
-        ..._apex,
-        chart: {..._apex.chart, type:'area', height:'100%'},
-        series: [{name: symbol, data: closes}],
-        xaxis: { categories: labels, tickAmount: 8, labels:{style:{colors:'#444',fontSize:'10px'},rotate:0} },
-        yaxis: { labels:{style:{colors:'#444',fontSize:'10px'}, formatter:v=>'฿'+v.toFixed(2)} },
-        stroke: { curve:'smooth', width:2 },
-        fill: { type:'gradient', gradient:{opacityFrom:0.2,opacityTo:0,stops:[0,100]} },
-        dataLabels: { enabled:false }, legend: { show:false },
-        colors: ['#d29922'],
-        markers: { size:0 },
-      });
-      setChartObj.render();
-    } else {
-      setChartObj.updateOptions({xaxis:{categories:labels},series:[{name:symbol,data:closes}]});
-    }
-
-    // Update analysis panel
-    if (stock?.analysis) {
-      const a = stock.analysis;
-      const sigColor = a.signal==='BUY'?'#A8FF53':a.signal==='SELL'?'#ff6b35':'#555555';
-      document.getElementById('setAnalysisPanel').innerHTML = `
-        <div class="d-flex justify-content-between mb-2">
-          <strong style="color:${sigColor}">${a.signal}</strong>
-          <span class="text-muted small">${(a.confidence*100).toFixed(0)}%</span>
-        </div>
-        <div class="small text-muted mb-3 p-2 rounded" style="background:rgba(48,54,61,0.4)">${a.reasoning}</div>
-        <div class="indicator-row"><span>RSI(14)</span>
-          <span style="color:${a.rsi<35?'#A8FF53':a.rsi>65?'#ff6b35':'#555555'}">${a.rsi} [${a.rsi_signal}]</span></div>
-        <div class="indicator-row"><span>MACD</span>
-          <span class="${a.macd_trend==='BULLISH'?'price-up':a.macd_trend==='BEARISH'?'price-down':'text-muted'}">${a.macd_trend}</span></div>
-        <div class="indicator-row"><span>EMA Trend</span>
-          <span class="${a.ema_trend==='BULLISH'?'price-up':a.ema_trend==='BEARISH'?'price-down':'text-muted'}">${a.ema_trend}</span></div>
-        <div class="indicator-row"><span>Bollinger</span>
-          <span class="${a.bb_signal==='OVERSOLD'?'price-up':a.bb_signal==='OVERBOUGHT'?'price-down':'text-muted'}">${a.bb_signal}</span></div>
-        <div class="indicator-row"><span>Volatility</span><span>${a.volatility}</span></div>
-        <div class="indicator-row"><span>Support</span><span class="price-up">฿${a.support}</span></div>
-        <div class="indicator-row"><span>Resistance</span><span class="price-down">฿${a.resistance}</span></div>`;
-    }
-  } catch(e) { console.error('loadSetChart', e); }
-}
-
-async function loadThaiFunds() {
-  document.getElementById('fundCards').innerHTML =
-    '<div class="col-12 text-muted text-center py-4"><div class="spinner-border spinner-border-sm text-secondary me-2"></div>กำลังโหลด NAV...</div>';
-  try {
-    const r = await fetch('/api/thai/funds');
-    thaiFundsData = await r.json();
-    renderFundCards(thaiFundsData);
-
-    const sel = document.getElementById('fundChartSelect');
-    sel.innerHTML = '';
-    thaiFundsData.forEach(f => {
-      const o = document.createElement('option');
-      o.value = f.code; o.textContent = f.name;
-      sel.appendChild(o);
-    });
-    if (thaiFundsData.length) loadFundChart(thaiFundsData[0].code);
-    const src = thaiFundsData[0]?.source || 'simulation';
-    document.getElementById('thaiDataSource').textContent = src;
-  } catch(e) { document.getElementById('fundCards').innerHTML = '<div class="col-12 text-danger p-3">'+e.message+'</div>'; }
-}
-
-function renderFundCards(funds) {
-  const container = document.getElementById('fundCards');
-  container.innerHTML = '';
-  const typeColor = {
-    equity:'rgba(46,160,67,0.12)', equity_esg:'rgba(46,160,67,0.08)',
-    fixed_income:'rgba(56,139,253,0.12)', money_market:'rgba(139,148,158,0.12)',
-    commodity:'rgba(210,153,34,0.12)', mixed:'rgba(163,113,247,0.12)',
-    foreign:'rgba(88,166,255,0.12)',
-  };
-  const typeLabel = {
-    equity:'หุ้นไทย', equity_esg:'หุ้น ESG', fixed_income:'ตราสารหนี้',
-    money_market:'ตลาดเงิน', commodity:'สินค้าโภคภัณฑ์', mixed:'ผสม', foreign:'ต่างประเทศ',
-  };
-  funds.forEach(f => {
-    const bg = typeColor[f.type] || 'rgba(48,54,61,0.2)';
-    const ret1d = f.ret_1d != null ? f.ret_1d : null;
-    const ret1m = f.ret_1m != null ? f.ret_1m : null;
-    const ret1y = f.ret_1y != null ? f.ret_1y : null;
-    const up = ret1d == null ? true : ret1d >= 0;
-    const col = document.createElement('div');
-    col.className = 'col-12 col-md-6 col-lg-4';
-    col.innerHTML = `
-      <div class="price-card" onclick="selectFund('${f.code}')" style="background:${bg}">
-        <div class="d-flex justify-content-between align-items-start mb-1">
-          <div>
-            <strong class="small">${f.name}</strong><br>
-            <span style="font-size:0.65rem;color:var(--text-muted)">${f.amcTH} · ${typeLabel[f.type]||f.type}</span>
-          </div>
-          ${f.source==='simulation'?'<span style="font-size:0.6rem;color:var(--text-muted);border:1px solid var(--border);border-radius:4px;padding:1px 5px">sim</span>':''}
-        </div>
-        <div class="fw-bold mt-1">฿${f.nav?.toFixed(4) || '—'}</div>
-        <div class="d-flex gap-3 mt-1" style="font-size:0.75rem">
-          <span>1D: <span class="${ret1d==null?'text-muted':ret1d>=0?'price-up':'price-down'}">${ret1d!=null?(ret1d>=0?'+':'')+ret1d.toFixed(2)+'%':'—'}</span></span>
-          <span>1M: <span class="${ret1m==null?'text-muted':ret1m>=0?'price-up':'price-down'}">${ret1m!=null?(ret1m>=0?'+':'')+ret1m.toFixed(2)+'%':'—'}</span></span>
-          <span>1Y: <span class="${ret1y==null?'text-muted':ret1y>=0?'price-up':'price-down'}">${ret1y!=null?(ret1y>=0?'+':'')+ret1y.toFixed(2)+'%':'—'}</span></span>
-        </div>
-      </div>`;
-    container.appendChild(col);
-  });
-}
-
-function selectFund(code) {
-  document.getElementById('fundChartSelect').value = code;
-  loadFundChart(code);
-}
-
-async function loadFundChart(code) {
-  const fund = thaiFundsData.find(f => f.code === code);
-  if (!fund) return;
-  try {
-    const history = fund.history || [];
-    if (!history.length) return;
-    const labels = history.map(h => h.date);
-    const navs   = history.map(h => h.nav);
-    const gridColor = 'rgba(34,34,34,0.8)';
-
-    if (!fundChartObj) {
-      fundChartObj = new ApexCharts(document.getElementById('fundChart'), {
-        ..._apex,
-        chart: {..._apex.chart, type:'area', height:'100%'},
-        series: [{name:'NAV (฿)', data: navs}],
-        xaxis: { categories: labels, tickAmount: 6, labels:{style:{colors:'#444',fontSize:'10px'},rotate:0} },
-        yaxis: { labels:{style:{colors:'#444',fontSize:'10px'}, formatter:v=>'฿'+v.toFixed(4)} },
-        stroke: { curve:'smooth', width:2 },
-        fill: { type:'gradient', gradient:{opacityFrom:0.2,opacityTo:0,stops:[0,100]} },
-        dataLabels: { enabled:false }, legend: { show:false },
-        colors: ['#A8FF53'],
-        markers: { size:0 },
-      });
-      fundChartObj.render();
-    } else {
-      fundChartObj.updateOptions({xaxis:{categories:labels},series:[{name:`${fund.name} NAV`,data:navs}]});
-    }
-
-    const typeLabel = {
-      equity:'หุ้นไทย',equity_esg:'หุ้น ESG',fixed_income:'ตราสารหนี้',
-      money_market:'ตลาดเงิน',commodity:'สินค้าโภคภัณฑ์',mixed:'ผสม',foreign:'ต่างประเทศ'
-    };
-    document.getElementById('fundInfoPanel').innerHTML = `
-      <div class="fw-bold mb-2">${fund.name}</div>
-      <div class="indicator-row"><span>บลจ.</span><span>${fund.amcTH}</span></div>
-      <div class="indicator-row"><span>ประเภท</span><span>${typeLabel[fund.type]||fund.type}</span></div>
-      <div class="indicator-row"><span>NAV/หน่วย</span><span>฿${fund.nav?.toFixed(4)||'—'}</span></div>
-      <div class="indicator-row"><span>1 วัน</span>
-        <span class="${!fund.ret_1d?'text-muted':fund.ret_1d>=0?'price-up':'price-down'}">${fund.ret_1d!=null?(fund.ret_1d>=0?'+':'')+fund.ret_1d.toFixed(2)+'%':'—'}</span></div>
-      <div class="indicator-row"><span>1 เดือน</span>
-        <span class="${!fund.ret_1m?'text-muted':fund.ret_1m>=0?'price-up':'price-down'}">${fund.ret_1m!=null?(fund.ret_1m>=0?'+':'')+fund.ret_1m.toFixed(2)+'%':'—'}</span></div>
-      <div class="indicator-row"><span>3 เดือน</span>
-        <span class="${!fund.ret_3m?'text-muted':fund.ret_3m>=0?'price-up':'price-down'}">${fund.ret_3m!=null?(fund.ret_3m>=0?'+':'')+fund.ret_3m.toFixed(2)+'%':'—'}</span></div>
-      <div class="indicator-row"><span>6 เดือน</span>
-        <span class="${!fund.ret_6m?'text-muted':fund.ret_6m>=0?'price-up':'price-down'}">${fund.ret_6m!=null?(fund.ret_6m>=0?'+':'')+fund.ret_6m.toFixed(2)+'%':'—'}</span></div>
-      <div class="indicator-row"><span>1 ปี</span>
-        <span class="${!fund.ret_1y?'text-muted':fund.ret_1y>=0?'price-up':'price-down'}">${fund.ret_1y!=null?(fund.ret_1y>=0?'+':'')+fund.ret_1y.toFixed(2)+'%':'—'}</span></div>
-      <div class="indicator-row"><span>YTD</span>
-        <span class="${!fund.ret_ytd?'text-muted':fund.ret_ytd>=0?'price-up':'price-down'}">${fund.ret_ytd!=null?(fund.ret_ytd>=0?'+':'')+fund.ret_ytd.toFixed(2)+'%':'—'}</span></div>
-      <div class="mt-2">
-        <span style="font-size:0.65rem;color:var(--text-muted)">แหล่งข้อมูล: ${fund.source==='sec_api'?'SEC Thailand':'Simulation'}</span>
-      </div>`;
-  } catch(e) { console.error('loadFundChart', e); }
-}
-
-// ============================================================
 // Multi-Timeframe Analysis (H)
 // ============================================================
 async function loadMTF() {
@@ -4329,17 +3882,6 @@ async function runWalkForward() {
   }
 }
 
-async function saveThaiSettings() {
-  const key = document.getElementById('secApiKey').value;
-  if (key) {
-    await fetch('/api/thai/settings', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({sec_api_key: key}),
-    });
-    showToast('Saved', 'SEC API key saved — NAV จะดึงจาก SEC Thailand', 'success');
-  }
-}
-
 // ============================================================
 // Dashboard State (Signal Funnel + PnL Today + Agent Status)
 // ============================================================
@@ -4398,244 +3940,6 @@ function renderDashboardState(d) {
   if (d.agents) renderAgents(d.agents);
   // Risk state embedded in dashboard update
   if (d.risk) { riskState = d.risk; renderRiskPanel(); }
-  // v1.4.0 Resilience panels
-  if (d.risk && d.risk.tail_risk) renderTailRiskPanel(d.risk.tail_risk, d.risk.limits || {});
-  if (d.trainer_drift)            renderDriftPanel(d.trainer_drift);
-  if (d.param_opt)                renderParamOptPanel(d.param_opt);
-  if (d.ml_champion != null)      renderMlChampPanel(d.ml_champion);
-  if (d.trade_journal)            renderTradeJournalPanel(d.trade_journal);
-}
-
-// ── v1.4.0 Resilience panels ───────────────────────────────────────────────
-
-function renderTailRiskPanel(tr, limits) {
-  const panel = document.getElementById('tailRiskPanel');
-  const badge = document.getElementById('varCircuitBadge');
-  if (!panel) return;
-
-  const pct = (v, dp=1) => v != null ? (v * 100).toFixed(dp) + '%' : '—';
-  const limVar = limits.max_var_pct || 0.05;
-  const limRuin = limits.max_prob_ruin || 0.40;
-
-  const varPct  = tr.var_pct  || 0;
-  const cvarPct = tr.cvar_pct || 0;
-  const pRuin   = tr.prob_ruin || 0;
-  const p95dd   = tr.p95_maxdd || 0;
-
-  const varRatio  = Math.min(varPct  / limVar,  1.0);
-  const ruinRatio = Math.min(pRuin   / limRuin, 1.0);
-  const varColor  = varRatio  > 0.8 ? '#ff4d6d' : varRatio  > 0.5 ? '#ffc107' : '#39d98a';
-  const ruinColor = ruinRatio > 0.8 ? '#ff4d6d' : ruinRatio > 0.5 ? '#ffc107' : '#39d98a';
-
-  if (badge) badge.style.display = (varRatio >= 1.0 || ruinRatio >= 1.0) ? '' : 'none';
-
-  const n = tr.n_paths || 0;
-  const h = tr.horizon  || 0;
-
-  panel.innerHTML = `
-    <div class="mb-2">
-      <div class="d-flex justify-content-between mb-1">
-        <span class="stat-label" style="margin:0">95% VaR <span style="font-size:0.62rem;color:var(--text-muted)">(lim ${pct(limVar,0)})</span></span>
-        <span style="font-family:var(--font-mono);font-size:0.8rem;color:${varColor}">${pct(varPct)}</span>
-      </div>
-      <div class="heat-bar"><div class="heat-fill" style="width:${(varRatio*100).toFixed(0)}%;background:${varColor}"></div></div>
-    </div>
-    <div class="mb-2">
-      <div class="d-flex justify-content-between mb-1">
-        <span class="stat-label" style="margin:0">CVaR (Expected Shortfall)</span>
-        <span style="font-family:var(--font-mono);font-size:0.8rem;color:${varColor}">${pct(cvarPct)}</span>
-      </div>
-    </div>
-    <div class="mb-2">
-      <div class="d-flex justify-content-between mb-1">
-        <span class="stat-label" style="margin:0">Prob Ruin <span style="font-size:0.62rem;color:var(--text-muted)">(DD>20% in ${h}d, lim ${pct(limRuin,0)})</span></span>
-        <span style="font-family:var(--font-mono);font-size:0.8rem;color:${ruinColor}">${pct(pRuin)}</span>
-      </div>
-      <div class="heat-bar"><div class="heat-fill" style="width:${(ruinRatio*100).toFixed(0)}%;background:${ruinColor}"></div></div>
-    </div>
-    <div class="d-flex justify-content-between" style="font-size:0.7rem;color:var(--text-muted)">
-      <span>P95 Max-DD: <strong style="font-family:var(--font-mono);color:var(--text-main)">${pct(p95dd)}</strong></span>
-      <span style="font-size:0.62rem">${n ? n.toLocaleString()+' paths' : ''}</span>
-    </div>`;
-}
-
-function renderDriftPanel(drift) {
-  const panel = document.getElementById('driftPanel');
-  const badge = document.getElementById('driftBadge');
-  if (!panel) return;
-
-  const hasDrift = drift.drift_count > 0;
-  const maxPsi   = drift.max_psi || 0;
-  const threshold = drift.threshold || 0.20;
-  const features  = drift.per_feature || {};
-  const hasBL     = drift.has_baseline;
-
-  if (badge) badge.style.display = (maxPsi > threshold) ? '' : 'none';
-
-  const psiColor = v => v > threshold ? '#ff4d6d' : v > 0.10 ? '#ffc107' : '#39d98a';
-  const psiLabel = v => v > threshold ? 'significant' : v > 0.10 ? 'minor' : 'stable';
-
-  const featureRows = Object.entries(features)
-    .sort(([,a],[,b]) => b - a)
-    .slice(0, 6)
-    .map(([f, v]) => {
-      const fill = Math.min(v / (threshold * 2), 1.0) * 100;
-      return `<div class="d-flex align-items-center gap-2 py-1" style="border-bottom:1px solid var(--border)">
-        <span style="font-size:0.68rem;font-family:var(--font-mono);flex:0 0 90px;color:var(--text-muted)">${f}</span>
-        <div class="heat-bar flex-fill"><div class="heat-fill" style="width:${fill.toFixed(0)}%;background:${psiColor(v)}"></div></div>
-        <span style="font-size:0.68rem;font-family:var(--font-mono);flex:0 0 42px;text-align:right;color:${psiColor(v)}">${v.toFixed(3)}</span>
-      </div>`;
-    }).join('');
-
-  panel.innerHTML = `
-    <div class="d-flex justify-content-between mb-2" style="font-size:0.75rem">
-      <span>Baseline: <strong style="color:${hasBL?'var(--accent-buy)':'var(--text-muted)'}">${hasBL ? 'recorded' : 'none yet'}</strong></span>
-      <span>Drift events: <strong style="color:${hasDrift?'#ffc107':'var(--text-main)'}">${drift.drift_count || 0}</strong></span>
-    </div>
-    <div class="d-flex justify-content-between mb-2" style="font-size:0.75rem">
-      <span>Max PSI: <strong style="font-family:var(--font-mono);color:${psiColor(maxPsi)}">${maxPsi.toFixed(3)}</strong></span>
-      <span style="font-size:0.68rem;color:${psiColor(maxPsi)}">${psiLabel(maxPsi)}</span>
-    </div>
-    <div style="font-size:0.65rem;color:var(--text-muted);margin-bottom:4px">PSI per feature (threshold ${threshold.toFixed(2)})</div>
-    ${featureRows || '<div class="text-muted text-center small py-1">รอ baseline...</div>'}`;
-}
-
-function renderParamOptPanel(opt) {
-  const panel = document.getElementById('paramOptPanel');
-  const badge = document.getElementById('paramChampBadge');
-  if (!panel) return;
-
-  if (!opt || opt.status === 'not_run') {
-    panel.innerHTML = '<div class="text-muted text-center small py-2">ยังไม่ได้รัน (ต้องการ ≥60 แท่ง)</div>';
-    return;
-  }
-
-  const bp    = opt.best_params || {};
-  const sharpe = opt.best_sharpe;
-  const challS = opt.last_challenger_sharpe;
-  const promoted = challS != null && sharpe != null && challS > sharpe - 0.01;
-  if (badge) badge.style.display = (challS != null && challS > (sharpe || -999) - 0.001) ? '' : 'none';
-
-  const paramRows = [
-    ['RSI Oversold',   bp.rsi_oversold,   ''],
-    ['RSI Overbought', bp.rsi_overbought,  ''],
-    ['ATR SL Mult',    bp.atr_sl_mult,     '×'],
-    ['Min Confidence', bp.min_confidence != null ? (bp.min_confidence * 100).toFixed(0) + '%' : null, ''],
-  ].filter(([,v]) => v != null).map(([label, val, suffix]) =>
-    `<div class="d-flex justify-content-between py-1" style="border-bottom:1px solid var(--border);font-size:0.72rem">
-      <span style="color:var(--text-muted)">${label}</span>
-      <strong style="font-family:var(--font-mono)">${val}${suffix}</strong>
-    </div>`
-  ).join('');
-
-  const sharpeColor = sharpe > 0 ? '#39d98a' : sharpe > -1 ? '#ffc107' : '#ff4d6d';
-  const opt_at = opt.optimized_at ? new Date(opt.optimized_at + 'Z').toLocaleString('th', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
-
-  panel.innerHTML = `
-    <div class="d-flex justify-content-between mb-2" style="font-size:0.75rem">
-      <span>Champion Sharpe: <strong style="font-family:var(--font-mono);color:${sharpeColor}">${sharpe != null ? sharpe.toFixed(3) : '—'}</strong></span>
-      ${challS != null ? `<span style="font-size:0.68rem;color:var(--text-muted)">challenger: ${challS.toFixed(3)}</span>` : ''}
-    </div>
-    ${paramRows}
-    <div class="mt-2" style="font-size:0.62rem;color:var(--text-muted);text-align:right">
-      last opt: ${opt_at} · ${opt.n_combos || 0} combos
-    </div>`;
-}
-
-function renderMlChampPanel(mc) {
-  const panel = document.getElementById('mlChampPanel');
-  const badge = document.getElementById('mlChampBadge');
-  if (!panel) return;
-  if (!mc || mc.model_type === 'none' || mc.model_type == null) {
-    panel.innerHTML = '<div class="text-muted text-center small py-2">ยังไม่มีโมเดล</div>';
-    if (badge) badge.style.display = 'none';
-    return;
-  }
-  const champAuc = mc.champion_auc;
-  const challAuc = mc.challenger_auc;
-  const promoted = mc.challenger_promoted === true;
-  const rejected  = mc.challenger_promoted === false;
-  if (badge) {
-    badge.style.display = promoted ? '' : 'none';
-  }
-  const aucColor = (v) => v == null ? 'var(--text-muted)' : v >= 0.60 ? '#39d98a' : v >= 0.52 ? '#ffc107' : '#ff4d6d';
-  const fmtAuc = (v) => v != null ? v.toFixed(4) : '—';
-  const acc = mc.accuracy != null ? (mc.accuracy * 100).toFixed(1) + '%' : '—';
-  const lastT = mc.last_trained
-    ? new Date(mc.last_trained + (mc.last_trained.includes('Z') ? '' : 'Z'))
-        .toLocaleString('th', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
-    : '—';
-  const typeLabel = mc.model_type === 'lightgbm' ? 'LightGBM' : mc.model_type === 'random_forest' ? 'RandomForest' : mc.model_type || '—';
-
-  const challRow = challAuc != null ? `
-    <div class="d-flex justify-content-between py-1" style="border-bottom:1px solid var(--border);font-size:0.72rem">
-      <span style="color:var(--text-muted)">Challenger AUC</span>
-      <strong style="font-family:var(--font-mono);color:${aucColor(challAuc)}">${fmtAuc(challAuc)}
-        ${promoted ? '<span style="color:#39d98a;font-size:0.65rem">↑ promoted</span>' : rejected ? '<span style="color:#ff4d6d;font-size:0.65rem">✕ rejected</span>' : ''}
-      </strong>
-    </div>` : '';
-
-  panel.innerHTML = `
-    <div class="d-flex justify-content-between py-1" style="border-bottom:1px solid var(--border);font-size:0.72rem">
-      <span style="color:var(--text-muted)">Champion AUC</span>
-      <strong style="font-family:var(--font-mono);color:${aucColor(champAuc)}">${fmtAuc(champAuc)}</strong>
-    </div>
-    ${challRow}
-    <div class="d-flex justify-content-between py-1" style="border-bottom:1px solid var(--border);font-size:0.72rem">
-      <span style="color:var(--text-muted)">CV Accuracy</span>
-      <strong style="font-family:var(--font-mono)">${acc}</strong>
-    </div>
-    <div class="mt-2" style="font-size:0.62rem;color:var(--text-muted);text-align:right">
-      ${typeLabel} · ${lastT}
-    </div>`;
-}
-
-function renderTradeJournalPanel(mem) {
-  const panel = document.getElementById('tradeJournalPanel');
-  const badge = document.getElementById('memoryStatBadge');
-  if (!panel) return;
-
-  if (!mem || !mem.total_trades) {
-    panel.innerHTML = '<div class="text-muted text-center small py-2">ยังไม่มีประวัติเทรดที่ปิดแล้ว</div>';
-    if (badge) badge.textContent = '';
-    return;
-  }
-
-  const wr = (mem.overall_win_rate != null) ? (mem.overall_win_rate * 100).toFixed(0) + '%' : '—';
-  const wrColor = mem.overall_win_rate >= 0.5 ? '#39d98a' : '#ff4d6d';
-  if (badge) badge.textContent =
-    `${mem.total_trades} เทรด · ${mem.distinct_setups} setups · ${mem.confident_setups} ยืนยันแล้ว`;
-
-  const sigLabel = (s) => {
-    const [reg, strat, band, rsi] = String(s).split('|');
-    return `${reg} · ${strat} · ${band} · ${rsi}`;
-  };
-  const row = (d, good) => {
-    const exp = (d.expectancy >= 0 ? '+' : '') + d.expectancy.toFixed(2) + '%';
-    const c = good ? '#39d98a' : '#ff4d6d';
-    return `<div class="d-flex justify-content-between py-1" style="border-bottom:1px solid var(--border);font-size:0.68rem">
-        <span style="color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%">${sigLabel(d.signature)}</span>
-        <span style="font-family:var(--font-mono)"><strong style="color:${c}">${exp}</strong> <span style="color:var(--text-muted)">${(d.win_rate*100).toFixed(0)}% · n=${d.n}</span></span>
-      </div>`;
-  };
-  const best  = (mem.best  || []).map(d => row(d, true)).join('')  || '<div class="text-muted small py-1">—</div>';
-  const worst = (mem.worst || []).map(d => row(d, false)).join('') || '<div class="text-muted small py-1">—</div>';
-
-  panel.innerHTML = `
-    <div class="d-flex justify-content-between mb-2" style="font-size:0.75rem">
-      <span>Overall win-rate: <strong style="font-family:var(--font-mono);color:${wrColor}">${wr}</strong></span>
-      <span style="font-size:0.66rem;color:var(--text-muted)">veto กันเซ็ตอัพที่ขาดทุนซ้ำ (≥${mem.min_samples} ตัวอย่าง)</span>
-    </div>
-    <div class="row g-2">
-      <div class="col-md-6">
-        <div style="font-size:0.66rem;color:#39d98a;font-weight:700;margin-bottom:2px">✓ เซ็ตอัพที่ดีที่สุด</div>
-        ${best}
-      </div>
-      <div class="col-md-6">
-        <div style="font-size:0.66rem;color:#ff4d6d;font-weight:700;margin-bottom:2px">✗ เซ็ตอัพที่ควรเลี่ยง / veto</div>
-        ${worst}
-      </div>
-    </div>`;
 }
 
 function renderAgents(agents) {
@@ -5109,7 +4413,7 @@ function _addNotif(item) {
 init();
 </script>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/bootstrap.bundle.min.js"></script>
 
 <!-- ── Floating Chat Button ── -->
 <button id="chatFab" onclick="toggleChat()" title="AI Assistant">
@@ -5122,7 +4426,7 @@ init();
   <div style="padding:13px 16px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;gap:10px;flex-shrink:0;">
     <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#39d98a);display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:700;color:#000;font-family:var(--font-headline)">AI</div>
     <div>
-      <div style="font-family:var(--font-headline);font-weight:700;font-size:0.92rem;line-height:1.2">Lunai <span style="font-size:0.65rem;font-weight:400;color:var(--text-muted);font-family:var(--font-mono)">v1.0.0</span></div>
+      <div style="font-family:var(--font-headline);font-weight:700;font-size:0.92rem;line-height:1.2">Aiterra Agent</div>
       <div id="chatStatus" style="font-size:0.65rem;color:var(--text-muted);font-family:var(--font-mono)">พร้อมรับคำสั่ง</div>
     </div>
     <button onclick="toggleChat()" style="margin-left:auto;background:none;border:none;color:var(--text-muted);cursor:pointer;padding:4px;line-height:1;font-size:1rem"><i class="bi bi-x-lg"></i></button>
