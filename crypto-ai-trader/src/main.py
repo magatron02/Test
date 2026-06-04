@@ -18,6 +18,7 @@ from .exchanges import create_exchange
 from .agent.ai_trader import AITrader
 from .agent.training_loop import TrainingLoop
 from .agent.hourly_trainer import HourlyTrainer
+from .agent.alert_monitor import AlertMonitor
 from .api.routes import router, set_trader, set_training_loop, set_hourly_trainer
 from .api.websocket import broadcast, websocket_endpoint
 
@@ -29,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 WEB_DIR = (Path(_sys._MEIPASS) / "src" / "web") if getattr(_sys, 'frozen', False) else (Path(__file__).parent / "web")
 
-app = FastAPI(title=settings.app_name, version="1.0.0")
+app = FastAPI(title=settings.app_name, version="1.1.0")
 
 # Attach slowapi rate-limiter state so @limiter.limit decorators work.
 try:
@@ -74,6 +75,8 @@ _trader: AITrader = None
 _trader_task = None
 _training_loop_inst: TrainingLoop = None
 _hourly_trainer_inst: HourlyTrainer = None
+_alert_monitor_inst: AlertMonitor = None
+_alert_task = None
 
 
 async def _snapshot_loop():
@@ -119,6 +122,7 @@ async def _snapshot_loop():
 @app.on_event("startup")
 async def startup():
     global _trader, _trader_task, _training_loop_inst, _hourly_trainer_inst
+    global _alert_monitor_inst, _alert_task
 
     init_db()
     logger.info(f"Database initialized")
@@ -142,6 +146,8 @@ async def startup():
 
     _trader_task = asyncio.create_task(_trader.start())
     asyncio.create_task(_snapshot_loop())
+    _alert_monitor_inst = AlertMonitor(exchange, broadcast_fn=broadcast)
+    _alert_task = asyncio.create_task(_alert_monitor_inst.start())
     _hourly_trainer_inst.start()
     logger.info(f"AI Trader started in {settings.trading_mode} mode (exchange={ex_name}) with model={settings.ai_model}")
 
@@ -159,12 +165,16 @@ async def shutdown():
         _trader.stop()
     if _trader_task:
         _trader_task.cancel()
+    if _alert_monitor_inst:
+        _alert_monitor_inst.stop()
+    if _alert_task:
+        _alert_task.cancel()
 
 
 def main():
     print(f"""
 ╔══════════════════════════════════════════╗
-║          Aiterra v1.0.0 - Starting...    ║
+║          Aiterra v1.1.0 - Starting...    ║
 ║  Mode: {settings.trading_mode.upper():<10} Model: {settings.ai_model:<12}║
 ║  Port: {settings.app_port:<10} URL: http://localhost:{settings.app_port} ║
 ╚══════════════════════════════════════════╝

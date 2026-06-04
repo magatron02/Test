@@ -92,6 +92,12 @@ trading:
   max_hold_hours: 24          # ปิด trade อัตโนมัติหลัง 24 ชม. (time-based exit)
   time_exit_stuck_pct: 2.0    # ปิดเฉพาะถ้า drift < 2% (ไม่ใช่ขาขึ้นแรง)
   live_max_budget_usdt: 0     # เพดานเงินจริงสูงสุดที่ AI ใช้ได้ (0 = ไม่จำกัด) — ตั้งผ่านปุ่ม Start Live
+  # Trading schedule — หยุดเปิดออเดอร์ใหม่ตามเวลา (ปิดออเดอร์เดิมยังทำงานเสมอ)
+  schedule:
+    enabled: false
+    no_trade_start: "00:00"   # ห้ามเปิดออเดอร์ใหม่ตั้งแต่ (เวลาเครื่อง HH:MM)
+    no_trade_end:   "06:00"   # ถึงเวลานี้ (ข้ามเที่ยงคืนได้ เช่น 22:00 → 06:00)
+    no_weekend:     false     # true = หยุดเทรดเสาร์-อาทิตย์
 
 strategy:
   primary: "hybrid"         # dca | trend | mean_reversion | hybrid
