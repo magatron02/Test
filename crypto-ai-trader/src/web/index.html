@@ -631,6 +631,21 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
     </div>
   </div>
 
+  <!-- Correlation Matrix Row -->
+  <div class="row g-3 mb-3" id="correlationRow">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-grid-3x3-gap me-2"></i>Correlation Matrix <span class="text-muted" style="font-size:0.7rem;font-weight:400">— ความสัมพันธ์ของราคา (กันถือเหรียญที่วิ่งทางเดียวกันซ้ำ)</span></span>
+          <span class="text-muted" style="font-size:0.65rem" id="corrUpdated">—</span>
+        </div>
+        <div class="card-body p-2" id="correlationPanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Risk Analytics Row -->
   <div class="row g-3 mb-3" id="analyticsRow">
     <div class="col-12">
@@ -2311,6 +2326,56 @@ async function fetchNarratives() {
     }
     if (currentSymbol && allAnalyses[currentSymbol]) updateAIPanel(currentSymbol);
   } catch {}
+}
+
+// Correlation matrix — pairwise price-return correlation across tracked symbols
+async function fetchCorrelations() {
+  try {
+    const r = await fetch('/api/correlations');
+    renderCorrelationPanel(await r.json());
+    const el = document.getElementById('corrUpdated');
+    if (el) el.textContent = new Date().toLocaleTimeString('th', {hour:'2-digit', minute:'2-digit'});
+  } catch {}
+}
+
+function _corrCell(v) {
+  if (v == null) return {bg:'transparent', txt:'·', color:'var(--text-muted)'};
+  // Red = highly correlated (crowded), green = diversifying (negative/low)
+  const a = Math.abs(v);
+  let bg;
+  if (v >= 0) bg = `rgba(255,107,53,${(a*0.85).toFixed(2)})`;   // positive → orange/red
+  else        bg = `rgba(57,217,138,${(a*0.85).toFixed(2)})`;   // negative → green
+  return {bg, txt:v.toFixed(2), color: a > 0.5 ? '#fff' : 'var(--text)'};
+}
+
+function renderCorrelationPanel(d) {
+  const panel = document.getElementById('correlationPanel');
+  if (!panel) return;
+  const syms = (d && d.symbols) || [];
+  const m = (d && d.matrix) || [];
+  if (syms.length < 2) {
+    panel.innerHTML = '<div class="text-muted text-center small py-2">ต้องมีข้อมูลราคาอย่างน้อย 2 เหรียญ</div>';
+    return;
+  }
+  const short = s => s.split('/')[0];
+  let head = '<th style="font-size:0.65rem"></th>' +
+    syms.map(s => `<th class="text-center" style="font-size:0.62rem;font-family:var(--font-mono)">${short(s)}</th>`).join('');
+  let rows = '';
+  for (let i = 0; i < syms.length; i++) {
+    let cells = `<td class="fw-bold" style="font-size:0.62rem;font-family:var(--font-mono)">${short(syms[i])}</td>`;
+    for (let j = 0; j < syms.length; j++) {
+      const c = _corrCell(m[i] ? m[i][j] : null);
+      cells += `<td class="text-center" style="background:${c.bg};color:${c.color};font-size:0.62rem;font-family:var(--font-mono);border-radius:3px">${c.txt}</td>`;
+    }
+    rows += `<tr>${cells}</tr>`;
+  }
+  panel.innerHTML =
+    `<div class="table-responsive"><table class="table table-sm table-borderless mb-1" style="min-width:max-content">
+       <thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>
+     <div class="text-muted" style="font-size:0.62rem">
+       <span style="color:#ff6b35">■</span> วิ่งทางเดียวกัน (เสี่ยงกระจุก) ·
+       <span style="color:#39d98a">■</span> สวนทางกัน (กระจายเสี่ยง)
+     </div>`;
 }
 
 async function fetchPatterns(symbol) {
@@ -4640,6 +4705,7 @@ async function init() {
   await fetchRegimes();
   await fetchRiskState();
   await fetchNarratives();
+  await fetchCorrelations();
   await fetchPatterns(Object.keys(allPrices)[0] || 'BTC/USDT');
   await fetchAnalytics();
   await fetchSentiment(Object.keys(allPrices)[0] || 'BTC/USDT');
@@ -4655,6 +4721,7 @@ async function init() {
   setInterval(fetchRegimes, 15000);
   setInterval(fetchRiskState, 10000);
   setInterval(fetchNarratives, 30000);
+  setInterval(fetchCorrelations, 30000);
   setInterval(fetchAnalytics, 60000);
   setInterval(() => fetchSentiment(Object.keys(allPrices)[0] || 'BTC/USDT'), 300000); // 5 min
   // E: Chart auto-refresh every 15 minutes

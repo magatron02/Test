@@ -338,6 +338,25 @@ class AITrader:
             self._set_agent("risk", "active", f"Block {symbol}: {reason}")
         return allowed, reason
 
+    def correlation_matrix(self) -> dict:
+        """Pairwise return correlation across tracked symbols (for the dashboard).
+
+        Returns ``{"symbols": [...], "matrix": [[...]]}`` with values in [-1, 1]
+        (None where there isn't enough overlapping history)."""
+        syms = [s for s in self._price_history if len(self._returns_for(s)) >= 5]
+        rets = {s: self._returns_for(s) for s in syms}
+        matrix = []
+        for a in syms:
+            row = []
+            for b in syms:
+                if a == b:
+                    row.append(1.0)
+                else:
+                    c = self._risk._pearson(rets[a], rets[b])
+                    row.append(round(c, 2) if c is not None else None)
+            matrix.append(row)
+        return {"symbols": syms, "matrix": matrix}
+
     # ── Signal generation ─────────────────────────────────────────────────
 
     async def _claude_signal_cached(
@@ -827,12 +846,28 @@ class AITrader:
         # Refresh correlation-aware HRP weights from last cycle's price history
         self._update_hrp_weights()
 
-        # Aggregate regime for risk engine update (use first symbol's regime as proxy)
-        dominant_regime = "RANGING"
+        # ── Phase A: analyze every symbol concurrently ───────────────────────
+        # analyze_symbol only reads market data and updates per-symbol caches,
+        # so running them together is race-free (single-threaded asyncio, writes
+        # land on distinct keys between awaits) and cuts cycle latency ~Nx.
+        self._set_agent("analyzer", "active", f"กำลังวิเคราะห์ {len(symbols)} เหรียญพร้อมกัน")
+        results = await asyncio.gather(
+            *(self.analyze_symbol(sym) for sym in symbols),
+            return_exceptions=True,
+        )
+        analyses: Dict[str, MarketAnalysis] = {}
+        for sym, res in zip(symbols, results):
+            if isinstance(res, Exception):
+                logger.error("Analysis failed for %s: %s", sym, res)
+            elif res is not None:
+                analyses[sym] = res
+        self._set_agent("analyzer", "idle", f"วิเคราะห์ครบ {len(analyses)}/{len(symbols)} เหรียญ")
 
+        # ── Phase B: decide + execute sequentially ───────────────────────────
+        # Kept sequential because each step mutates shared state (portfolio cash,
+        # open trades, risk engine) — parallelising here would race on capital.
         for symbol in symbols:
-            self._set_agent("analyzer", "active", f"กำลังวิเคราะห์ {symbol}")
-            analysis = await self.analyze_symbol(symbol)
+            analysis = analyses.get(symbol)
             if not analysis:
                 continue
             self._signal_stats["analyzed"] += 1
@@ -841,7 +876,6 @@ class AITrader:
             if regime is None:
                 from .market_regime import RegimeResult as RR
                 regime = RR("RANGING", 0.5, 20.0, 2.0, 0.0, "default")
-            dominant_regime = regime.regime
 
             await self._check_exit_conditions(symbol)
 
@@ -895,7 +929,6 @@ class AITrader:
 
             await asyncio.sleep(0.5)
 
-        self._set_agent("analyzer", "idle", "วิเคราะห์ครบทุก symbol แล้ว")
         state = await self.get_dashboard_state()
         await self._broadcast("dashboard_update", state)
 
