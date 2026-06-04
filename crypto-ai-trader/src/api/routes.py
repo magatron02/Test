@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from ..core.config import settings
-from ..core.database import Portfolio, Trade, TrainingRecord, get_db, SessionLocal
+from ..core.database import Portfolio, PriceAlert, Trade, TrainingRecord, get_db, SessionLocal
 from .websocket import get_notifications, clear_notifications
 from ..notifications import line_notify, telegram_notify
 
@@ -151,6 +151,7 @@ async def get_trades(limit: int = 50, db: Session = Depends(get_db)):
             "ai_model": t.ai_model,
             "confidence": t.confidence,
             "reasoning": t.reasoning,
+            "journal": t.journal,
             "close_price": t.close_price,
             "pnl": t.pnl,
             "pnl_pct": t.pnl_pct,
@@ -288,6 +289,7 @@ _SETTINGS_ALLOWLIST: Dict[str, set] = {
         "take_profit_pct", "stop_loss_pct", "min_confidence",
         "analysis_interval", "risk_per_trade_pct", "max_daily_loss_pct",
         "max_open_trades", "max_position_pct", "dry_run",
+        "schedule", "live_max_budget_usdt",
     },
     "strategy": {
         "primary", "roi_table", "trailing_stop",
@@ -334,13 +336,27 @@ async def update_settings(data: Dict[str, Any]):
 
 
 @router.post("/mode")
-async def set_mode(data: Dict[str, str]):
+async def set_mode(data: Dict[str, Any]):
     mode = data.get("mode", "demo")
     if mode not in ("demo", "live"):
         raise HTTPException(400, "Mode must be 'demo' or 'live'")
+    if mode == "live":
+        # Real funds at risk — require explicit confirmation and accept a budget cap.
+        if not data.get("confirm"):
+            raise HTTPException(400, "Live mode requires confirm=true")
+        if "budget_usdt" in data:
+            try:
+                budget = float(data.get("budget_usdt") or 0)
+            except (TypeError, ValueError):
+                raise HTTPException(400, "budget_usdt must be a number")
+            if budget < 0 or budget > 10_000_000:
+                raise HTTPException(400, "budget_usdt must be 0 – 10,000,000")
+            settings.set(budget, "trading", "live_max_budget_usdt")
     settings.set(mode, "trading", "mode")
     settings.save()
-    return {"mode": mode}
+    settings.reload()
+    return {"mode": mode,
+            "live_max_budget_usdt": settings.get("trading", "live_max_budget_usdt", default=0)}
 
 
 @router.post("/strategy")
@@ -745,6 +761,104 @@ async def get_open_positions():
             "opened_at":      trade["opened_at"].isoformat() if isinstance(trade.get("opened_at"), datetime) else trade.get("opened_at"),
         })
     return rows
+
+
+# ─── Price Alerts ─────────────────────────────────────────────────
+
+def _alert_to_dict(a: PriceAlert) -> dict:
+    return {
+        "id": a.id,
+        "symbol": a.symbol,
+        "condition": a.condition,
+        "target_price": a.target_price,
+        "note": a.note,
+        "active": a.active,
+        "repeat": a.repeat,
+        "triggered_at": a.triggered_at.isoformat() if a.triggered_at else None,
+        "created_at": a.created_at.isoformat() if a.created_at else None,
+    }
+
+
+@router.get("/alerts")
+async def list_alerts(db: Session = Depends(get_db)):
+    """GET /api/alerts — all price alerts, active first then newest."""
+    alerts = db.query(PriceAlert).order_by(
+        PriceAlert.active.desc(), PriceAlert.created_at.desc()
+    ).all()
+    return [_alert_to_dict(a) for a in alerts]
+
+
+@router.post("/alerts")
+async def create_alert(data: Dict[str, Any], db: Session = Depends(get_db)):
+    """POST /api/alerts — create a price alert.
+    Body: {"symbol":"BTC/THB", "condition":"above"|"below", "target_price":1234, "note":"", "repeat":false}
+    """
+    symbol = str(data.get("symbol") or "")
+    condition = str(data.get("condition") or "").lower()
+    if symbol not in settings.symbols:
+        raise HTTPException(400, f"symbol must be one of: {settings.symbols}")
+    if condition not in ("above", "below"):
+        raise HTTPException(400, "condition must be 'above' or 'below'")
+    try:
+        target = float(data.get("target_price"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "target_price must be a number")
+    if target <= 0 or target > 1e12:
+        raise HTTPException(400, "target_price out of range")
+    note = (str(data.get("note") or ""))[:200]
+    alert = PriceAlert(
+        symbol=symbol,
+        condition=condition,
+        target_price=target,
+        note=note or None,
+        active=True,
+        repeat=bool(data.get("repeat", False)),
+    )
+    db.add(alert)
+    db.commit()
+    db.refresh(alert)
+    return _alert_to_dict(alert)
+
+
+@router.post("/alerts/{alert_id}/toggle")
+async def toggle_alert(alert_id: int, db: Session = Depends(get_db)):
+    """POST /api/alerts/{id}/toggle — enable/disable an alert (re-arms a fired one)."""
+    alert = db.query(PriceAlert).filter(PriceAlert.id == alert_id).first()
+    if not alert:
+        raise HTTPException(404, "Alert not found")
+    alert.active = not alert.active
+    if alert.active:
+        alert.triggered_at = None  # re-arm
+    db.commit()
+    db.refresh(alert)
+    return _alert_to_dict(alert)
+
+
+@router.delete("/alerts/{alert_id}")
+async def delete_alert(alert_id: int, db: Session = Depends(get_db)):
+    """DELETE /api/alerts/{id} — remove an alert."""
+    alert = db.query(PriceAlert).filter(PriceAlert.id == alert_id).first()
+    if not alert:
+        raise HTTPException(404, "Alert not found")
+    db.delete(alert)
+    db.commit()
+    return {"deleted": alert_id}
+
+
+# ─── Trade Journal ────────────────────────────────────────────────
+
+@router.post("/trades/{trade_id}/note")
+async def set_trade_note(trade_id: int, data: Dict[str, Any], db: Session = Depends(get_db)):
+    """POST /api/trades/{id}/note — attach/update a personal journal note on a trade.
+    Body: {"note": "เหตุผลที่เข้า/ออก ..."}
+    """
+    trade = db.query(Trade).filter(Trade.id == trade_id).first()
+    if not trade:
+        raise HTTPException(404, "Trade not found")
+    note = str(data.get("note") or "")[:2000]
+    trade.journal = note or None
+    db.commit()
+    return {"ok": True, "id": trade_id, "journal": trade.journal}
 
 
 @router.post("/trade/manual")

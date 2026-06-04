@@ -497,6 +497,7 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
     <a class="pill-link nav-link" onclick="showSection('analytics',this)">Analytics</a>
     <a class="pill-link nav-link" onclick="showSection('trade-history',this)">History</a>
     <a class="pill-link nav-link" onclick="showSection('positions',this)">Positions</a>
+    <a class="pill-link nav-link" onclick="showSection('alerts',this)" id="navAlerts">Alerts</a>
     <a class="pill-link nav-link" onclick="showSection('notifications',this)" id="navNotifications">Notifications</a>
     <a class="pill-link nav-link" onclick="showSection('thai-market',this)">ตลาดไทย</a>
     <a class="pill-link nav-link" onclick="showSection('settings',this)">Settings</a>
@@ -1200,8 +1201,8 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
     </div>
     <div class="card-body p-0" style="overflow-x:auto">
       <table class="table table-dark mb-0">
-        <thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th>Price</th><th>Amount</th><th>Strategy</th><th>Model</th><th>Conf</th><th>Status</th><th>PnL</th></tr></thead>
-        <tbody id="historyBody"><tr><td colspan="10" class="text-center text-muted p-3">ยังไม่มีประวัติ</td></tr></tbody>
+        <thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th>Price</th><th>Amount</th><th>Strategy</th><th>Model</th><th>Conf</th><th>Status</th><th>PnL</th><th style="width:44px"></th></tr></thead>
+        <tbody id="historyBody"><tr><td colspan="11" class="text-center text-muted p-3">ยังไม่มีประวัติ</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -1276,6 +1277,119 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
 </section>
 
 <!-- NOTIFICATIONS -->
+<!-- PRICE ALERTS -->
+<section id="sec-alerts" class="section">
+  <div class="row g-3">
+    <div class="col-md-5">
+      <div class="card">
+        <div class="card-header"><i class="bi bi-bell me-2"></i>ตั้งแจ้งเตือนราคา</div>
+        <div class="card-body">
+          <div class="mb-2">
+            <label class="form-label small mb-1">Symbol</label>
+            <select class="form-select form-select-sm" id="alertSymbol"></select>
+          </div>
+          <div class="row g-2 mb-2">
+            <div class="col-6">
+              <label class="form-label small mb-1">เงื่อนไข</label>
+              <select class="form-select form-select-sm" id="alertCondition">
+                <option value="above">📈 ราคาขึ้นถึง</option>
+                <option value="below">📉 ราคาลงถึง</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label small mb-1">ราคาเป้าหมาย</label>
+              <input type="number" class="form-control form-control-sm" id="alertPrice" placeholder="0.00" min="0" step="any">
+            </div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small mb-1">โน้ต (ไม่บังคับ)</label>
+            <input type="text" class="form-control form-control-sm" id="alertNote" placeholder="เช่น: แนวรับสำคัญ" maxlength="200">
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="alertRepeat">
+            <label class="form-check-label small" for="alertRepeat">แจ้งซ้ำทุกครั้ง (ไม่ปิดหลังแจ้งครั้งแรก)</label>
+          </div>
+          <button class="btn btn-primary btn-sm w-100" onclick="createAlert()">
+            <i class="bi bi-plus-circle me-1"></i>เพิ่มการแจ้งเตือน
+          </button>
+          <div id="alertCreateResult" class="small mt-2" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-7">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-list-check me-2"></i>การแจ้งเตือนทั้งหมด</span>
+          <button class="btn btn-outline-secondary btn-sm" onclick="loadAlerts()"><i class="bi bi-arrow-clockwise"></i></button>
+        </div>
+        <div class="card-body p-0">
+          <div id="alertsEmpty" class="text-center text-muted py-4" style="font-size:0.85rem">
+            <i class="bi bi-bell-slash" style="font-size:1.8rem;display:block;margin-bottom:8px"></i>ยังไม่มีการแจ้งเตือน
+          </div>
+          <div id="alertsList" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRADE JOURNAL MODAL -->
+<div class="modal fade" id="journalModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:var(--bg-card);border:1px solid var(--border)">
+      <div class="modal-header" style="border-color:var(--border)">
+        <h6 class="modal-title"><i class="bi bi-journal-text me-2"></i>Trade Journal</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="journalTradeInfo" class="small text-muted mb-2"></div>
+        <label class="form-label small mb-1">บันทึก / เหตุผล / สิ่งที่เรียนรู้</label>
+        <textarea class="form-control" id="journalText" rows="5" maxlength="2000"
+          placeholder="เช่น: เข้าเพราะ RSI oversold + breakout / ออกเพราะ momentum อ่อนลง / ครั้งหน้าควร..."></textarea>
+        <div class="d-flex justify-content-between align-items-center mt-1">
+          <small class="text-muted" id="journalCharCount">0 / 2000</small>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-color:var(--border)">
+        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
+        <button class="btn btn-primary btn-sm" onclick="saveJournal()"><i class="bi bi-save me-1"></i>บันทึก</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LIVE MODE CONFIRMATION MODAL -->
+<div class="modal fade" id="liveModeModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:var(--bg-card);border:1px solid var(--border)">
+      <div class="modal-header" style="border-color:var(--border);background:rgba(220,53,69,0.15)">
+        <h6 class="modal-title text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>เปิด Live Mode — ใช้เงินจริง</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-warning py-2 small mb-3">
+          ⚠️ ต้องตั้งค่า Exchange API key ใน Settings → Exchange API Keys ก่อน<br>
+          ระบบจะเทรดด้วยเงินจริงทันทีหลังเปิด Live Mode
+        </div>
+        <label class="form-label small mb-1">
+          วงเงินสูงสุดที่ให้ AI ใช้ได้ <span class="text-muted">(0 = ไม่จำกัด)</span>
+        </label>
+        <div class="input-group input-group-sm mb-1">
+          <input type="number" class="form-control" id="liveBudgetInput" value="0" min="0" step="100" placeholder="0">
+          <span class="input-group-text" id="liveBudgetCurLabel">USDT</span>
+        </div>
+        <small class="text-muted">ตั้งวงเงินเพื่อจำกัดความเสี่ยง เช่น 5000 = AI ใช้ได้ไม่เกิน 5,000</small>
+      </div>
+      <div class="modal-footer" style="border-color:var(--border)">
+        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmLiveMode()">
+          <i class="bi bi-exclamation-triangle me-1"></i>ยืนยัน เปิด Live Mode
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <section id="sec-notifications" class="section">
   <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
@@ -1664,6 +1778,35 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
       </div>
 
       <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-clock me-2"></i>Trading Schedule</div>
+        <div class="card-body">
+          <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" id="schedEnabled" role="switch">
+            <label class="form-check-label small" for="schedEnabled">เปิดใช้ตารางเวลา (หยุดเปิดออเดอร์ใหม่ตามช่วงเวลา)</label>
+          </div>
+          <div class="row g-2 mb-2">
+            <div class="col-6">
+              <label class="form-label small mb-1">ห้ามเทรดตั้งแต่</label>
+              <input type="time" class="form-control form-control-sm" id="schedStart" value="00:00">
+            </div>
+            <div class="col-6">
+              <label class="form-label small mb-1">ถึงเวลา</label>
+              <input type="time" class="form-control form-control-sm" id="schedEnd" value="06:00">
+            </div>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="schedNoWeekend">
+            <label class="form-check-label small" for="schedNoWeekend">หยุดเทรดวันเสาร์–อาทิตย์</label>
+          </div>
+          <small class="text-muted d-block mb-2">การปิดออเดอร์เดิม (Stop Loss / Take Profit) ยังทำงานตามปกติในช่วงเวลาพัก</small>
+          <button class="btn btn-primary btn-sm" onclick="saveSchedule()">
+            <i class="bi bi-save me-1"></i>Save Schedule
+          </button>
+          <span id="schedSaveResult" class="small ms-2" style="display:none"></span>
+        </div>
+      </div>
+
+      <div class="card mb-3">
         <div class="card-header"><i class="bi bi-cpu me-2"></i>AI Model</div>
         <div class="card-body">
           <label class="form-label small mb-1">Claude API Key</label>
@@ -1861,6 +2004,8 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
 // State
 // ============================================================
 let ws = null;
+let _quoteCur = 'USDT';
+let _symbols  = [];
 let reconnectTimer = null;
 let portfolioData = { labels: [], values: [] };
 let currentSymbol = null;
@@ -2518,6 +2663,9 @@ function renderPriceCards() {
   if (!currentSymbol && Object.keys(allPrices).length > 0) {
     selectSymbol(Object.keys(allPrices)[0]);
   }
+  // Keep _symbols in sync so the Alerts form is always populated
+  _symbols = Object.keys(allPrices);
+  _populateAlertSymbols();
 }
 
 function formatPrice(p) {
@@ -2706,9 +2854,13 @@ async function refreshHistory() {
     const trades = await r.json();
     document.getElementById('historyCount').textContent = trades.length + ' trades';
     const body = document.getElementById('historyBody');
-    if (!trades.length) { body.innerHTML = '<tr><td colspan="10" class="text-center text-muted p-3">ยังไม่มีประวัติ</td></tr>'; return; }
+    if (!trades.length) { body.innerHTML = '<tr><td colspan="11" class="text-center text-muted p-3">ยังไม่มีประวัติ</td></tr>'; return; }
     body.innerHTML = trades.map(t => {
       const pnlCls = !t.pnl_pct ? '' : t.pnl_pct >= 0 ? 'text-success' : 'text-danger';
+      const info = `#${t.id} ${t.side} ${t.symbol} @ ${formatPrice(t.price)} (${t.opened_at ? new Date(t.opened_at).toLocaleDateString('th') : ''})`;
+      const noteIcon = t.journal
+        ? `<i class="bi bi-journal-text" style="color:var(--accent)" title="${t.journal.slice(0,60)}"></i>`
+        : `<i class="bi bi-journal-plus" style="color:var(--text-muted)"></i>`;
       return `<tr>
         <td class="text-muted">${t.opened_at ? new Date(t.opened_at).toLocaleString('th') : '—'}</td>
         <td>${t.symbol}</td>
@@ -2720,6 +2872,7 @@ async function refreshHistory() {
         <td>${((t.confidence||0)*100).toFixed(0)}%</td>
         <td><span class="badge bg-${t.status==='closed'?(t.pnl_pct>=0?'success':'danger'):'warning'}">${t.status}</span></td>
         <td class="${pnlCls}">${t.pnl_pct!=null?(t.pnl_pct>=0?'+':'')+t.pnl_pct.toFixed(2)+'%':'—'}</td>
+        <td><button class="btn btn-link p-0" style="line-height:1;font-size:0.85rem" onclick="openJournalModal(${t.id},${JSON.stringify(info)},${JSON.stringify(t.journal||'')})" title="Trade Journal">${noteIcon}</button></td>
       </tr>`;
     }).join('');
   } catch {}
@@ -2955,12 +3108,26 @@ async function refreshLoopStatus() {
 // Settings
 // ============================================================
 async function hotSwapMode(mode) {
-  if (mode === 'live' && !confirm(
-    'Live Mode ใช้เงินจริง!\n\n' +
-    '⚠️ ต้องตั้งค่า Exchange API key ใน Settings → Exchange API Keys ก่อน\n\n' +
-    'คุณแน่ใจหรือไม่?'
-  )) return;
+  if (mode === 'live') {
+    // Show budget-confirmation modal instead of a plain confirm dialog
+    const cur = _quoteCur || 'USDT';
+    const curLabel = document.getElementById('liveBudgetCurLabel');
+    if (curLabel) curLabel.textContent = cur;
+    const modal = new bootstrap.Modal(document.getElementById('liveModeModal'));
+    modal.show();
+    return;
+  }
+  await _doModeSwap('demo', 0);
+}
 
+async function confirmLiveMode() {
+  const budget = parseFloat(document.getElementById('liveBudgetInput')?.value || '0') || 0;
+  const modal = bootstrap.Modal.getInstance(document.getElementById('liveModeModal'));
+  if (modal) modal.hide();
+  await _doModeSwap('live', budget);
+}
+
+async function _doModeSwap(mode, budgetUsdt) {
   const resultEl = document.getElementById('modeSwapResult');
   resultEl.style.display = '';
   resultEl.innerHTML = '<span class="text-muted"><span class="spinner-border spinner-border-sm me-1" style="width:10px;height:10px;border-width:1.5px"></span>กำลังสลับ mode…</span>';
@@ -2971,10 +3138,12 @@ async function hotSwapMode(mode) {
   if (btnLive) btnLive.disabled = true;
 
   try {
-    const r = await fetch('/api/mode/swap', {
+    const body = {mode, confirm: true};
+    if (mode === 'live') body.budget_usdt = budgetUsdt;
+    const r = await fetch('/api/mode', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({mode}),
+      body: JSON.stringify(body),
     });
     const d = await r.json();
     if (!r.ok) {
@@ -2982,9 +3151,11 @@ async function hotSwapMode(mode) {
       showToast('Mode Error', d.detail || 'Swap failed', 'danger');
       return;
     }
+    const cap = d.live_max_budget_usdt;
+    const capStr = cap > 0 ? ` · วงเงิน ${cap.toLocaleString()} ${_quoteCur}` : '';
     const exLabel = d.exchange ? ` (${d.exchange})` : '';
-    resultEl.innerHTML = `<span style="color:var(--accent-buy)">🟢 สลับเป็น ${d.mode.toUpperCase()}${exLabel} สำเร็จ</span>`;
-    showToast('Mode', `Switched to ${d.mode.toUpperCase()}${exLabel}`, mode === 'demo' ? 'success' : 'warning');
+    resultEl.innerHTML = `<span style="color:var(--accent-buy)">🟢 สลับเป็น ${d.mode.toUpperCase()}${exLabel}${capStr} สำเร็จ</span>`;
+    showToast('Mode', `Switched to ${d.mode.toUpperCase()}${exLabel}${capStr}`, mode === 'demo' ? 'success' : 'warning');
     _updateModeBadge(d.mode);
     refreshLiveReadiness();
     await fetchStatus();
@@ -4530,6 +4701,196 @@ init();
     </button>
   </div>
 </div>
+
+
+<script>
+// ── Price Alerts ─────────────────────────────────────────────────────────────
+
+function _populateAlertSymbols() {
+  const sel = document.getElementById('alertSymbol');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '';
+  (_symbols || []).forEach(s => {
+    const o = document.createElement('option');
+    o.value = s; o.textContent = s;
+    if (s === current) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+
+async function loadAlerts() {
+  _populateAlertSymbols();
+  try {
+    const rows = await fetch('/api/alerts').then(r => r.json());
+    const listEl  = document.getElementById('alertsList');
+    const emptyEl = document.getElementById('alertsEmpty');
+    if (!rows.length) {
+      if (listEl)  listEl.style.display  = 'none';
+      if (emptyEl) emptyEl.style.display = '';
+      return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+    if (listEl)  listEl.style.display  = '';
+    listEl.innerHTML = rows.map(a => {
+      const fired = a.triggered_at ? `<span class="text-muted" style="font-size:0.68rem">แจ้งล่าสุด ${new Date(a.triggered_at).toLocaleString('th-TH',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'})}</span>` : '';
+      const badge = a.active
+        ? `<span class="badge bg-success" style="font-size:0.62rem">Active</span>`
+        : `<span class="badge bg-secondary" style="font-size:0.62rem">Off</span>`;
+      const arrow = a.condition === 'above' ? '📈' : '📉';
+      const cond  = a.condition === 'above' ? 'ขึ้นถึง' : 'ลงถึง';
+      const repeat = a.repeat ? `<span class="badge" style="font-size:0.6rem;background:var(--bg-main);color:var(--text-muted);border:1px solid var(--border)">ซ้ำ</span>` : '';
+      return `<div class="d-flex align-items-center gap-2 px-3 py-2" style="border-bottom:1px solid var(--border);font-size:0.8rem">
+        <span style="font-size:1rem">${arrow}</span>
+        <div class="flex-grow-1 min-width-0">
+          <div class="fw-bold">${a.symbol} ${cond} <span style="color:var(--accent)">${(+a.target_price).toLocaleString(undefined,{maximumFractionDigits:4})}</span></div>
+          ${a.note ? `<div class="text-muted" style="font-size:0.72rem">📝 ${a.note}</div>` : ''}
+          <div class="d-flex gap-1 align-items-center mt-1">${badge}${repeat}${fired}</div>
+        </div>
+        <div class="d-flex gap-1 flex-shrink-0">
+          <button class="btn btn-outline-secondary btn-sm px-1 py-0" onclick="toggleAlert(${a.id})" title="${a.active ? 'ปิด' : 'เปิด'}">
+            <i class="bi bi-${a.active ? 'pause-fill' : 'play-fill'}" style="font-size:0.7rem"></i>
+          </button>
+          <button class="btn btn-outline-danger btn-sm px-1 py-0" onclick="deleteAlert(${a.id})" title="ลบ">
+            <i class="bi bi-trash" style="font-size:0.7rem"></i>
+          </button>
+        </div>
+      </div>`;
+    }).join('');
+
+    // Badge count on nav
+    const active = rows.filter(a => a.active).length;
+    const navEl = document.getElementById('navAlerts');
+    if (navEl) {
+      navEl.innerHTML = active
+        ? `Alerts <span class="badge rounded-pill" style="background:var(--accent);color:#000;font-size:0.6rem;vertical-align:middle;padding:2px 5px">${active}</span>`
+        : 'Alerts';
+    }
+  } catch(e) { console.error('loadAlerts', e); }
+}
+
+async function createAlert() {
+  const symbol     = document.getElementById('alertSymbol')?.value;
+  const condition  = document.getElementById('alertCondition')?.value;
+  const target     = parseFloat(document.getElementById('alertPrice')?.value);
+  const note       = document.getElementById('alertNote')?.value?.trim() || '';
+  const repeat     = document.getElementById('alertRepeat')?.checked;
+  const resultEl   = document.getElementById('alertCreateResult');
+
+  if (!symbol || !condition) return;
+  if (isNaN(target) || target <= 0) {
+    if (resultEl) { resultEl.style.display=''; resultEl.innerHTML='<span class="text-danger">ใส่ราคาเป้าหมายให้ถูกต้อง</span>'; }
+    return;
+  }
+  try {
+    const r = await fetch('/api/alerts', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({symbol, condition, target_price: target, note, repeat}),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Failed');
+    if (resultEl) { resultEl.style.display=''; resultEl.innerHTML=`<span class="text-success">✓ เพิ่มแล้ว: ${symbol} ${condition} ${target.toLocaleString()}</span>`; }
+    document.getElementById('alertPrice').value = '';
+    document.getElementById('alertNote').value  = '';
+    await loadAlerts();
+  } catch(e) {
+    if (resultEl) { resultEl.style.display=''; resultEl.innerHTML=`<span class="text-danger">🔴 ${e.message}</span>`; }
+  }
+}
+
+async function toggleAlert(id) {
+  try {
+    await fetch(`/api/alerts/${id}/toggle`, {method:'POST'});
+    await loadAlerts();
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+}
+
+async function deleteAlert(id) {
+  if (!confirm('ลบการแจ้งเตือนนี้?')) return;
+  try {
+    await fetch(`/api/alerts/${id}`, {method:'DELETE'});
+    await loadAlerts();
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+}
+
+// ── Trade Journal ─────────────────────────────────────────────────────────────
+
+let _journalTradeId = null;
+
+function openJournalModal(tradeId, info, existingNote) {
+  _journalTradeId = tradeId;
+  const infoEl = document.getElementById('journalTradeInfo');
+  const textEl = document.getElementById('journalText');
+  const countEl = document.getElementById('journalCharCount');
+  if (infoEl) infoEl.textContent = info || '';
+  if (textEl) {
+    textEl.value = existingNote || '';
+    if (countEl) countEl.textContent = `${textEl.value.length} / 2000`;
+    textEl.oninput = () => { if (countEl) countEl.textContent = `${textEl.value.length} / 2000`; };
+  }
+  new bootstrap.Modal(document.getElementById('journalModal')).show();
+}
+
+async function saveJournal() {
+  if (!_journalTradeId) return;
+  const note = document.getElementById('journalText')?.value || '';
+  try {
+    const r = await fetch(`/api/trades/${_journalTradeId}/note`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({note}),
+    });
+    if (!r.ok) throw new Error((await r.json()).detail);
+    bootstrap.Modal.getInstance(document.getElementById('journalModal')).hide();
+    showToast('Journal', 'บันทึกแล้ว', 'success');
+    loadTrades();
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+}
+
+// ── Trading Schedule ──────────────────────────────────────────────────────────
+
+async function saveSchedule() {
+  const enabled    = document.getElementById('schedEnabled')?.checked;
+  const start      = document.getElementById('schedStart')?.value || '00:00';
+  const end        = document.getElementById('schedEnd')?.value   || '06:00';
+  const no_weekend = document.getElementById('schedNoWeekend')?.checked;
+  const resultEl   = document.getElementById('schedSaveResult');
+  try {
+    await fetch('/api/settings', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ trading: { schedule: { enabled, no_trade_start: start, no_trade_end: end, no_weekend } } }),
+    });
+    if (resultEl) { resultEl.style.display=''; resultEl.style.color='var(--accent-buy)'; resultEl.textContent='✓ บันทึกแล้ว'; setTimeout(() => resultEl.style.display='none', 2500); }
+  } catch(e) {
+    if (resultEl) { resultEl.style.display=''; resultEl.style.color='var(--accent-red)'; resultEl.textContent='🔴 ' + e.message; }
+  }
+}
+
+// Extend loadSettings to populate schedule + wire alerts on section switch
+const _origLoadSettings = typeof loadSettings === 'function' ? loadSettings : null;
+async function loadSettings() {
+  if (_origLoadSettings) await _origLoadSettings();
+  try {
+    const r = await fetch('/api/settings');
+    const d = await r.json();
+    const sched = d.trading?.schedule || {};
+    const schedEnabled = document.getElementById('schedEnabled');
+    if (schedEnabled) schedEnabled.checked = !!sched.enabled;
+    const schedStart = document.getElementById('schedStart');
+    if (schedStart && sched.no_trade_start) schedStart.value = sched.no_trade_start;
+    const schedEnd = document.getElementById('schedEnd');
+    if (schedEnd && sched.no_trade_end) schedEnd.value = sched.no_trade_end;
+    const schedNoWeekend = document.getElementById('schedNoWeekend');
+    if (schedNoWeekend) schedNoWeekend.checked = !!sched.no_weekend;
+  } catch {}
+}
+
+// Load alerts when the alerts section becomes active
+const _origShowSection = showSection;
+function showSection(name, el) {
+  _origShowSection(name, el);
+  if (name === 'alerts') loadAlerts();
+}
+</script>
 
 </body>
 </html>

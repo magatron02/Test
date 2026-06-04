@@ -469,6 +469,13 @@ class AITrader:
             return False
 
         if signal.action == "BUY" and not force:
+            # Trading schedule gate — pause opening new positions during quiet hours
+            quiet, q_reason = self._in_quiet_period()
+            if quiet:
+                logger.info("Skip BUY %s: %s", symbol, q_reason)
+                self._set_agent("risk", "idle", q_reason)
+                return False
+
             portfolio = await self._get_portfolio_summary()
             regime_mult = self._risk.get_regime_multiplier(regime.regime)
             hrp_cap = self._risk.max_position_pct * self._hrp_multiplier(symbol)
@@ -486,6 +493,13 @@ class AITrader:
 
             if not self._sizer.is_tradeable(size_usdt):
                 logger.info("Skip BUY %s: position too small (%.2f USDT)", symbol, size_usdt)
+                return False
+
+            # Live budget cap — never deploy more real capital than the user allowed
+            remaining = self._live_budget_remaining()
+            if remaining is not None and size_usdt > remaining:
+                logger.info("Skip BUY %s: live budget cap reached (remaining %.2f)", symbol, remaining)
+                self._set_agent("risk", "active", f"Block {symbol}: เกินงบ Live ที่ตั้งไว้")
                 return False
 
             # Risk engine gate
@@ -905,6 +919,59 @@ class AITrader:
         """Deactivate kill switch — allow trading to resume."""
         self._killed = False
         logger.info("Kill switch deactivated — trading resumed")
+
+    # ── Trading schedule (quiet hours) ──────────────────────────────────────
+
+    def _in_quiet_period(self) -> Tuple[bool, str]:
+        """Return (True, reason) when new positions should be paused.
+
+        Honours an optional trading.schedule block:
+            enabled, no_trade_start "HH:MM", no_trade_end "HH:MM", no_weekend.
+        Quiet hours only block *opening* new trades — exits always run so risk
+        is never left unmanaged. Times use the server's local clock.
+        """
+        sched = settings.get("trading", "schedule", default={}) or {}
+        if not sched.get("enabled", False):
+            return (False, "")
+        now = datetime.now()
+        if sched.get("no_weekend", False) and now.weekday() >= 5:
+            return (True, "พักเทรดวันหยุดสุดสัปดาห์")
+
+        start = str(sched.get("no_trade_start", "") or "")
+        end = str(sched.get("no_trade_end", "") or "")
+        if not start or not end:
+            return (False, "")
+        try:
+            sh, sm = (int(x) for x in start.split(":"))
+            eh, em = (int(x) for x in end.split(":"))
+        except (ValueError, AttributeError):
+            return (False, "")
+        cur = now.hour * 60 + now.minute
+        s = sh * 60 + sm
+        e = eh * 60 + em
+        # Same-day window (s < e) vs overnight window that wraps midnight (s > e)
+        in_window = (s <= cur < e) if s < e else (cur >= s or cur < e)
+        if in_window:
+            return (True, f"พักเทรดตามตาราง ({start}–{end})")
+        return (False, "")
+
+    # ── Live budget cap ─────────────────────────────────────────────────────
+
+    def _deployed_capital(self) -> float:
+        """Total cost basis currently tied up in open positions."""
+        return sum(float(t.get("cost", 0) or 0) for t in self._open_trades.values())
+
+    def _live_budget_remaining(self) -> Optional[float]:
+        """Remaining spend allowed under the live budget cap.
+
+        Returns None when no cap applies (demo mode, or cap == 0 = unlimited).
+        """
+        if settings.trading_mode != "live":
+            return None
+        cap = float(settings.get("trading", "live_max_budget_usdt", default=0) or 0)
+        if cap <= 0:
+            return None
+        return max(0.0, cap - self._deployed_capital())
 
     @property
     def dry_run(self) -> bool:
