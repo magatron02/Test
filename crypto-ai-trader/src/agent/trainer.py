@@ -6,6 +6,7 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
+from .drift_detector import DriftDetector
 from .strategy_manager import TradingSignal
 from ..core.config import settings
 from ..core.database import SessionLocal, TrainingRecord
@@ -43,6 +44,10 @@ class AITrainer:
             "model_type": "none",
         }
         self._trades_since_train = 0
+        # F3.4 — drift detection
+        self._drift_detector = DriftDetector()
+        self._recent_features: Dict[str, List[float]] = {}   # feature → recent values
+        self._predict_count = 0
         # Gradient-boosting model with SHAP explanations (primary when available)
         self._gbm = None
         try:
@@ -185,6 +190,7 @@ class AITrainer:
                     })
                     logger.info("LightGBM trained on %d samples, CV acc=%.3f",
                                 len(records), res["accuracy"])
+                    self._record_drift_baseline(records, use_gbm=True)
                     return True
                 logger.warning("GBM fit failed (%s); falling back to RandomForest",
                                res.get("error"))
@@ -209,7 +215,45 @@ class AITrainer:
         })
 
         logger.info(f"Model trained on {len(records)} samples, accuracy={accuracy:.3f}")
+        self._record_drift_baseline(records, use_gbm=False)
         return True
+
+    # ── F3.4 Drift helpers ────────────────────────────────────────────────
+
+    def _record_drift_baseline(self, records, *, use_gbm: bool):
+        """Snapshot training-time feature distributions for PSI baseline."""
+        baseline: Dict[str, List[float]] = {}
+        key_list = GBM_FEATURE_KEYS if use_gbm else FEATURE_KEYS
+        for r in records:
+            if not r.features:
+                continue
+            vec = (self._extract_gbm_features(r.features) if use_gbm
+                   else self._extract_features(r.features))
+            for i, k in enumerate(key_list):
+                baseline.setdefault(k, []).append(float(vec[i]))
+        self._drift_detector.record_baseline(baseline)
+        self._recent_features = {}
+        self._predict_count = 0
+
+    def _accumulate_predict_features(self, features: Dict, *, use_gbm: bool):
+        """Buffer incoming feature values for drift check."""
+        key_list = GBM_FEATURE_KEYS if use_gbm else FEATURE_KEYS
+        vec = (self._extract_gbm_features(features) if use_gbm
+               else self._extract_features(features))
+        for i, k in enumerate(key_list):
+            self._recent_features.setdefault(k, []).append(float(vec[i]))
+
+    def _maybe_check_drift(self):
+        """Check drift every 50 predictions; trigger retrain on significant drift."""
+        self._predict_count += 1
+        if self._predict_count % 50 != 0:
+            return
+        if not self._drift_detector.has_baseline():
+            return
+        drift, _ = self._drift_detector.check(self._recent_features)
+        if drift:
+            logger.warning("Drift detected — scheduling retrain")
+            self.train()
 
     def predict(self, features: Dict) -> Optional[TradingSignal]:
         # ── Primary: LightGBM with SHAP-backed reasoning ────────────────────
@@ -218,6 +262,8 @@ class AITrainer:
                 x = np.array(self._extract_gbm_features(features))
                 pred = self._gbm.predict(x)
                 if pred:
+                    self._accumulate_predict_features(features, use_gbm=True)
+                    self._maybe_check_drift()
                     top = self._gbm.explain(x)[:3]
                     drivers = ", ".join(
                         f"{d['feature']}({d['shap']:+.2f})" for d in top
@@ -239,6 +285,8 @@ class AITrainer:
             return None
         try:
             feat_vec = np.array([self._extract_features(features)])
+            self._accumulate_predict_features(features, use_gbm=False)
+            self._maybe_check_drift()
             pred = self._model.predict(feat_vec)[0]
             proba = self._model.predict_proba(feat_vec)[0]
             confidence = float(max(proba))
@@ -284,4 +332,5 @@ class AITrainer:
         self._stats["labelled_records"] = labelled
         gbm_ready = self._gbm is not None and self._gbm.ready
         self._stats["model_ready"] = gbm_ready or (self._model is not None)
+        self._stats["drift"] = self._drift_detector.summary()
         return dict(self._stats)

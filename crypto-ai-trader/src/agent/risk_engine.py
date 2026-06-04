@@ -6,6 +6,7 @@ Tracks:
   - Portfolio heat (total open risk as % of equity)
   - Per-symbol risk budget
   - Circuit-breaker: halts all new trades on limit breach
+  - VaR / CVaR + Monte-Carlo tail-risk (F3.3)
 
 Regime multipliers reduce/increase allowed risk based on detected market state.
 """
@@ -13,6 +14,8 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
+
+from .var_engine import summarize as _var_summarize
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +63,8 @@ class RiskEngine:
         self._equity_history: List[Tuple[datetime, float]] = []
         self._state = RiskState()
         self._open_risks: Dict[str, float] = {}   # symbol → risk in quote currency
+        self._daily_returns: List[float] = []     # for VaR/CVaR (F3.3)
+        self._prev_equity: Optional[float] = None
 
     # ── State update ──────────────────────────────────────────────────────
 
@@ -85,6 +90,14 @@ class RiskEngine:
 
         if equity > 0:
             self._state.daily_pnl_pct = daily_pnl / equity
+
+        # Track daily return for VaR/CVaR (F3.3)
+        if self._prev_equity and self._prev_equity > 0:
+            daily_ret = (equity - self._prev_equity) / self._prev_equity
+            self._daily_returns.append(daily_ret)
+            if len(self._daily_returns) > 365:
+                self._daily_returns = self._daily_returns[-365:]
+        self._prev_equity = equity
 
         heat = sum(self._open_risks.values()) / equity if equity > 0 else 0.0
         self._state.portfolio_heat_pct = heat
@@ -203,7 +216,7 @@ class RiskEngine:
 
     def summary(self) -> dict:
         s = self._state
-        return {
+        result = {
             "equity":           round(s.equity, 2),
             "high_water_mark":  round(s.high_water_mark, 2),
             "drawdown_pct":     round(s.current_drawdown_pct, 4),
@@ -214,3 +227,9 @@ class RiskEngine:
             "circuit_reason":   s.circuit_reason,
             "regime":           s.regime,
         }
+        # F3.3 — VaR/CVaR + Monte-Carlo tail risk
+        try:
+            result["tail_risk"] = _var_summarize(self._daily_returns)
+        except Exception:
+            result["tail_risk"] = {}
+        return result

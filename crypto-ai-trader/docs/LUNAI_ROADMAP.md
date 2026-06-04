@@ -50,8 +50,8 @@ Foundation  Awareness  Judgment  Perception  Resilience       Autonomy
 | **v1.1.0** ✅ | Awareness | F3.2, F5.4, F1.4 | เห็นความเสี่ยง + อธิบายการตัดสินใจได้ | — |
 | **v1.2.0** ✅ | Judgment | F2.1, F2.2 | เลือก model + จัดการ exit ฉลาดขึ้น | — |
 | **v1.3.0** ✅ | Perception | F1.1, F1.2, F1.3 | ข้อมูลที่ตลาด spot มองไม่เห็น | — |
-| **v1.3.0** | Perception | F1.1, F1.2, F1.3 | ข้อมูลที่ตลาด spot มองไม่เห็น | 3 สัปดาห์ |
-| **v1.4.0** | Resilience | F3.4, F5.1, F3.3 | self-validate + tail-risk control | 3 สัปดาห์ |
+| **v1.3.0** ✅ | Perception | F1.1, F1.2, F1.3 | ข้อมูลที่ตลาด spot มองไม่เห็น | — |
+| **v1.4.0** ✅ | Resilience | F3.4, F5.1, F3.3 | self-validate + tail-risk control | — |
 | **v2.0.0** | Autonomy | F3.1, F5.3, F2.3, F2.4 | multi-strategy + self-managing | 4–6 สัปดาห์ |
 | _backlog_ | Advanced | F4.1–F4.4, F5.2 | ของเสริม ทำเมื่อ ROI คุ้ม | — |
 
@@ -159,15 +159,21 @@ Foundation  Awareness  Judgment  Perception  Resilience       Autonomy
 
 ---
 
-## v1.4.0 — "Resilience" 🛡️
+## v1.4.0 — "Resilience" 🛡️ ✅ (implemented)
 
 **ธีม:** Lunai ตรวจสอบตัวเองได้ และอยู่รอดในเหตุการณ์รุนแรง
 
-| Feature | สิ่งที่ได้ | Effort |
-|---------|-----------|--------|
-| `F3.4` Drift Detection + Auto Re-validate | จับ model เสื่อม → retrain + OOS validate ก่อน deploy | M |
-| `F5.1` Param Optimization (Optuna) | จูน parameter อัตโนมัติบน walk-forward (กัน overfit) | M |
-| `F3.3` VaR / CVaR + Monte Carlo | tail-risk เชิงปริมาณ (proactive แทน reactive) | M |
+| Feature | สิ่งที่ได้ | Effort | สถานะ |
+|---------|-----------|--------|-------|
+| `F3.3` VaR / CVaR + Monte Carlo | tail-risk เชิงปริมาณ (proactive แทน reactive) | M | ✅ |
+| `F3.4` Drift Detection + Auto Re-validate | จับ model เสื่อม → retrain อัตโนมัติ | M | ✅ |
+| `F5.1` Param Optimization | walk-forward grid search (RSI/ATR/confidence) | M | ✅ |
+
+**สิ่งที่ลงจริง:**
+- `F3.3` — `src/agent/var_engine.py`: pure functions `var_cvar(returns, confidence)`, `monte_carlo_maxdd(returns, n_paths, horizon)`, `summarize()`; bootstrap sampling สำหรับ path simulation; wired เข้า `RiskEngine.summary()` ใต้ key `tail_risk`; `_daily_returns` history rolling 365 วัน
+- `F3.4` — `src/agent/drift_detector.py`: PSI-based drift detection; pure `psi(expected, actual, buckets)` + `detect_feature_drift()`; `DriftDetector` class ที่ record baseline หลัง training และ check ทุก 50 predictions; trigger retrain อัตโนมัติเมื่อ PSI > 0.20; wired เข้า `AITrainer.train()` (baseline), `predict()` (accumulate + check), `stats` (drift summary)
+- `F5.1` — `src/agent/param_optimizer.py`: walk-forward splits + exhaustive grid search ไม่ต้อง Optuna; tune RSI thresholds, ATR multiplier, confidence gate; persist `best_params.json` ใน `models_dir`; `ParamOptimizer` class load-on-startup; `_simulate_returns()` simulation objective
+- **Tests:** +39 tests (`test_var_engine.py` × 11, `test_drift_detector.py` × 12, `test_param_optimizer.py` × 16) — รวมทั้งหมด **138 ผ่านหมด**
 
 **🎯 เป้าหมายวัดผล:**
 - Model ใหม่ deploy เฉพาะเมื่อ OOS Sharpe ≥ ตัวเดิม (champion/challenger)
@@ -255,5 +261,5 @@ Foundation  Awareness  Judgment  Perception  Resilience       Autonomy
 
 ---
 
-*อัปเดตล่าสุด: 2026-06-04 · Lunai v1.0.0 (engine) ภายใน Aiterra v1.1.0 (platform)*
+*อัปเดตล่าสุด: 2026-06-04 · Lunai v1.4.0 (engine) ภายใน Aiterra v1.4.0 (platform)*
 *Feature spec: [`ROADMAP.md`](./ROADMAP.md)*
