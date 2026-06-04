@@ -47,8 +47,8 @@ Foundation  Awareness  Judgment  Perception  Resilience       Autonomy
 | เวอร์ชั่น | ธีม | Features | เป้าหมายหลัก | ระยะ |
 |----------|-----|----------|-------------|------|
 | **v1.0.0** ✅ | Foundation | (มีอยู่แล้ว) | baseline ที่เทรดได้จริง | — |
-| **v1.1.0** | Awareness | F3.2, F5.4, F1.4 | เห็นความเสี่ยง + อธิบายการตัดสินใจได้ | 2 สัปดาห์ |
-| **v1.2.0** | Judgment | F2.1, F2.2 | เลือก model + จัดการ exit ฉลาดขึ้น | 2 สัปดาห์ |
+| **v1.1.0** ✅ | Awareness | F3.2, F5.4, F1.4 | เห็นความเสี่ยง + อธิบายการตัดสินใจได้ | — |
+| **v1.2.0** ✅ | Judgment | F2.1, F2.2 | เลือก model + จัดการ exit ฉลาดขึ้น | — |
 | **v1.3.0** | Perception | F1.1, F1.2, F1.3 | ข้อมูลที่ตลาด spot มองไม่เห็น | 3 สัปดาห์ |
 | **v1.4.0** | Resilience | F3.4, F5.1, F3.3 | self-validate + tail-risk control | 3 สัปดาห์ |
 | **v2.0.0** | Autonomy | F3.1, F5.3, F2.3, F2.4 | multi-strategy + self-managing | 4–6 สัปดาห์ |
@@ -104,14 +104,20 @@ Foundation  Awareness  Judgment  Perception  Resilience       Autonomy
 
 ---
 
-## v1.2.0 — "Judgment" 🧠
+## v1.2.0 — "Judgment" 🧠 ✅ (implemented)
 
 **ธีม:** Lunai ตัดสินใจดีขึ้น — เลือก model ที่เหมาะกับสถานการณ์ + จัดการ exit เป็น
 
-| Feature | สิ่งที่ได้ | Effort |
-|---------|-----------|--------|
-| `F2.1` Meta-Ensemble ⭐ | RL เลือกว่า model ไหน (rule/ml/claude) เก่งต่อ regime+symbol | M |
-| `F2.2` Adaptive SL/TP | SL/TP เป็น ATR/structure-based แทน fixed % + trailing | M |
+| Feature | สิ่งที่ได้ | Effort | สถานะ |
+|---------|-----------|--------|-------|
+| `F2.1` Meta-Ensemble ⭐ | RL เลือกว่า model ไหน (rule/ml/claude) เก่งต่อ regime+symbol | M | ✅ |
+| `F2.2` Adaptive SL/TP | SL/TP เป็น ATR/structure-based แทน fixed % + trailing | M | ✅ |
+
+**สิ่งที่ลงจริง:**
+- `F2.1` — `ModelBandit` (UCB1, arms = model×regime = 15) เพิ่มใน `rl_trainer.py`; persist `rl_model_bandit.pkl`; wired เข้า hybrid path ใน `_get_final_signal()` แทน hard-coded fallback; reward update ใน `_close_trade()`;  `model_bandit_stats` โผล่ใน dashboard
+- `F2.2` — `ExitManager` (`src/agent/exit_manager.py`): ATR-based SL (k×ATR per regime), R:R table (BULL=3×, RANGING=2×, VOLATILE=1.5×, CRASH=1.5×), ATR trailing (activate at N×ATR profit); `attach_exits()` wired เข้า `_execute_trade()` ทับ fixed-%; `check_exit()` เป็น primary path ใน `_check_exit_conditions()`; fallback fixed-% ยังอยู่สำหรับ edge cases
+- `_signal_attribution` เพิ่ม field `bandit_model` — บันทึกว่า ModelBandit เลือก model ไหน
+- **Tests:** +19 tests (`test_exit_manager.py` × 12, `test_model_bandit.py` × 7) — รวมทั้งหมด **61 ผ่านหมด**
 
 **ทำไมสำคัญ:** นี่คือ upgrade สมองที่ใช้ของเดิม (UCB1) — ผลกระทบต่อ P&L สูงสุดโดยไม่ต้องเพิ่ม data
 

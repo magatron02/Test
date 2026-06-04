@@ -4,11 +4,12 @@ from datetime import datetime, date
 from typing import Dict, List, Optional, Tuple
 
 from .claude_analyzer import ClaudeAnalyzer
+from .exit_manager import ExitManager
 from .market_analyzer import MarketAnalysis, analyze
 from .market_regime import RegimeResult, detect_regime
 from .risk_engine import RiskEngine
 from .position_sizer import PositionSizer
-from .rl_trainer import RLTrainer
+from .rl_trainer import ModelBandit, RLTrainer
 from .strategy_manager import StrategyManager, TradingSignal
 from .trainer import AITrainer
 from ..core.config import settings
@@ -45,9 +46,11 @@ class AITrader:
         # ── New autotrade components ──────────────────────────────────────
         risk_cfg = settings.get("risk", default={}) or {}
         sizer_cfg = settings.get("position_sizer", default={}) or {}
-        self._risk     = RiskEngine(config=risk_cfg)
-        self._sizer    = PositionSizer(config=sizer_cfg)
-        self._rl       = RLTrainer(models_dir=settings.models_dir)
+        self._risk        = RiskEngine(config=risk_cfg)
+        self._sizer       = PositionSizer(config=sizer_cfg)
+        self._rl          = RLTrainer(models_dir=settings.models_dir)
+        self._model_bandit = ModelBandit(models_dir=settings.models_dir)  # F2.1
+        self._exit_mgr    = ExitManager()                                   # F2.2
 
         self._running     = False
         self._analyses:   Dict[str, MarketAnalysis] = {}
@@ -151,11 +154,12 @@ class AITrader:
                 "floating": round(floating, 2),
                 "total":    round(self._daily_pnl + floating, 2),
             },
-            "agents":        self._agent_activity,
-            "last_signal":   self._last_signal_info,
-            "open_positions": len(self._open_trades),
-            "risk":          self._risk.summary(),
-            "rl_stats":      self._rl.stats,
+            "agents":             self._agent_activity,
+            "last_signal":        self._last_signal_info,
+            "open_positions":     len(self._open_trades),
+            "risk":               self._risk.summary(),
+            "rl_stats":           self._rl.stats,
+            "model_bandit_stats": self._model_bandit.get_stats(),   # F2.1
         }
 
     async def _broadcast(self, event: str, data: dict):
@@ -356,7 +360,7 @@ class AITrader:
             ml_signal = self._trainer.predict(analysis.features)
             _capture("ml", ml_signal)
 
-        # RL selects the best strategy for this regime
+        # RL bandit 1: best strategy for this regime
         rl_strategy = self._rl.select_strategy(regime.regime)
         logger.debug("RL selected strategy=%s for regime=%s", rl_strategy, regime.regime)
 
@@ -377,23 +381,25 @@ class AITrader:
             sig = await multi_model_signal(analysis)
             _capture("multi_model", sig)
             chosen = "multi_model"
-        else:  # hybrid or fallback — let RL guide the primary strategy
-            # RL picks the strategy best suited to the current regime; dispatch
-            # to that single strategy instead of the blended hybrid (which lets
-            # conflicting sub-strategies cancel each other out to HOLD).
+        else:
+            # Hybrid path — RL bandit 2 (F2.1): select which model to use
+            bandit_model = self._model_bandit.select_model(regime.regime)
+            logger.debug("ModelBandit selected model=%s for regime=%s",
+                         bandit_model, regime.regime)
+
+            # Always compute rule signal (cheap, always available)
             rule_sig = self._strategy.signal_for_strategy(rl_strategy, analysis, ml_signal)
             _capture("rule", rule_sig, strategy=rl_strategy)
 
-            if settings.claude_api_key and ai_model in ("claude", "hybrid"):
+            if bandit_model == "claude" and settings.claude_api_key:
                 try:
                     claude_sig = await self._claude.analyze(analysis, portfolio)
                     _capture("claude", claude_sig)
-                    if claude_sig.confidence > rule_sig.confidence:
-                        sig, chosen = claude_sig, "claude"
-                    else:
-                        sig, chosen = rule_sig, f"rule:{rl_strategy}"
+                    sig, chosen = claude_sig, "claude"
                 except Exception:
                     sig, chosen = rule_sig, f"rule:{rl_strategy}"
+            elif bandit_model == "ml" and ml_signal:
+                sig, chosen = ml_signal, "ml"
             else:
                 sig, chosen = rule_sig, f"rule:{rl_strategy}"
 
@@ -413,16 +419,18 @@ class AITrader:
                 sig.stop_loss_pct, sig.take_profit_pct,
             )
 
+        bandit_model_used = locals().get("bandit_model")  # only set in hybrid path
         self._signal_attribution = {
-            "mode":        ai_model,
-            "chosen":      chosen,
-            "rl_strategy": rl_strategy,
-            "regime":      regime.regime,
-            "min_conf":    round(min_conf, 2),
-            "gated":       gated,
-            "components":  components,
-            "final":       {"action": final_sig.action,
-                            "confidence": round(final_sig.confidence, 3)},
+            "mode":         ai_model,
+            "chosen":       chosen,
+            "rl_strategy":  rl_strategy,
+            "bandit_model": bandit_model_used,  # F2.1 — which model bandit picked
+            "regime":       regime.regime,
+            "min_conf":     round(min_conf, 2),
+            "gated":        gated,
+            "components":   components,
+            "final":        {"action": final_sig.action,
+                             "confidence": round(final_sig.confidence, 3)},
         }
         return final_sig
 
@@ -536,6 +544,7 @@ class AITrader:
             else:
                 order = await self._exchange.create_order(symbol, signal.action.lower(), amount)
 
+            # Build base trade data then overlay ATR-based exits (F2.2)
             trade_data = {
                 "symbol":            symbol,
                 "side":              signal.action,
@@ -552,6 +561,12 @@ class AITrader:
                 "high_water":        order.price,
                 "trailing_sl":       None,
             }
+
+            # Overlay ATR-based SL/TP (F2.2) — overwrites fixed-% levels
+            if analysis.atr_pct and analysis.atr_pct > 0:
+                self._exit_mgr.attach_exits(
+                    trade_data, order.price, analysis.atr_pct, regime.regime
+                )
 
             db = SessionLocal()
             try:
@@ -581,6 +596,10 @@ class AITrader:
 
             self._trainer.record_trade(symbol, analysis.features, signal.action, trade_id)
             self._rl.record_trade(trade_id, signal.strategy, regime.regime)
+            # F2.1: record which model was chosen for this trade so we can reward it on close
+            _chosen_model = (self._signal_attribution or {}).get("chosen", "rule")
+            _model_key = _chosen_model.split(":")[0]  # "rule:trend" → "rule"
+            self._model_bandit.record_trade(trade_id, _model_key, regime.regime)
 
             if signal.action == "BUY":
                 self._open_trades[symbol] = {**trade_data, "trade_id": trade_id}
@@ -664,6 +683,7 @@ class AITrader:
 
             self._trainer.update_outcome(trade_id, pnl_pct)
             self._rl.update_outcome(trade_id, pnl_pct, self._strategy)
+            self._model_bandit.update_outcome(trade_id, pnl_pct)  # F2.1
             self._sizer.update_outcome(symbol, pnl_pct)
             self._risk.deregister_trade(symbol)
 
@@ -694,21 +714,35 @@ class AITrader:
         if not analysis:
             return
         price  = analysis.price
-        sl     = trade["stop_loss_price"]
-        tp     = trade["take_profit_price"]
         entry  = trade["price"]
         opened = trade.get("opened_at", datetime.utcnow())
+        regime = trade.get("regime", "RANGING")
 
-        # ── 1. Fixed stop loss ────────────────────────────────────────────
-        if price <= sl:
-            await self._close_trade(symbol, price, f"Stop loss ({price:.4f} ≤ {sl:.4f})")
-            return
+        # ── 1. ATR-based SL / trailing / TP  (F2.2) ──────────────────────
+        # When trade was opened with atr_pct, ExitManager handles all three
+        # exit types in one call (SL, trailing, TP).
+        atr_pct = getattr(analysis, "atr_pct", None) or 0.0
+        if atr_pct > 0:
+            exit_reason = self._exit_mgr.check_exit(trade, price, atr_pct, regime)
+            if exit_reason:
+                await self._close_trade(symbol, price, exit_reason)
+                return
+        else:
+            # Fallback: fixed SL/TP for trades without ATR data
+            sl = trade.get("stop_loss_price")
+            tp = trade.get("take_profit_price")
+            if sl and price <= sl:
+                await self._close_trade(symbol, price, f"Stop loss ({price:.4f} ≤ {sl:.4f})")
+                return
+            if tp and price >= tp:
+                await self._close_trade(symbol, price, f"Take profit ({price:.4f} ≥ {tp:.4f})")
+                return
 
-        # ── 2. Trailing stop ──────────────────────────────────────────────
+        # ── 2. Legacy config trailing stop ───────────────────────────────
         trail_cfg = settings.get("strategy", "trailing_stop") or {}
-        if trail_cfg.get("enabled"):
-            trail_pct      = float(trail_cfg.get("pct", 0.02))
-            trail_act_pct  = float(trail_cfg.get("activate_pct", 0.01))
+        if trail_cfg.get("enabled") and atr_pct == 0:
+            trail_pct     = float(trail_cfg.get("pct", 0.02))
+            trail_act_pct = float(trail_cfg.get("activate_pct", 0.01))
             hw = max(trade.get("high_water", entry), price)
             trade["high_water"] = hw
             cur_profit = (hw - entry) / entry
@@ -719,7 +753,8 @@ class AITrader:
                     trade["trailing_sl"] = new_trail
             trail_sl = trade.get("trailing_sl")
             if trail_sl and price <= trail_sl:
-                await self._close_trade(symbol, price, f"Trailing stop ({price:.4f} ≤ {trail_sl:.4f})")
+                await self._close_trade(symbol, price,
+                                        f"Trailing stop ({price:.4f} ≤ {trail_sl:.4f})")
                 return
 
         # ── 3. ROI table (time-based take profit) ─────────────────────────
@@ -741,10 +776,6 @@ class AITrader:
                     await self._close_trade(symbol, price,
                         f"ROI table: {cur_pnl:.1%} ≥ {roi_thresh:.1%} at {age_minutes:.0f}min")
                     return
-
-        # ── 4. Fixed take profit ──────────────────────────────────────────
-        if price >= tp:
-            await self._close_trade(symbol, price, f"Take profit ({price:.4f} ≥ {tp:.4f})")
 
     # ── Main cycle ────────────────────────────────────────────────────────
 
