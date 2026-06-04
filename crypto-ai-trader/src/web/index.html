@@ -1628,6 +1628,33 @@ ol.small, ul.small, .small.text-muted,
         </div>
       </div>
 
+      <!-- Small Budget Preset -->
+      <div class="card mb-3" style="border-color:rgba(255,193,7,0.4)">
+        <div class="card-header" style="background:rgba(255,193,7,0.08)">
+          <i class="bi bi-piggy-bank me-2" style="color:#ffc107"></i>ตั้งค่าสำหรับงบน้อย
+        </div>
+        <div class="card-body">
+          <div class="row g-2 align-items-end mb-2">
+            <div class="col-8">
+              <label class="form-label small mb-1">งบเริ่มต้น (<span id="presetCurLabel">THB</span>)</label>
+              <div class="input-group input-group-sm">
+                <input type="number" class="form-control" id="presetBudget" value="500" min="100" step="100">
+                <span class="input-group-text" id="presetCurSuffix">THB</span>
+              </div>
+            </div>
+            <div class="col-4">
+              <button class="btn btn-warning btn-sm w-100" onclick="applySmallBudgetPreset()" style="color:#000;font-weight:700">
+                <i class="bi bi-magic me-1"></i>ใช้งาน
+              </button>
+            </div>
+          </div>
+          <div id="presetResult" style="display:none;font-size:0.75rem"></div>
+          <small class="text-muted d-block" style="font-size:0.7rem">
+            ปรับ Kelly fraction, ขนาด position, stop-loss และ max trades ให้เหมาะกับงบที่ใส่โดยอัตโนมัติ
+          </small>
+        </div>
+      </div>
+
       <div class="card mb-3">
         <div class="card-header"><i class="bi bi-sliders me-2"></i>Trading Parameters</div>
         <div class="card-body">
@@ -1782,11 +1809,13 @@ ol.small, ul.small, .small.text-muted,
               <input class="form-check-input" type="checkbox" id="binance_th_enabled">
               <label class="form-check-label small" for="binance_th_enabled">Enable Binance TH</label>
             </div>
-            <div class="d-flex gap-2">
+            <div class="d-flex gap-2 flex-wrap">
               <button class="btn btn-primary btn-sm" onclick="saveExchangeKey('binance_th')"><i class="bi bi-save me-1"></i>Save</button>
-              <button class="btn btn-outline-secondary btn-sm" onclick="saveAndTest('binance_th')"><i class="bi bi-wifi me-1"></i>Save & Test</button>
+              <button class="btn btn-outline-info btn-sm" onclick="probeExchange('binance_th')"><i class="bi bi-wifi me-1"></i>ทดสอบ Connection</button>
             </div>
             <div id="extest-binance_th" class="mt-2" style="display:none;font-size:0.78rem"></div>
+            <!-- Probe result panel -->
+            <div id="probe-binance_th" class="mt-2 rounded p-2" style="display:none;background:var(--bg-main);font-size:0.78rem;border:1px solid var(--border)"></div>
           </div>
           <div id="ex-bitkub" class="ex-tab" style="display:none">
             <label class="form-label small mb-1">API Key</label>
@@ -2456,6 +2485,8 @@ async function fetchPortfolioStats() {
     }
     const cur = d.quote_currency || 'USDT';
     _quoteCur = cur;
+    // Sync preset currency labels
+    ['presetCurLabel','presetCurSuffix','liveBudgetCurLabel'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent=cur; });
     const sym = cur === 'USDT' ? '$' : '';
     const initial = d.initial_balance || (cur === 'THB' ? 350000 : 10000);   // demo virtual baseline; PnL-vs-initial is meaningful in demo
     animateNum('totalValue', d.total_value, sym, sym ? '' : ' ' + cur, 2);
@@ -4516,6 +4547,113 @@ const _origShowSection = showSection;
 function showSection(name, el) {
   _origShowSection(name, el);
   if (name === 'alerts') loadAlerts();
+}
+
+// ── Exchange Connection Probe ─────────────────────────────────────────────────
+
+async function probeExchange(name) {
+  const resultEl = document.getElementById(`probe-${name}`);
+  if (!resultEl) return;
+  const apiKey    = (document.getElementById(`${name}_api_key`)    || {}).value || '';
+  const apiSecret = (document.getElementById(`${name}_api_secret`) || {}).value || '';
+
+  resultEl.style.display = '';
+  resultEl.innerHTML = '<span class="text-muted"><span class="spinner-border spinner-border-sm me-1" style="width:10px;height:10px;border-width:1.5px"></span>กำลังทดสอบ…</span>';
+
+  try {
+    const r = await fetch('/api/exchange/probe', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({exchange: name, api_key: apiKey, api_secret: apiSecret}),
+    });
+    const d = await r.json();
+    if (!r.ok) { resultEl.innerHTML = `<span class="text-danger">🔴 ${d.detail}</span>`; return; }
+
+    const pubRow = d.public_ok
+      ? `<div>🟢 <b>Public API</b> — BTC ราคา ${(d.price||0).toLocaleString()} <span class="text-muted">(${d.latency_ms}ms)</span></div>`
+      : `<div>🔴 <b>Public API</b> — ไม่สามารถเชื่อมต่อได้</div>`;
+
+    let authRow = '';
+    if (d.auth_ok === null) {
+      authRow = `<div>⚪ <b>Auth API</b> — ยังไม่ได้ใส่ API Key</div>`;
+    } else if (d.auth_ok) {
+      const balItems = Object.entries(d.balance || {})
+        .map(([a, b]) => `${a}: <b>${b.free.toLocaleString(undefined,{maximumFractionDigits:4})}</b>`)
+        .join(' · ');
+      authRow = `<div>🟢 <b>Auth API</b> — ยืนยัน Key สำเร็จ<br>
+        <span class="text-muted" style="font-size:0.72rem">💼 Balance: ${balItems || 'ยังไม่มีสินทรัพย์'}</span></div>`;
+    } else {
+      authRow = `<div>🔴 <b>Auth API</b> — ${d.error || 'Key ไม่ถูกต้องหรือไม่มีสิทธิ์'}</div>`;
+    }
+
+    resultEl.innerHTML = pubRow + authRow;
+
+    if (d.auth_ok) {
+      showToast('Connection OK', `${name}: เชื่อมต่อและยืนยัน API Key สำเร็จ`, 'success');
+    } else if (d.public_ok) {
+      showToast('Partial', `${name}: Public API ได้ แต่ Auth ยังไม่ผ่าน`, 'warning');
+    }
+  } catch(e) {
+    resultEl.innerHTML = `<span class="text-danger">🔴 ${e.message}</span>`;
+  }
+}
+
+// ── Small-Budget Preset ───────────────────────────────────────────────────────
+
+async function applySmallBudgetPreset() {
+  const budget  = parseFloat(document.getElementById('presetBudget')?.value || '500') || 500;
+  const cur     = _quoteCur || 'USDT';
+  const resultEl = document.getElementById('presetResult');
+
+  // Derive safe params for this budget:
+  // min_trade = Binance TH floor (~100 THB / ~3 USDT)
+  const minTrade = cur === 'THB' ? 100 : 3;
+  // max_trade = 80% of budget, leave 20% buffer
+  const maxTrade = Math.floor(budget * 0.80);
+  // fallback_risk_pct: need portfolio × fallback > min_trade → fallback > min_trade/budget
+  const fallback = Math.min(0.50, Math.max(0.25, (minTrade * 1.5) / budget));
+  // stop loss widens for small budgets (need room to breathe)
+  const slPct    = budget < 1000 ? 5 : budget < 5000 ? 4 : 3;
+  const tpPct    = slPct * 2;
+
+  if (resultEl) { resultEl.style.display=''; resultEl.innerHTML = '<span class="text-muted">กำลังบันทึก…</span>'; }
+
+  try {
+    await fetch('/api/settings', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        position_sizer: {
+          kelly_fraction:    1.0,
+          min_trade_usdt:    minTrade,
+          max_trade_usdt:    maxTrade,
+          fallback_risk_pct: parseFloat(fallback.toFixed(3)),
+        },
+        trading: {
+          max_open_trades:    1,
+          max_position_pct:   0.80,
+          stop_loss_pct:      slPct / 100,
+          take_profit_pct:    tpPct / 100,
+          risk_per_trade_pct: 0.05,
+          max_daily_loss_pct: 0.10,
+          live_max_budget_usdt: budget,
+        },
+      }),
+    });
+
+    if (resultEl) {
+      resultEl.innerHTML = `<span style="color:var(--accent-buy)">
+        ✓ ปรับแล้ว — Kelly=100% · Min ${minTrade}${cur} · Max ${maxTrade}${cur}/trade · SL ${slPct}% · TP ${tpPct}% · Max 1 position · Budget cap ${budget}${cur}
+      </span>`;
+    }
+    showToast('Preset Applied', `ตั้งค่าสำหรับงบ ${budget.toLocaleString()} ${cur} แล้ว`, 'success');
+    // Reload settings UI fields
+    await loadSettings();
+
+    // Populate budget field in Live mode modal too
+    const liveBudgetEl = document.getElementById('liveBudgetInput');
+    if (liveBudgetEl) liveBudgetEl.value = budget;
+  } catch(e) {
+    if (resultEl) { resultEl.innerHTML = `<span class="text-danger">🔴 ${e.message}</span>`; }
+  }
 }
 </script>
 

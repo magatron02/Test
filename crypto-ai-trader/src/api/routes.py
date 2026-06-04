@@ -1213,6 +1213,79 @@ async def hot_swap_mode(data: Dict[str, str]):
     return {"mode": mode, "exchange": exchange_name, "swapped": True}
 
 
+@router.post("/exchange/probe")
+async def probe_exchange(data: Dict[str, Any]):
+    """POST /api/exchange/probe — test public + authenticated connection for a named exchange.
+
+    Does NOT require the exchange to be enabled.  Useful during setup to verify
+    API keys before going live.
+
+    Body: {"exchange": "binance_th", "api_key": "...", "api_secret": "..."}
+    Returns: public_ok, auth_ok, balances (THB/USDT/BTC), latency_ms, error.
+    """
+    from ..exchanges.factory import LIVE_EXCHANGES, _load
+    import time as _time
+
+    name = str(data.get("exchange") or "binance_th").lower()
+    if name not in LIVE_EXCHANGES:
+        raise HTTPException(400, f"Unknown exchange: {name}. Must be one of {list(LIVE_EXCHANGES)}")
+
+    api_key    = str(data.get("api_key")    or "").strip()
+    api_secret = str(data.get("api_secret") or "").strip()
+
+    # Temporarily write keys to settings so the client picks them up,
+    # then restore originals regardless of outcome.
+    orig_key    = settings.get("exchanges", name, "api_key",    default="")
+    orig_secret = settings.get("exchanges", name, "api_secret", default="")
+    result: dict = {"exchange": name, "public_ok": False, "auth_ok": False,
+                    "balance": {}, "latency_ms": None, "error": None}
+    client = None
+    try:
+        if api_key:
+            settings.set(api_key,    "exchanges", name, "api_key")
+        if api_secret:
+            settings.set(api_secret, "exchanges", name, "api_secret")
+
+        client = _load(name)
+        probe_sym = "BTC/THB" if name in ("bitkub", "binance_th") else "BTC/USDT"
+
+        # 1. Public API — price fetch (no auth)
+        t0 = _time.monotonic()
+        ticker = await client.get_ticker(probe_sym)
+        result["latency_ms"] = round((_time.monotonic() - t0) * 1000)
+        result["public_ok"]  = ticker.price > 0
+        result["price"]      = round(ticker.price, 2)
+
+        # 2. Authenticated API — balance fetch (requires valid keys)
+        if api_key and api_secret:
+            try:
+                balances = await client.get_balance()
+                bal = {}
+                for asset in ("THB", "USDT", "BTC", "ETH", "BNB", "XRP", "SOL"):
+                    b = balances.get(asset)
+                    if b:
+                        bal[asset] = {"free": round(b.free, 6), "total": round(b.total, 6)}
+                result["auth_ok"]  = True
+                result["balance"]  = bal
+            except Exception as e:
+                result["auth_ok"] = False
+                result["error"]   = f"Auth failed: {str(e)[:200]}"
+        else:
+            result["auth_ok"] = None  # keys not provided — not tested
+    except Exception as e:
+        result["error"] = str(e)[:200]
+    finally:
+        # Always restore original keys
+        settings.set(orig_key,    "exchanges", name, "api_key")
+        settings.set(orig_secret, "exchanges", name, "api_secret")
+        if client is not None and hasattr(client, "close"):
+            try:
+                await client.close()
+            except Exception:
+                pass
+    return result
+
+
 @router.get("/exchange/active")
 async def get_active_exchange():
     """GET /api/exchange/active — which live exchange is selected and which would
