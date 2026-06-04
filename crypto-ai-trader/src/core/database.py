@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from sqlalchemy import (
-    Column, DateTime, Float, Integer, JSON, String, Text, create_engine
+    Boolean, Column, DateTime, Float, Integer, JSON, String, Text, create_engine
 )
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
