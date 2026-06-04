@@ -52,6 +52,17 @@ class SentimentSnapshot:
     oi_change_pct: Optional[float] = None         # OI % change over ~15 min
     long_short_ratio: Optional[float] = None      # global account long/short ratio
     taker_buy_sell_ratio: Optional[float] = None  # taker buy vol / sell vol
+    # F1.2 Order Book Microstructure
+    ob_imbalance: Optional[float] = None          # bid/(bid+ask) depth — >0.5 = buy pressure
+    ob_signal: Optional[str] = None               # BULLISH | NEUTRAL | BEARISH
+    ob_spread_bps: Optional[float] = None
+    # F1.1 On-chain Metrics (BTC only for now)
+    onchain_label: Optional[str] = None
+    onchain_score: Optional[float] = None         # [-1, 1]
+    # F1.3 Social / News Sentiment
+    social_label: Optional[str] = None
+    social_score: Optional[float] = None          # [-1, 1]
+    social_article_count: Optional[int] = None
     error: Optional[str] = None
     ts: float = field(default_factory=time.time)
 
@@ -346,19 +357,32 @@ async def get_taker_ratio(symbol: str = "BTCUSDT", period: str = "5m") -> dict:
 
 
 async def get_snapshot(exchange=None, symbol: str = "BTC/USDT") -> SentimentSnapshot:
-    """Gather all sentiment data concurrently and return a unified snapshot."""
+    """Gather all sentiment data concurrently and return a unified snapshot.
+
+    Sources now include (F1.1–F1.3 additions):
+      • Order book microstructure — bid/ask imbalance + wall detection
+      • On-chain metrics         — active address / tx growth (BTC only)
+      • Social/news sentiment    — CryptoCompare news keyword scoring
+    """
+    from .orderbook import get_order_book
+    from .onchain import get_onchain
+    from .social import get_news_sentiment
+
     binance_symbol = symbol.replace("/", "")  # BTC/USDT → BTCUSDT
 
-    fng_task = get_fear_greed()
+    fng_task     = get_fear_greed()
     funding_task = get_funding_rate(exchange, symbol) if exchange else None
-    oi_task = get_open_interest(binance_symbol)
-    ls_task = get_long_short_ratio(binance_symbol)
-    taker_task = get_taker_ratio(binance_symbol)
+    oi_task      = get_open_interest(binance_symbol)
+    ls_task      = get_long_short_ratio(binance_symbol)
+    taker_task   = get_taker_ratio(binance_symbol)
+    ob_task      = get_order_book(binance_symbol)        # F1.2
+    onchain_task = get_onchain(symbol)                   # F1.1
+    social_task  = get_news_sentiment(symbol)            # F1.3
 
     tasks = [fng_task]
     if funding_task is not None:
         tasks.append(funding_task)
-    tasks += [oi_task, ls_task, taker_task]
+    tasks += [oi_task, ls_task, taker_task, ob_task, onchain_task, social_task]
 
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -366,15 +390,25 @@ async def get_snapshot(exchange=None, symbol: str = "BTC/USDT") -> SentimentSnap
         return r if not isinstance(r, Exception) else {}
 
     idx = 0
-    fng_data = _ok(results[idx]); idx += 1
+    fng_data     = _ok(results[idx]); idx += 1
     funding_data = {}
     if funding_task is not None:
         funding_data = _ok(results[idx]); idx += 1
-    oi_data = _ok(results[idx]); idx += 1
-    ls_data = _ok(results[idx]); idx += 1
-    taker_data = _ok(results[idx]); idx += 1
+    oi_data      = _ok(results[idx]); idx += 1
+    ls_data      = _ok(results[idx]); idx += 1
+    taker_data   = _ok(results[idx]); idx += 1
+    ob_snap      = results[idx]; idx += 1   # OrderBookSnapshot or Exception
+    oc_snap      = results[idx]; idx += 1   # OnchainSnapshot or Exception
+    soc_snap     = results[idx]; idx += 1   # SocialSnapshot or Exception
 
     oi_change = _record_oi(binance_symbol, oi_data.get("open_interest_contracts"))
+
+    # Safely extract dataclass fields (fall back to None on exception)
+    def _field(snap, attr):
+        try:
+            return getattr(snap, attr)
+        except Exception:
+            return None
 
     return SentimentSnapshot(
         fear_greed_value=fng_data.get("value"),
@@ -386,4 +420,15 @@ async def get_snapshot(exchange=None, symbol: str = "BTC/USDT") -> SentimentSnap
         oi_change_pct=oi_change,
         long_short_ratio=ls_data.get("long_short_ratio"),
         taker_buy_sell_ratio=taker_data.get("taker_buy_sell_ratio"),
+        # F1.2 Order Book
+        ob_imbalance  = _field(ob_snap, "bid_ask_imbalance"),
+        ob_signal     = _field(ob_snap, "signal"),
+        ob_spread_bps = _field(ob_snap, "spread_bps"),
+        # F1.1 On-chain
+        onchain_label = _field(oc_snap, "label"),
+        onchain_score = _field(oc_snap, "score"),
+        # F1.3 Social
+        social_label         = _field(soc_snap, "label"),
+        social_score         = _field(soc_snap, "score"),
+        social_article_count = _field(soc_snap, "article_count"),
     )

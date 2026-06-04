@@ -1329,39 +1329,47 @@ async def get_analytics(symbol: Optional[str] = None, days: int = 30):
 
 @router.get("/sentiment")
 async def get_sentiment(symbol: str = "BTC/USDT"):
-    """GET /api/sentiment — Fear & Greed index, funding rate, and open interest.
+    """GET /api/sentiment — all market intelligence data for a symbol.
 
-    symbol: crypto pair, e.g. BTC/USDT (used for funding rate fetch)
+    Returns Fear & Greed, funding, OI, derivatives flow, order book
+    microstructure (F1.2), on-chain metrics (F1.1), and news sentiment (F1.3).
+    symbol: crypto pair, e.g. BTC/USDT
     """
     from ..data.sentiment import (
         get_fear_greed, get_funding_rate, get_open_interest,
         get_long_short_ratio, get_taker_ratio, derivatives_bias, _record_oi,
     )
+    from ..data.orderbook import get_order_book
+    from ..data.onchain import get_onchain
+    from ..data.social import get_news_sentiment
 
-    binance_symbol = symbol.replace("/", "")  # BTC/USDT → BTCUSDT
-
+    binance_symbol = symbol.replace("/", "")
     exchange = _trader._exchange if _trader else None
 
-    # Current price (for OI contracts → USDT notional)
     mark_price = None
     if _trader:
         a = _trader.analyses.get(symbol)
         if a:
             mark_price = a.price
 
-    # Gather concurrently; funding rate needs the exchange client
-    fng_task   = get_fear_greed()
-    oi_task    = get_open_interest(binance_symbol, mark_price=mark_price)
-    ls_task    = get_long_short_ratio(binance_symbol)
-    taker_task = get_taker_ratio(binance_symbol)
+    # All sources fire concurrently
+    fng_task     = get_fear_greed()
+    oi_task      = get_open_interest(binance_symbol, mark_price=mark_price)
+    ls_task      = get_long_short_ratio(binance_symbol)
+    taker_task   = get_taker_ratio(binance_symbol)
+    ob_task      = get_order_book(binance_symbol)      # F1.2
+    onchain_task = get_onchain(symbol)                 # F1.1
+    social_task  = get_news_sentiment(symbol)          # F1.3
 
     if exchange:
         funding_task = get_funding_rate(exchange, symbol)
-        fng, oi, ls, taker, funding = await asyncio.gather(
-            fng_task, oi_task, ls_task, taker_task, funding_task, return_exceptions=True)
+        fng, oi, ls, taker, funding, ob, oc, soc = await asyncio.gather(
+            fng_task, oi_task, ls_task, taker_task, funding_task,
+            ob_task, onchain_task, social_task, return_exceptions=True)
     else:
-        fng, oi, ls, taker = await asyncio.gather(
-            fng_task, oi_task, ls_task, taker_task, return_exceptions=True)
+        fng, oi, ls, taker, ob, oc, soc = await asyncio.gather(
+            fng_task, oi_task, ls_task, taker_task,
+            ob_task, onchain_task, social_task, return_exceptions=True)
         funding = {"symbol": symbol, "funding_rate": None, "error": "exchange unavailable"}
 
     fng     = fng     if not isinstance(fng,     Exception) else {"value": None, "label": None, "error": str(fng)}
@@ -1369,21 +1377,25 @@ async def get_sentiment(symbol: str = "BTC/USDT"):
     ls      = ls      if not isinstance(ls,      Exception) else {"long_short_ratio": None, "error": str(ls)}
     taker   = taker   if not isinstance(taker,   Exception) else {"taker_buy_sell_ratio": None, "error": str(taker)}
     funding = funding if not isinstance(funding, Exception) else {"funding_rate": None, "error": str(funding)}
+    # ob/oc/soc are dataclasses; on exception substitute a None-safe fallback
+    if isinstance(ob,  Exception): ob  = None
+    if isinstance(oc,  Exception): oc  = None
+    if isinstance(soc, Exception): soc = None
+
+    def _f(snap, attr):
+        try:
+            return getattr(snap, attr) if snap else None
+        except Exception:
+            return None
 
     # Derive trading bias from Fear & Greed
     fng_value = fng.get("value")
-    if fng_value is None:
-        bias = "NEUTRAL"
-    elif fng_value <= 25:
-        bias = "CONTRARIAN_BUY"
-    elif fng_value <= 45:
-        bias = "CAUTIOUS_BUY"
-    elif fng_value <= 55:
-        bias = "NEUTRAL"
-    elif fng_value <= 75:
-        bias = "CAUTIOUS_SELL"
-    else:
-        bias = "CONTRARIAN_SELL"
+    if fng_value is None:   bias = "NEUTRAL"
+    elif fng_value <= 25:   bias = "CONTRARIAN_BUY"
+    elif fng_value <= 45:   bias = "CAUTIOUS_BUY"
+    elif fng_value <= 55:   bias = "NEUTRAL"
+    elif fng_value <= 75:   bias = "CAUTIOUS_SELL"
+    else:                   bias = "CONTRARIAN_SELL"
 
     oi_change = _record_oi(binance_symbol, oi.get("open_interest_contracts"))
     deriv_label, deriv_score = derivatives_bias(
@@ -1408,10 +1420,10 @@ async def get_sentiment(symbol: str = "BTC/USDT"):
             "error":        funding.get("error"),
         },
         "open_interest": {
-            "usdt":      oi.get("open_interest_usdt"),
-            "contracts": oi.get("open_interest_contracts"),
+            "usdt":       oi.get("open_interest_usdt"),
+            "contracts":  oi.get("open_interest_contracts"),
             "change_pct": oi_change,
-            "error":     oi.get("error"),
+            "error":      oi.get("error"),
         },
         "derivatives": {
             "long_short_ratio":     ls.get("long_short_ratio"),
@@ -1420,6 +1432,33 @@ async def get_sentiment(symbol: str = "BTC/USDT"):
             "bias":                 deriv_label,
             "score":                deriv_score,
             "error":                ls.get("error") or taker.get("error"),
+        },
+        # F1.2 Order Book Microstructure
+        "order_book": {
+            "bid_ask_imbalance": _f(ob, "bid_ask_imbalance"),
+            "bid_wall_pct":      _f(ob, "bid_wall_pct"),
+            "ask_wall_pct":      _f(ob, "ask_wall_pct"),
+            "spread_bps":        _f(ob, "spread_bps"),
+            "signal":            _f(ob, "signal") or "NEUTRAL",
+            "error":             _f(ob, "error"),
+        },
+        # F1.1 On-chain Metrics
+        "onchain": {
+            "active_addr_change_pct": _f(oc, "active_addr_change_pct"),
+            "tx_count_change_pct":    _f(oc, "tx_count_change_pct"),
+            "hash_rate_change_pct":   _f(oc, "hash_rate_change_pct"),
+            "label":                  _f(oc, "label") or "NEUTRAL",
+            "score":                  _f(oc, "score"),
+            "error":                  _f(oc, "error"),
+        },
+        # F1.3 Social / News Sentiment
+        "social": {
+            "label":         _f(soc, "label") or "NEUTRAL",
+            "score":         _f(soc, "score"),
+            "article_count": _f(soc, "article_count"),
+            "bullish_count": _f(soc, "bullish_count"),
+            "bearish_count": _f(soc, "bearish_count"),
+            "error":         _f(soc, "error"),
         },
     }
 

@@ -49,6 +49,7 @@ Foundation  Awareness  Judgment  Perception  Resilience       Autonomy
 | **v1.0.0** ✅ | Foundation | (มีอยู่แล้ว) | baseline ที่เทรดได้จริง | — |
 | **v1.1.0** ✅ | Awareness | F3.2, F5.4, F1.4 | เห็นความเสี่ยง + อธิบายการตัดสินใจได้ | — |
 | **v1.2.0** ✅ | Judgment | F2.1, F2.2 | เลือก model + จัดการ exit ฉลาดขึ้น | — |
+| **v1.3.0** ✅ | Perception | F1.1, F1.2, F1.3 | ข้อมูลที่ตลาด spot มองไม่เห็น | — |
 | **v1.3.0** | Perception | F1.1, F1.2, F1.3 | ข้อมูลที่ตลาด spot มองไม่เห็น | 3 สัปดาห์ |
 | **v1.4.0** | Resilience | F3.4, F5.1, F3.3 | self-validate + tail-risk control | 3 สัปดาห์ |
 | **v2.0.0** | Autonomy | F3.1, F5.3, F2.3, F2.4 | multi-strategy + self-managing | 4–6 สัปดาห์ |
@@ -130,15 +131,24 @@ Foundation  Awareness  Judgment  Perception  Resilience       Autonomy
 
 ---
 
-## v1.3.0 — "Perception" 📡
+## v1.3.0 — "Perception" 📡 ✅ (implemented)
 
 **ธีม:** Lunai เห็นสิ่งที่ตลาด spot มองไม่เห็น — edge จากข้อมูล ไม่ใช่แค่ราคา
 
-| Feature | สิ่งที่ได้ | Effort |
-|---------|-----------|--------|
-| `F1.1` On-chain Metrics | exchange netflow, whale transfers, MVRV | M |
-| `F1.2` Order Book Microstructure | bid/ask imbalance, wall detection (execution filter) | M |
-| `F1.3` Social Sentiment | mention volume + sentiment divergence | M |
+| Feature | สิ่งที่ได้ | Effort | สถานะ |
+|---------|-----------|--------|-------|
+| `F1.1` On-chain Metrics | active addresses, tx count, hash rate growth (BTC) | M | ✅ |
+| `F1.2` Order Book Microstructure | bid/ask imbalance, wall detection (support/resistance) | M | ✅ |
+| `F1.3` Social Sentiment | news keyword sentiment scoring via CryptoCompare | M | ✅ |
+
+**สิ่งที่ลงจริง:**
+- `F1.2` — `src/data/orderbook.py`: pure `analyze_order_book(bids, asks)` → imbalance, wall detection, spread_bps, signal (BULLISH/NEUTRAL/BEARISH); async `get_order_book(symbol)` จาก Binance public depth endpoint (ไม่ต้องการ API key); cache 30s
+- `F1.1` — `src/data/onchain.py`: pure `onchain_bias(addr_change, tx_change, hr_change)` → (label, score); async `get_btc_onchain()` จาก blockchain.com/stats (BTC เท่านั้น, ไม่ต้องการ key); `get_onchain(symbol)` fallback gracefully สำหรับ non-BTC; cache 10 min
+- `F1.3` — `src/data/social.py`: pure `social_sentiment_score(articles, hint)` → keyword count + ratio scoring; async `get_news_sentiment(symbol)` จาก CryptoCompare news API (free, no key); cache 5 min
+- `SentimentSnapshot` เพิ่ม fields: ob_imbalance, ob_signal, onchain_label/score, social_label/score/article_count
+- `get_snapshot()` — รวม 8 sources พร้อมกัน (asyncio.gather); graceful fallback ทุก source
+- `/api/sentiment` — ส่งคืน blocks ใหม่ order_book, onchain, social
+- **Tests:** +27 tests (`test_orderbook.py` × 10, `test_onchain.py` × 9, `test_social.py` × 8) — รวมทั้งหมด **88 ผ่านหมด**
 
 **🎯 เป้าหมายวัดผล:**
 - เพิ่ม feature ทีละตัว เทียบ Sharpe before/after — เก็บเฉพาะตัวที่ทำให้ดีขึ้น
