@@ -293,12 +293,65 @@ class AITrader:
         if not allowed:
             return False, reason
 
+        # Correlation guard — avoid stacking highly-correlated positions
+        ok, corr_reason = self._check_correlation_guard(symbol)
+        if not ok:
+            return False, corr_reason
+
         # Legacy max_open_trades guard
         max_open = int(settings.get("trading", "max_open_trades", default=3))
         if len(self._open_trades) >= max_open:
             return False, "Max open trades reached"
 
         return True, ""
+
+    def _returns_for(self, symbol: str) -> list:
+        """Convert tracked close history to a simple return series."""
+        closes = self._price_history.get(symbol) or []
+        if len(closes) < 6:
+            return []
+        return [
+            (closes[i] - closes[i - 1]) / closes[i - 1]
+            for i in range(1, len(closes))
+            if closes[i - 1]
+        ]
+
+    def _check_correlation_guard(self, symbol: str) -> Tuple[bool, str]:
+        """Block a BUY too correlated with currently-held symbols."""
+        held = [s for s in self._open_trades if s != symbol]
+        if not held:
+            return True, ""
+        candidate = self._returns_for(symbol)
+        if len(candidate) < 5:
+            return True, ""
+        portfolio_returns = {}
+        for s in held:
+            rets = self._returns_for(s)
+            if len(rets) >= 5:
+                portfolio_returns[s] = rets
+        allowed, reason, _ = self._risk.check_correlation(candidate, portfolio_returns)
+        if not allowed:
+            self._set_agent("risk", "active", f"Block {symbol}: {reason}")
+        return allowed, reason
+
+    def correlation_matrix(self) -> dict:
+        """Pairwise return correlation across tracked symbols (for the dashboard).
+
+        Returns ``{"symbols": [...], "matrix": [[...]]}`` with values in [-1, 1]
+        (None where there isn't enough overlapping history)."""
+        syms = [s for s in self._price_history if len(self._returns_for(s)) >= 5]
+        rets = {s: self._returns_for(s) for s in syms}
+        matrix = []
+        for a in syms:
+            row = []
+            for b in syms:
+                if a == b:
+                    row.append(1.0)
+                else:
+                    c = self._risk._pearson(rets[a], rets[b])
+                    row.append(round(c, 2) if c is not None else None)
+            matrix.append(row)
+        return {"symbols": syms, "matrix": matrix}
 
     # ── Signal generation ─────────────────────────────────────────────────
 

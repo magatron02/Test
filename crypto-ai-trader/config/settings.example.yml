@@ -147,6 +147,9 @@ risk:
   max_daily_loss_pct: 0.05   # หยุดเทรดถ้าขาดทุนเกิน 5% ต่อวัน
   max_portfolio_heat: 0.20   # สูงสุด 20% ของ portfolio เป็น open risk
   max_position_pct:   0.10   # สูงสุด 10% ของ portfolio ต่อ 1 position
+  # Correlation guard — บล็อก BUY ที่สัมพันธ์กับ position ที่ถืออยู่สูงเกินไป (กัน diversify ปลอม)
+  max_correlation:    0.80   # บล็อกถ้า avg correlation กับ positions ที่ถือ > ค่านี้
+  correlation_guard_enabled: true
 
 # ── Smart Position Sizing (Kelly Criterion) ────────────────────────────────
 position_sizer:

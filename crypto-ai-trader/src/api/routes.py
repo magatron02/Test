@@ -1351,6 +1351,14 @@ async def get_narratives():
     return dict(_trader.narratives)
 
 
+@router.get("/correlations")
+async def get_correlations():
+    """GET /api/correlations — pairwise return-correlation matrix across symbols."""
+    if not _trader:
+        return {"symbols": [], "matrix": []}
+    return _trader.correlation_matrix()
+
+
 @router.get("/risk")
 async def get_risk_state():
     """GET /api/risk — portfolio risk engine state (drawdown, heat, circuit breaker)."""
