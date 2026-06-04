@@ -1,5 +1,7 @@
-# Lunai v1.0.0 — Roadmap: Feature ที่ทำให้ AI ฉลาดขึ้น
+# Aiterra v1.1.0 / Lunai — Roadmap: Feature ที่ทำให้ AI ฉลาดขึ้น
 
+> **สถาปัตยกรรมชื่อ:** `Aiterra` = โปรแกรมหลัก (shell/platform) · `Lunai` = AI autotrade engine ที่อยู่ข้างใน
+>
 > เอกสารนี้คือ **backlog / โจทย์** สำหรับพัฒนา Lunai ให้ตัดสินใจเทรดได้ฉลาดขึ้น
 > แต่ละ feature เขียนเป็น "task card" — มี เป้าหมาย / เหตุผล / ไฟล์ที่แตะ / dependency /
 > ระดับความยาก / acceptance criteria — หยิบไปทำตามทีหลังได้ทันที
@@ -316,4 +318,4 @@ F1.3 Social · F2.3 Journal · F2.4 Meta-params · F3.1 Pairs · F4.x Advanced p
 
 ---
 
-*อัปเดตล่าสุด: 2026-06-04 · Lunai v1.0.0*
+*อัปเดตล่าสุด: 2026-06-04 · Aiterra v1.1.0 · Lunai (AI engine)*
