@@ -22,7 +22,16 @@ def _analysis(price=100.0, **overrides):
         smc_summary="", overall_signal="BUY",
     )
     base.update(overrides)
-    return MarketAnalysis(**base)
+    # Only pass fields the dataclass actually declares; set the rest as plain
+    # attributes so the test is portable across MarketAnalysis variants
+    # (e.g. branches where `volume_spike` doesn't exist on the dataclass).
+    declared = set(MarketAnalysis.__dataclass_fields__)
+    ctor = {k: v for k, v in base.items() if k in declared}
+    extra = {k: v for k, v in base.items() if k not in declared}
+    a = MarketAnalysis(**ctor)
+    for k, v in extra.items():
+        setattr(a, k, v)
+    return a
 
 
 def _signal(action="BUY", conf=0.72):

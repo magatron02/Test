@@ -90,7 +90,7 @@ def build_narrative(analysis, regime, signal) -> str:
     bb = _bb_phrase(analysis.bb_position)
     if bb:
         extras.append(bb)
-    if analysis.volume_spike:
+    if getattr(analysis, "volume_spike", False):
         extras.append("วอลุ่มพุ่งผิดปกติ")
     elif analysis.volume_signal and analysis.volume_signal not in ("NORMAL", ""):
         extras.append(f"วอลุ่ม {analysis.volume_signal}")
