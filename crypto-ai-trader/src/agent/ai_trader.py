@@ -69,6 +69,8 @@ class AITrader:
             "date": "", "analyzed": 0, "signals": 0, "approved": 0, "rejected": 0
         }
         self._last_signal_info: Optional[dict] = None
+        # Attribution: which sub-signals drove the last decision (F5.4)
+        self._signal_attribution: Optional[dict] = None
         self._agent_activity: Dict[str, dict] = {
             "analyzer":   {"status": "idle", "detail": "พร้อมทำงาน", "ts": None},
             "strategist": {"status": "idle", "detail": "พร้อมทำงาน", "ts": None},
@@ -285,12 +287,46 @@ class AITrader:
         if not allowed:
             return False, reason
 
+        # Correlation guard — avoid stacking highly-correlated positions
+        ok, corr_reason = self._check_correlation_guard(symbol)
+        if not ok:
+            return False, corr_reason
+
         # Legacy max_open_trades guard
         max_open = int(settings.get("trading", "max_open_trades", default=3))
         if len(self._open_trades) >= max_open:
             return False, "Max open trades reached"
 
         return True, ""
+
+    def _returns_for(self, symbol: str) -> list:
+        """Convert tracked close history to a simple return series."""
+        closes = self._price_history.get(symbol) or []
+        if len(closes) < 6:
+            return []
+        return [
+            (closes[i] - closes[i - 1]) / closes[i - 1]
+            for i in range(1, len(closes))
+            if closes[i - 1]
+        ]
+
+    def _check_correlation_guard(self, symbol: str) -> Tuple[bool, str]:
+        """Block a BUY too correlated with currently-held symbols (F3.2)."""
+        held = [s for s in self._open_trades if s != symbol]
+        if not held:
+            return True, ""
+        candidate = self._returns_for(symbol)
+        if len(candidate) < 5:
+            return True, ""
+        portfolio_returns = {}
+        for s in held:
+            rets = self._returns_for(s)
+            if len(rets) >= 5:
+                portfolio_returns[s] = rets
+        allowed, reason, avg_corr = self._risk.check_correlation(candidate, portfolio_returns)
+        if not allowed:
+            self._set_agent("risk", "active", f"Block {symbol}: {reason}")
+        return allowed, reason
 
     # ── Signal generation ─────────────────────────────────────────────────
 
@@ -303,36 +339,63 @@ class AITrader:
         ai_model  = settings.ai_model
         ml_signal = None
 
+        # Attribution: record every sub-signal that contributes to the decision
+        components: Dict[str, Optional[dict]] = {
+            "ml": None, "rule": None, "claude": None, "multi_model": None,
+        }
+
+        def _capture(name, s, strategy=None):
+            if s is None:
+                return
+            entry = {"action": s.action, "confidence": round(s.confidence, 3)}
+            if strategy:
+                entry["strategy"] = strategy
+            components[name] = entry
+
         if ai_model in ("ml", "hybrid") and settings.get("ai", "ml", "enabled", default=True):
             ml_signal = self._trainer.predict(analysis.features)
+            _capture("ml", ml_signal)
 
         # RL selects the best strategy for this regime
         rl_strategy = self._rl.select_strategy(regime.regime)
         logger.debug("RL selected strategy=%s for regime=%s", rl_strategy, regime.regime)
 
+        chosen = ai_model
         if ai_model == "claude":
             sig = await self._claude.analyze(analysis, portfolio)
+            _capture("claude", sig)
+            chosen = "claude"
         elif ai_model == "rule_based":
             sig = self._strategy.get_signal(analysis)
+            _capture("rule", sig, strategy=sig.strategy)
+            chosen = "rule_based"
         elif ai_model == "ml" and ml_signal:
             sig = ml_signal
+            chosen = "ml"
         elif ai_model == "multi_model":
             from .multi_model import multi_model_signal
             sig = await multi_model_signal(analysis)
+            _capture("multi_model", sig)
+            chosen = "multi_model"
         else:  # hybrid or fallback — let RL guide the primary strategy
             # RL picks the strategy best suited to the current regime; dispatch
             # to that single strategy instead of the blended hybrid (which lets
             # conflicting sub-strategies cancel each other out to HOLD).
             rule_sig = self._strategy.signal_for_strategy(rl_strategy, analysis, ml_signal)
+            _capture("rule", rule_sig, strategy=rl_strategy)
 
             if settings.claude_api_key and ai_model in ("claude", "hybrid"):
                 try:
                     claude_sig = await self._claude.analyze(analysis, portfolio)
-                    sig = claude_sig if claude_sig.confidence > rule_sig.confidence else rule_sig
+                    _capture("claude", claude_sig)
+                    if claude_sig.confidence > rule_sig.confidence:
+                        sig, chosen = claude_sig, "claude"
+                    else:
+                        sig, chosen = rule_sig, f"rule:{rl_strategy}"
                 except Exception:
-                    sig = rule_sig
+                    sig, chosen = rule_sig, f"rule:{rl_strategy}"
             else:
-                sig = rule_sig
+                sig, chosen = rule_sig, f"rule:{rl_strategy}"
 
         # In crash/volatile regimes, require higher confidence bar
         min_conf = float(settings.get("trading", "min_confidence", default=0.60))
@@ -341,14 +404,41 @@ class AITrader:
         elif regime.regime == "VOLATILE":
             min_conf = max(min_conf, 0.75)
 
-        if sig.action != "HOLD" and sig.confidence < min_conf:
-            return TradingSignal(
+        gated = sig.action != "HOLD" and sig.confidence < min_conf
+        final_sig = sig
+        if gated:
+            final_sig = TradingSignal(
                 "HOLD", sig.confidence, sig.strategy,
                 f"Confidence {sig.confidence:.0%} below regime threshold {min_conf:.0%}",
                 sig.stop_loss_pct, sig.take_profit_pct,
             )
 
-        return sig
+        self._signal_attribution = {
+            "mode":        ai_model,
+            "chosen":      chosen,
+            "rl_strategy": rl_strategy,
+            "regime":      regime.regime,
+            "min_conf":    round(min_conf, 2),
+            "gated":       gated,
+            "components":  components,
+            "final":       {"action": final_sig.action,
+                            "confidence": round(final_sig.confidence, 3)},
+        }
+        return final_sig
+
+    @staticmethod
+    def _attribution_summary(attr: Optional[dict]) -> str:
+        """Compact one-line attribution for persisting alongside a trade."""
+        if not attr:
+            return ""
+        parts = []
+        for name, c in (attr.get("components") or {}).items():
+            if c:
+                parts.append(f"{name}={c['action']}@{c['confidence']:.2f}")
+        tag = " GATED" if attr.get("gated") else ""
+        return (f"[attr chosen={attr.get('chosen')} "
+                f"{' '.join(parts)} rl={attr.get('rl_strategy')} "
+                f"{attr.get('regime')}{tag}]")
 
     # ── Trade execution ───────────────────────────────────────────────────
 
@@ -465,6 +555,9 @@ class AITrader:
 
             db = SessionLocal()
             try:
+                attr_summary = self._attribution_summary(self._signal_attribution)
+                reasoning = (f"{signal.reasoning} {attr_summary}".strip()
+                             if attr_summary else signal.reasoning)
                 trade = Trade(
                     symbol=symbol,
                     side=signal.action,
@@ -476,7 +569,7 @@ class AITrader:
                     strategy=signal.strategy,
                     ai_model=settings.ai_model,
                     confidence=signal.confidence,
-                    reasoning=signal.reasoning,
+                    reasoning=reasoning,
                     indicators=analysis.features,
                 )
                 db.add(trade)
@@ -495,16 +588,17 @@ class AITrader:
                 self._risk.register_open_trade(symbol, risk_amount)
 
             await self._broadcast("trade_executed", {
-                "symbol":     symbol,
-                "side":       signal.action,
-                "price":      order.price,
-                "amount":     order.amount,
-                "cost":       order.cost,
-                "strategy":   signal.strategy,
-                "confidence": signal.confidence,
-                "reasoning":  signal.reasoning,
-                "mode":       settings.trading_mode,
-                "regime":     regime.regime,
+                "symbol":      symbol,
+                "side":        signal.action,
+                "price":       order.price,
+                "amount":      order.amount,
+                "cost":        order.cost,
+                "strategy":    signal.strategy,
+                "confidence":  signal.confidence,
+                "reasoning":   signal.reasoning,
+                "mode":        settings.trading_mode,
+                "regime":      regime.regime,
+                "attribution": self._signal_attribution,
             })
             logger.info(
                 "Trade executed: %s %s @ %.4f (conf=%.2f, regime=%s)",
@@ -692,11 +786,12 @@ class AITrader:
                 f"{symbol}: {signal.action} ({signal.confidence:.0%}) [{regime.regime}]",
             )
             self._last_signal_info = {
-                "symbol":     symbol,
-                "action":     signal.action,
-                "confidence": round(signal.confidence, 2),
-                "regime":     regime.regime,
-                "ts":         datetime.utcnow().isoformat(),
+                "symbol":      symbol,
+                "action":      signal.action,
+                "confidence":  round(signal.confidence, 2),
+                "regime":      regime.regime,
+                "ts":          datetime.utcnow().isoformat(),
+                "attribution": self._signal_attribution,
             }
 
             await self._broadcast("analysis_update", {

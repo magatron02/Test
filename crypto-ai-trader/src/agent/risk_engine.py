@@ -51,6 +51,10 @@ class RiskEngine:
         self._max_daily_loss_pct = float(cfg.get("max_daily_loss_pct", 0.05))
         self._max_portfolio_heat = float(cfg.get("max_portfolio_heat", 0.20))
         self._max_position_pct   = float(cfg.get("max_position_pct",   0.10))
+        # Correlation guard: block a new BUY if it is too correlated with
+        # the symbols already held (avoids fake diversification).
+        self._max_correlation    = float(cfg.get("max_correlation",    0.80))
+        self._correlation_guard  = bool(cfg.get("correlation_guard_enabled", True))
 
         self._high_water_mark: float = 0.0
         self._equity_history: List[Tuple[datetime, float]] = []
@@ -127,6 +131,53 @@ class RiskEngine:
             )
 
         return True, ""
+
+    # ── Correlation guard ─────────────────────────────────────────────────
+
+    @staticmethod
+    def _pearson(a: List[float], b: List[float]) -> Optional[float]:
+        """Pearson correlation of two return series over their common tail."""
+        n = min(len(a), len(b))
+        if n < 5:
+            return None
+        x, y = a[-n:], b[-n:]
+        mx = sum(x) / n
+        my = sum(y) / n
+        cov = sum((xi - mx) * (yi - my) for xi, yi in zip(x, y))
+        vx = sum((xi - mx) ** 2 for xi in x)
+        vy = sum((yi - my) ** 2 for yi in y)
+        if vx <= 0 or vy <= 0:
+            return None
+        return cov / (vx ** 0.5 * vy ** 0.5)
+
+    def check_correlation(
+        self,
+        candidate_returns: List[float],
+        portfolio_returns: Dict[str, List[float]],
+    ) -> Tuple[bool, str, Optional[float]]:
+        """Block a new BUY whose avg correlation with held symbols is too high.
+
+        Returns ``(allowed, reason, avg_corr)``. When the guard is disabled, no
+        held positions, or insufficient history exist, it allows the trade.
+        """
+        if not self._correlation_guard or not portfolio_returns:
+            return True, "", None
+
+        corrs = []
+        for sym, rets in portfolio_returns.items():
+            c = self._pearson(candidate_returns, rets)
+            if c is not None:
+                corrs.append(abs(c))
+        if not corrs:
+            return True, "", None
+
+        avg_corr = sum(corrs) / len(corrs)
+        if avg_corr > self._max_correlation:
+            return False, (
+                f"Correlation {avg_corr:.2f} with held positions exceeds "
+                f"{self._max_correlation:.2f}"
+            ), avg_corr
+        return True, "", avg_corr
 
     # ── Position tracking ─────────────────────────────────────────────────
 

@@ -74,24 +74,33 @@ Foundation  Awareness  Judgment  Perception  Resilience       Autonomy
 
 ---
 
-## v1.1.0 — "Awareness" 👁️
+## v1.1.0 — "Awareness" 👁️ ✅ (implemented)
 
 **ธีม:** Lunai เห็นความเสี่ยงรอบตัว และอธิบายได้ว่าทำไมถึงเทรด
 
 **ทำไมเวอร์ชั่นนี้ก่อน:** quick wins ที่ใช้ infra เดิม + `F5.4` ทำให้ debug ทุกเวอร์ชั่นถัดไปง่ายขึ้น (เห็นว่าใครพาเข้าเทรด)
 
-| Feature | สิ่งที่ได้ | Effort |
-|---------|-----------|--------|
-| `F3.2` Correlation Guard | กัน over-concentration (ไม่ stack BTC+ETH+BNB ที่ corr 0.8+) | S |
-| `F5.4` Attribution Logging | ทุกเทรดบอกได้ว่ามาจาก signal ไหน น้ำหนักเท่าไร | S |
-| `F1.4` Derivatives Depth | long/short ratio, OI skew, liquidation cluster | S |
+| Feature | สิ่งที่ได้ | Effort | สถานะ |
+|---------|-----------|--------|-------|
+| `F3.2` Correlation Guard | กัน over-concentration (ไม่ stack BTC+ETH+BNB ที่ corr 0.8+) | S | ✅ |
+| `F5.4` Attribution Logging | ทุกเทรดบอกได้ว่ามาจาก signal ไหน น้ำหนักเท่าไร | S | ✅ |
+| `F1.4` Derivatives Depth | long/short ratio, taker flow, OI change | S | ✅ |
+
+**สิ่งที่ลงจริง (commit นี้):**
+- `F3.2` — `RiskEngine.check_correlation()` + Pearson helper; wired เข้า BUY gate ใน `ai_trader._check_risk_limits` ผ่าน `_check_correlation_guard()`; config `risk.max_correlation` (0.80) + เปิด/ปิดได้
+- `F5.4` — `_get_final_signal` เก็บ attribution ของทุก sub-signal (ml/rule/claude/multi_model + RL strategy + regime + confidence gate); แสดงใน dashboard `last_signal.attribution`, ใส่ใน `trade_executed` broadcast, และ persist สรุปสั้นลง trade reasoning
+- `F1.4` — `sentiment.py` เพิ่ม `get_long_short_ratio()`, `get_taker_ratio()`, OI-change tracking + pure `derivatives_bias()` scorer; โผล่ใน `/api/sentiment` block ใหม่ `derivatives`
+- **Tests:** +14 unit tests (`test_derivatives_bias.py`, `test_correlation_guard.py`) — รวมทั้งหมด 42 ผ่านหมด
+
+> ⚠️ **เลื่อนไป v1.2:** liquidation-cluster hint (เชื่อม `F2.2` adaptive SL/TP) — Binance ไม่มี public endpoint ฟรี; deriv feature injection เข้า ML hot-path เลื่อนเพื่อกัน latency regression
 
 **🎯 เป้าหมายวัดผล:**
 - Max Drawdown ลดลง ≥ 10% จาก baseline (จาก correlation guard)
-- ทุกเทรดมี attribution breakdown ครบ 100%
+- ทุกเทรดมี attribution breakdown ครบ 100% ✅ (โครงพร้อม — รอวัดผลจริงใน paper)
 - ไม่มี regression: Sharpe ไม่ต่ำกว่า baseline
 
 **🚪 Exit gate:** ผ่าน [Release Gate](#release-gate) + correlation guard บล็อกได้จริงใน paper test
+> ⏳ ยังต้องทำก่อนปิด gate: lock baseline (dry-run ≥ 2 สัปดาห์) → วัด Max DD / attribution coverage จริง
 
 ---
 

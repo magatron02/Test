@@ -1333,7 +1333,10 @@ async def get_sentiment(symbol: str = "BTC/USDT"):
 
     symbol: crypto pair, e.g. BTC/USDT (used for funding rate fetch)
     """
-    from ..data.sentiment import get_fear_greed, get_funding_rate, get_open_interest
+    from ..data.sentiment import (
+        get_fear_greed, get_funding_rate, get_open_interest,
+        get_long_short_ratio, get_taker_ratio, derivatives_bias, _record_oi,
+    )
 
     binance_symbol = symbol.replace("/", "")  # BTC/USDT → BTCUSDT
 
@@ -1347,18 +1350,24 @@ async def get_sentiment(symbol: str = "BTC/USDT"):
             mark_price = a.price
 
     # Gather concurrently; funding rate needs the exchange client
-    fng_task = get_fear_greed()
-    oi_task  = get_open_interest(binance_symbol, mark_price=mark_price)
+    fng_task   = get_fear_greed()
+    oi_task    = get_open_interest(binance_symbol, mark_price=mark_price)
+    ls_task    = get_long_short_ratio(binance_symbol)
+    taker_task = get_taker_ratio(binance_symbol)
 
     if exchange:
         funding_task = get_funding_rate(exchange, symbol)
-        fng, oi, funding = await asyncio.gather(fng_task, oi_task, funding_task, return_exceptions=True)
+        fng, oi, ls, taker, funding = await asyncio.gather(
+            fng_task, oi_task, ls_task, taker_task, funding_task, return_exceptions=True)
     else:
-        fng, oi = await asyncio.gather(fng_task, oi_task, return_exceptions=True)
+        fng, oi, ls, taker = await asyncio.gather(
+            fng_task, oi_task, ls_task, taker_task, return_exceptions=True)
         funding = {"symbol": symbol, "funding_rate": None, "error": "exchange unavailable"}
 
     fng     = fng     if not isinstance(fng,     Exception) else {"value": None, "label": None, "error": str(fng)}
     oi      = oi      if not isinstance(oi,      Exception) else {"open_interest_usdt": None, "error": str(oi)}
+    ls      = ls      if not isinstance(ls,      Exception) else {"long_short_ratio": None, "error": str(ls)}
+    taker   = taker   if not isinstance(taker,   Exception) else {"taker_buy_sell_ratio": None, "error": str(taker)}
     funding = funding if not isinstance(funding, Exception) else {"funding_rate": None, "error": str(funding)}
 
     # Derive trading bias from Fear & Greed
@@ -1375,6 +1384,14 @@ async def get_sentiment(symbol: str = "BTC/USDT"):
         bias = "CAUTIOUS_SELL"
     else:
         bias = "CONTRARIAN_SELL"
+
+    oi_change = _record_oi(binance_symbol, oi.get("open_interest_contracts"))
+    deriv_label, deriv_score = derivatives_bias(
+        ls.get("long_short_ratio"),
+        taker.get("taker_buy_sell_ratio"),
+        oi_change,
+        funding.get("funding_rate"),
+    )
 
     return {
         "symbol": symbol,
@@ -1393,7 +1410,16 @@ async def get_sentiment(symbol: str = "BTC/USDT"):
         "open_interest": {
             "usdt":      oi.get("open_interest_usdt"),
             "contracts": oi.get("open_interest_contracts"),
+            "change_pct": oi_change,
             "error":     oi.get("error"),
+        },
+        "derivatives": {
+            "long_short_ratio":     ls.get("long_short_ratio"),
+            "taker_buy_sell_ratio": taker.get("taker_buy_sell_ratio"),
+            "oi_change_pct":        oi_change,
+            "bias":                 deriv_label,
+            "score":                deriv_score,
+            "error":                ls.get("error") or taker.get("error"),
         },
     }
 
