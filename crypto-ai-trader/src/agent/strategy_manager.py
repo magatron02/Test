@@ -27,6 +27,22 @@ class StrategyManager:
             "trend": 0.35,
             "mean_reversion": 0.35,
         }
+        # Walk-forward optimizer overrides (F5.1) — None = use config/hardcoded defaults
+        self._opt_rsi_oversold:  Optional[float] = None
+        self._opt_rsi_overbought: Optional[float] = None
+
+    def set_opt_params(
+        self,
+        rsi_oversold:  Optional[float] = None,
+        rsi_overbought: Optional[float] = None,
+    ):
+        """Apply walk-forward optimized RSI bands. Pass None to clear."""
+        self._opt_rsi_oversold  = rsi_oversold
+        self._opt_rsi_overbought = rsi_overbought
+        logger.info(
+            "StrategyManager: opt RSI bands updated oversold=%.0f overbought=%.0f",
+            rsi_oversold or 0.0, rsi_overbought or 0.0,
+        )
 
     def update_weights(self, weights: Dict[str, float]):
         """Updated by AI trainer based on performance."""
@@ -35,8 +51,11 @@ class StrategyManager:
 
     def dca_signal(self, analysis: MarketAnalysis) -> TradingSignal:
         cfg = settings.get("strategy", "dca") or {}
-        rsi_buy = float(cfg.get("rsi_buy_threshold", 35))
-        rsi_sell = float(cfg.get("rsi_sell_threshold", 65))
+        # Optimizer override takes precedence over the config value when present
+        rsi_buy  = self._opt_rsi_oversold  if self._opt_rsi_oversold  is not None \
+                   else float(cfg.get("rsi_buy_threshold",  35))
+        rsi_sell = self._opt_rsi_overbought if self._opt_rsi_overbought is not None \
+                   else float(cfg.get("rsi_sell_threshold", 65))
         interval_h = float(cfg.get("interval_hours", 24))
 
         symbol = analysis.symbol

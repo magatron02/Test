@@ -141,7 +141,8 @@ def _ohlcv_to_arrays(candles: List[OHLCV]):
 
 
 def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
-            rsi_period: int = 14, bb_period: int = 20, atr_period: int = 14) -> MarketAnalysis:
+            rsi_period: int = 14, bb_period: int = 20, atr_period: int = 14,
+            rsi_oversold: float = 30.0, rsi_overbought: float = 70.0) -> MarketAnalysis:
     if len(candles) < 30:
         return MarketAnalysis(symbol=symbol, price=price, change_24h=change_24h)
 
@@ -150,9 +151,9 @@ def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
 
     # RSI
     result.rsi = _rsi(closes, rsi_period)
-    if result.rsi < 30:
+    if result.rsi < rsi_oversold:
         result.rsi_signal = "OVERSOLD"
-    elif result.rsi > 70:
+    elif result.rsi > rsi_overbought:
         result.rsi_signal = "OVERBOUGHT"
 
     # MACD

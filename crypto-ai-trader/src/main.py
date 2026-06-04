@@ -142,7 +142,9 @@ async def startup():
     _trader.set_broadcast(broadcast)
 
     _training_loop_inst = TrainingLoop(_trader, broadcast_fn=broadcast)
-    _hourly_trainer_inst = HourlyTrainer(_trader._trainer, broadcast_fn=broadcast)
+    _hourly_trainer_inst = HourlyTrainer(
+        _trader._trainer, broadcast_fn=broadcast, trader=_trader
+    )
 
     set_trader(_trader)
     set_training_loop(_training_loop_inst)

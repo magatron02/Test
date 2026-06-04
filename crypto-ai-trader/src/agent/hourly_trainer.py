@@ -47,8 +47,9 @@ class HourlyTrainer:
         "min_confidence": [0.50, 0.55, 0.60, 0.65, 0.70],
     }
 
-    def __init__(self, trainer, broadcast_fn=None):
+    def __init__(self, trainer, broadcast_fn=None, *, trader=None):
         self._trainer   = trainer
+        self._trader    = trader   # optional AITrader ref — used to refresh opt params
         self._broadcast = broadcast_fn
         self._task: Optional[asyncio.Task] = None
         self._param_opt = ParamOptimizer(
@@ -194,6 +195,12 @@ class HourlyTrainer:
                 "HourlyTrainer: param-opt on %s (%d bars) → sharpe=%.3f params=%s",
                 sym, len(bars), result.get("best_sharpe", 0.0), result.get("best_params"),
             )
+            # Propagate newly-saved params to the live trader immediately (F5.1)
+            if self._trader is not None and hasattr(self._trader, "_apply_opt_params"):
+                try:
+                    self._trader._apply_opt_params()
+                except Exception as ex:
+                    logger.warning("HourlyTrainer: failed to refresh trader opt params — %s", ex)
         except Exception as e:
             logger.warning("HourlyTrainer: param-opt failed — %s", e)
 

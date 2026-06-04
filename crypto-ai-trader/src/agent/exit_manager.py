@@ -57,12 +57,18 @@ class ExitManager:
         entry_price: float,
         atr_pct: float,        # ATR expressed as % of price (e.g. 1.5 = 1.5%)
         regime: str,
+        sl_mult_override: Optional[float] = None,
     ) -> dict:
         """Return a dict with sl_pct, tp_pct, trail_activate_pct, trail_pct.
 
         All values are fractions (0.03 = 3%), ready to multiply against price.
+
+        ``sl_mult_override`` replaces the regime table entry when provided —
+        used by the walk-forward optimizer to apply its data-driven multiplier.
+        The R:R and trail-activation ratios remain regime-specific so stop placement
+        changes without collapsing the profit structure.
         """
-        k_sl    = _SL_ATR_K.get(regime, 1.5)
+        k_sl    = sl_mult_override if sl_mult_override is not None else _SL_ATR_K.get(regime, 1.5)
         rr      = _TP_RR.get(regime, 2.0)
         k_trail = _TRAIL_ACTIVATE_K.get(regime, 0.75)
 
@@ -86,6 +92,7 @@ class ExitManager:
         entry_price: float,
         atr_pct: float,
         regime: str,
+        sl_mult_override: Optional[float] = None,
     ) -> dict:
         """Enrich a trade_data dict with ATR-based SL/TP price levels.
 
@@ -93,7 +100,7 @@ class ExitManager:
         atr_trail_pct, atr_regime.  Also overwrites stop_loss_price and
         take_profit_price so the rest of the system sees the dynamic values.
         """
-        exits = self.compute_exits(entry_price, atr_pct, regime)
+        exits = self.compute_exits(entry_price, atr_pct, regime, sl_mult_override)
 
         sl_price = entry_price * (1.0 - exits["sl_pct"])
         tp_price = entry_price * (1.0 + exits["tp_pct"])

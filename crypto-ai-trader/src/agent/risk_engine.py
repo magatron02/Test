@@ -54,6 +54,11 @@ class RiskEngine:
         self._max_daily_loss_pct = float(cfg.get("max_daily_loss_pct", 0.05))
         self._max_portfolio_heat = float(cfg.get("max_portfolio_heat", 0.20))
         self._max_position_pct   = float(cfg.get("max_position_pct",   0.10))
+        # F3.3 — VaR/CVaR circuit-breaker limits (proactive tail-risk halt)
+        # Halt when 95% VaR of daily returns exceeds this fraction of equity.
+        self._max_var_pct        = float(cfg.get("max_var_pct",        0.05))
+        # Halt when Monte-Carlo prob_ruin (max-DD > 20% in 30 days) exceeds this.
+        self._max_prob_ruin      = float(cfg.get("max_prob_ruin",       0.40))
         # Correlation guard: block a new BUY if it is too correlated with
         # the symbols already held (avoids fake diversification).
         self._max_correlation    = float(cfg.get("max_correlation",    0.80))
@@ -112,21 +117,51 @@ class RiskEngine:
 
     def _check_circuit_breaker(self):
         s = self._state
+
+        # 1. Realised drawdown from high-water mark
         if s.current_drawdown_pct >= self._max_drawdown_pct:
-            s.circuit_open = True
+            s.circuit_open   = True
             s.circuit_reason = (
                 f"Max drawdown {s.current_drawdown_pct:.1%} exceeded "
                 f"{self._max_drawdown_pct:.1%}"
             )
-        elif s.equity > 0 and (s.daily_pnl / s.equity) <= -self._max_daily_loss_pct:
-            s.circuit_open = True
+            return
+
+        # 2. Intraday loss limit
+        if s.equity > 0 and (s.daily_pnl / s.equity) <= -self._max_daily_loss_pct:
+            s.circuit_open   = True
             s.circuit_reason = (
                 f"Daily loss limit {s.daily_pnl_pct:.1%} reached "
                 f"(limit={self._max_daily_loss_pct:.1%})"
             )
-        else:
-            s.circuit_open = False
-            s.circuit_reason = ""
+            return
+
+        # 3. F3.3 — VaR / Monte-Carlo tail-risk gate (proactive, not reactive)
+        #    Requires at least 20 observations so we don't trigger on noise.
+        if len(self._daily_returns) >= 20:
+            try:
+                tail = _var_summarize(self._daily_returns)
+                var    = tail.get("var_pct", 0.0)
+                p_ruin = tail.get("prob_ruin", 0.0)
+                if var > self._max_var_pct:
+                    s.circuit_open   = True
+                    s.circuit_reason = (
+                        f"VaR {var:.1%} exceeds limit {self._max_var_pct:.1%} "
+                        f"(tail-risk circuit)"
+                    )
+                    return
+                if p_ruin > self._max_prob_ruin:
+                    s.circuit_open   = True
+                    s.circuit_reason = (
+                        f"Monte Carlo ruin probability {p_ruin:.0%} exceeds "
+                        f"limit {self._max_prob_ruin:.0%}"
+                    )
+                    return
+            except Exception:
+                pass   # never let VaR failure block the circuit-breaker reset
+
+        s.circuit_open   = False
+        s.circuit_reason = ""
 
     # ── Trade gating ──────────────────────────────────────────────────────
 
@@ -226,6 +261,12 @@ class RiskEngine:
             "circuit_open":     s.circuit_open,
             "circuit_reason":   s.circuit_reason,
             "regime":           s.regime,
+            "limits": {
+                "max_drawdown_pct":   self._max_drawdown_pct,
+                "max_daily_loss_pct": self._max_daily_loss_pct,
+                "max_var_pct":        self._max_var_pct,
+                "max_prob_ruin":      self._max_prob_ruin,
+            },
         }
         # F3.3 — VaR/CVaR + Monte-Carlo tail risk
         try:

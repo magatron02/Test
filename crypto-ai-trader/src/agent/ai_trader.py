@@ -56,10 +56,7 @@ class AITrader:
         self._exit_mgr    = ExitManager()                                   # F2.2
         # F5.1 — walk-forward optimized params (loaded from best_params.json)
         self._param_opt   = ParamOptimizer(models_dir=settings.models_dir)
-        _bp = self._param_opt.best_params or {}
-        self._opt_min_conf: Optional[float] = (
-            float(_bp["min_confidence"]) if "min_confidence" in _bp else None
-        )
+        self._apply_opt_params()
         # Fingerprint cache: skip the costly Claude call when the market is unchanged
         self._signal_cache = SignalCache(settings.get("ai", "signal_cache", default={}) or {})
 
@@ -93,6 +90,44 @@ class AITrader:
             "trainer":    {"status": "idle", "detail": "พร้อมทำงาน", "ts": None},
             "risk":       {"status": "idle", "detail": "พร้อมทำงาน", "ts": None},
         }
+
+    def _apply_opt_params(self):
+        """
+        Load best_params.json (F5.1) and distribute the tuned values to every
+        subsystem that consumes them.  Safe to call at startup or after a new
+        optimization run — always overwrites with the latest values.
+        """
+        bp: dict = self._param_opt.best_params or {}
+
+        # confidence gate — only allowed to *tighten* vs. the operator config
+        cfg_min_conf = float(settings.get("trading", "min_confidence", default=0.60))
+        raw = bp.get("min_confidence")
+        self._opt_min_conf: Optional[float] = (
+            max(cfg_min_conf, float(raw)) if raw is not None else None
+        )
+
+        # RSI bands → market analyzer (signals) + strategy manager (DCA + mean_rev)
+        self._opt_rsi_oversold:  Optional[float] = (
+            float(bp["rsi_oversold"])  if "rsi_oversold"  in bp else None
+        )
+        self._opt_rsi_overbought: Optional[float] = (
+            float(bp["rsi_overbought"]) if "rsi_overbought" in bp else None
+        )
+        self._strategy.set_opt_params(
+            rsi_oversold  = self._opt_rsi_oversold,
+            rsi_overbought= self._opt_rsi_overbought,
+        )
+
+        # ATR SL multiplier → ExitManager (stored for use in attach_exits calls)
+        self._opt_atr_sl_mult: Optional[float] = (
+            float(bp["atr_sl_mult"]) if "atr_sl_mult" in bp else None
+        )
+
+        logger.info(
+            "ParamOpt applied: min_conf=%s rsi_ov=%s rsi_ob=%s atr_mult=%s",
+            self._opt_min_conf, self._opt_rsi_oversold,
+            self._opt_rsi_overbought, self._opt_atr_sl_mult,
+        )
 
     def set_broadcast(self, fn):
         self._broadcast_fn = fn
@@ -194,6 +229,8 @@ class AITrader:
                 rsi_period=int(cfg.get("rsi_period", 14)),
                 bb_period=int(cfg.get("bb_period",   20)),
                 atr_period=int(cfg.get("atr_period", 14)),
+                rsi_oversold  = self._opt_rsi_oversold  or 30.0,
+                rsi_overbought= self._opt_rsi_overbought or 70.0,
             )
             self._analyses[symbol] = analysis
 
@@ -456,7 +493,7 @@ class AITrader:
         # bot trade more recklessly than the operator allows. Regime
         # escalation (CRASH/VOLATILE) still applies on top.
         min_conf = float(settings.get("trading", "min_confidence", default=0.60))
-        if self._opt_min_conf is not None:
+        if getattr(self, "_opt_min_conf", None) is not None:
             min_conf = max(min_conf, self._opt_min_conf)
         if regime.regime == "CRASH":
             min_conf = max(min_conf, 0.85)
@@ -629,10 +666,12 @@ class AITrader:
                 "trailing_sl":       None,
             }
 
-            # Overlay ATR-based SL/TP (F2.2) — overwrites fixed-% levels
+            # Overlay ATR-based SL/TP (F2.2) — overwrites fixed-% levels.
+            # Optimizer's atr_sl_mult (F5.1) overrides the regime default when present.
             if analysis.atr_pct and analysis.atr_pct > 0:
                 self._exit_mgr.attach_exits(
-                    trade_data, order.price, analysis.atr_pct, regime.regime
+                    trade_data, order.price, analysis.atr_pct, regime.regime,
+                    sl_mult_override=self._opt_atr_sl_mult,
                 )
 
             db = SessionLocal()

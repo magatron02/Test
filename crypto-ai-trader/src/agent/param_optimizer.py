@@ -253,15 +253,41 @@ class ParamOptimizer:
         self._result:    Optional[Dict[str, Any]] = load_best_params(self._models_dir)
 
     def run(self, data: List[Dict[str, float]]) -> Dict[str, Any]:
-        """Run optimisation and persist result. Returns the result dict."""
+        """
+        Run optimisation with champion/challenger gating.
+
+        The *challenger* (new run) must improve on the *champion* (current saved
+        result) by at least ``_MIN_IMPROVEMENT`` Sharpe points before the new
+        params replace the old ones.  The existing champion is always returned
+        when the challenger cannot beat it; the new result is still accessible
+        via ``_last_challenger`` for diagnostics.
+        """
         logger.info("ParamOptimizer: starting grid search (%d bars)", len(data))
-        self._result = grid_search(data, grid=self._grid, n_splits=self._n_splits)
-        save_best_params(self._result, self._models_dir)
-        logger.info(
-            "ParamOptimizer: best Sharpe=%.3f params=%s",
-            self._result["best_sharpe"], self._result["best_params"],
-        )
-        return self._result
+        challenger = grid_search(data, grid=self._grid, n_splits=self._n_splits)
+        self._last_challenger = challenger
+
+        champion_sharpe = (self._result or {}).get("best_sharpe", -999.0)
+        challenger_sharpe = challenger.get("best_sharpe", -999.0)
+
+        if challenger_sharpe > champion_sharpe + self._MIN_IMPROVEMENT:
+            self._result = challenger
+            save_best_params(self._result, self._models_dir)
+            logger.info(
+                "ParamOptimizer: challenger promoted → champion "
+                "(Sharpe %.3f → %.3f) params=%s",
+                champion_sharpe, challenger_sharpe, challenger["best_params"],
+            )
+        else:
+            logger.info(
+                "ParamOptimizer: challenger (Sharpe %.3f) did not beat champion "
+                "(Sharpe %.3f) — keeping current params",
+                challenger_sharpe, champion_sharpe,
+            )
+        return self._result or challenger
+
+    # Minimum Sharpe improvement required to promote challenger → champion.
+    # Small positive value avoids churn on noise while still allowing updates.
+    _MIN_IMPROVEMENT: float = 0.05
 
     @property
     def best_params(self) -> Optional[Dict[str, Any]]:
@@ -273,9 +299,11 @@ class ParamOptimizer:
     def summary(self) -> dict:
         if not self._result:
             return {"status": "not_run"}
+        challenger = getattr(self, "_last_challenger", None)
         return {
-            "best_sharpe":  self._result.get("best_sharpe"),
-            "n_combos":     self._result.get("n_combos"),
-            "optimized_at": self._result.get("optimized_at"),
-            "best_params":  self._result.get("best_params"),
+            "best_sharpe":        self._result.get("best_sharpe"),
+            "n_combos":           self._result.get("n_combos"),
+            "optimized_at":       self._result.get("optimized_at"),
+            "best_params":        self._result.get("best_params"),
+            "last_challenger_sharpe": challenger.get("best_sharpe") if challenger else None,
         }
