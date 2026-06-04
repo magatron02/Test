@@ -54,8 +54,9 @@ exchanges:
     data_source: "binance"          # ดึงข้อมูลตลาดจาก exchange ไหน
 
 backtest:
-  fee_pct: 0.001        # Commission per side (0.001 = 0.1% — Binance taker)
-  slippage_pct: 0.0005  # Market-impact slippage per fill (0.05%)
+  fee_pct: 0.0            # Binance TH: 0% สำหรับคู่ /THB (BTC/THB, ETH/THB ฯลฯ) — ต้อง KYC ก่อน
+                          # ถ้าใช้คู่ /USDT หรือยังไม่ KYC: เปลี่ยนเป็น 0.001 (0.1%)
+  slippage_pct: 0.0005    # Market-impact slippage per fill (0.05%)
 
 trading:
   dry_run: false        # true = log orders but never send to exchange
