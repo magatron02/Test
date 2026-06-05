@@ -347,7 +347,7 @@ class AITrader:
     # ── Risk checks ───────────────────────────────────────────────────────
 
     async def _update_risk_engine(self, portfolio: dict, regime: str):
-        """Push current state into the RiskEngine."""
+        """Push current state into the RiskEngine and run adaptive limit recalibration (F2.4)."""
         equity = portfolio.get("total_value", 0)
         self._risk.update(
             equity=equity,
@@ -355,6 +355,7 @@ class AITrader:
             open_trades=self._open_trades,
             regime=regime,
         )
+        self._risk.adaptive_adjust()
 
     async def _check_risk_limits(self, symbol: str, trade_risk: float = 0.0) -> Tuple[bool, str]:
         """Gate a new BUY through the advanced risk engine."""
@@ -438,6 +439,61 @@ class AITrader:
         self._signal_cache.put(analysis.symbol, analysis, regime, sig)
         return sig
 
+    def _get_pairs_signal(
+        self,
+        symbol: str,
+        primary_sig: TradingSignal,
+    ) -> Optional[TradingSignal]:
+        """
+        F3.1 — Stat-arb pairs signal for ``symbol``.
+
+        Checks if ``symbol`` participates in any confirmed cointegrated pair
+        (from ``self._price_history``), computes the spread z-score, and returns
+        a TradingSignal whose action / confidence reflect the mean-reversion
+        direction.  Returns None when no confirmed pair exists, history is
+        insufficient (< 50 bars), or an exception occurs.
+
+        The returned signal is an *advisory* — callers blend its confidence into
+        the primary signal but do not treat it as a standalone trade trigger.
+        """
+        try:
+            from .cointegration import pairs_signal as _pairs_signal
+            hist = self._price_history
+            if symbol not in hist or len(hist[symbol]) < 50:
+                return None
+            prices_a = hist[symbol]
+
+            best: Optional[TradingSignal] = None
+            best_abs_z = 0.0
+            entry_z = float(settings.get("cointegration", "entry_z", default=2.0))
+            for partner, prices_b_list in hist.items():
+                if partner == symbol or len(prices_b_list) < 50:
+                    continue
+                n = min(len(prices_a), len(prices_b_list))
+                ps = _pairs_signal(
+                    list(prices_a[-n:]),
+                    list(prices_b_list[-n:]),
+                    entry_z=entry_z,
+                )
+                action = ps.get("action_a", "HOLD")
+                z = float(ps.get("zscore", 0.0))
+                conf = float(ps.get("confidence", 0.0))
+                if action == "HOLD" or abs(z) < entry_z or abs(z) <= best_abs_z:
+                    continue
+                best_abs_z = abs(z)
+                best = TradingSignal(
+                    action   = action,
+                    confidence = conf,
+                    strategy = "pairs",
+                    reasoning = f"{z:+.2f}",   # z-score stored as reasoning for attribution
+                    stop_loss_pct   = primary_sig.stop_loss_pct,
+                    take_profit_pct = primary_sig.take_profit_pct,
+                )
+            return best
+        except Exception as exc:
+            logger.debug("Pairs signal skipped for %s: %s", symbol, exc)
+            return None
+
     async def _get_final_signal(
         self,
         analysis: MarketAnalysis,
@@ -449,7 +505,7 @@ class AITrader:
 
         # Attribution: record every sub-signal that contributes to the decision
         components: Dict[str, Optional[dict]] = {
-            "ml": None, "rule": None, "claude": None, "multi_model": None,
+            "ml": None, "rule": None, "claude": None, "multi_model": None, "pairs": None,
         }
 
         def _capture(name, s, strategy=None):
@@ -506,6 +562,30 @@ class AITrader:
                 sig, chosen = ml_signal, "ml"
             else:
                 sig, chosen = rule_sig, f"rule:{rl_strategy}"
+
+        # F3.1 — Pairs signal: blend stat-arb z-score into the decision when
+        # this symbol participates in a confirmed cointegrated pair.
+        pairs_sig = self._get_pairs_signal(analysis.symbol, sig)
+        if pairs_sig is not None:
+            _capture("pairs", pairs_sig)
+            # Align: pairs signal agrees with primary → small confidence boost
+            # Diverge: pairs signal disagrees → slight confidence penalty
+            if pairs_sig.action == sig.action and sig.action != "HOLD":
+                sig = TradingSignal(
+                    sig.action,
+                    min(1.0, sig.confidence + 0.05 * pairs_sig.confidence),
+                    sig.strategy,
+                    sig.reasoning + f" | pairs z={pairs_sig.reasoning}",
+                    sig.stop_loss_pct, sig.take_profit_pct,
+                )
+            elif pairs_sig.action not in ("HOLD", sig.action) and sig.action != "HOLD":
+                sig = TradingSignal(
+                    sig.action,
+                    max(0.0, sig.confidence - 0.05 * pairs_sig.confidence),
+                    sig.strategy,
+                    sig.reasoning,
+                    sig.stop_loss_pct, sig.take_profit_pct,
+                )
 
         # Base confidence bar. The walk-forward optimizer (F5.1) may only
         # *tighten* the gate — it can raise min_conf above the configured

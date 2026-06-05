@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
+import numpy as np
+
 from .var_engine import summarize as _var_summarize
 
 logger = logging.getLogger(__name__)
@@ -70,6 +72,13 @@ class RiskEngine:
         self._open_risks: Dict[str, float] = {}   # symbol → risk in quote currency
         self._daily_returns: List[float] = []     # for VaR/CVaR (F3.3)
         self._prev_equity: Optional[float] = None
+
+        # F2.4 — adaptive meta-params: record the base (operator-configured)
+        # limits so adaptive_adjust() can always anchor to them.
+        self._base_max_drawdown_pct   = self._max_drawdown_pct
+        self._base_max_var_pct        = self._max_var_pct
+        self._base_max_daily_loss_pct = self._max_daily_loss_pct
+        self._adaptive_mult: float = 1.0   # last applied multiplier (for dashboard)
 
     # ── State update ──────────────────────────────────────────────────────
 
@@ -162,6 +171,58 @@ class RiskEngine:
 
         s.circuit_open   = False
         s.circuit_reason = ""
+
+    # ── F2.4 Adaptive meta-parameters ────────────────────────────────────
+
+    def adaptive_adjust(self) -> float:
+        """
+        Recalibrate ``max_drawdown_pct``, ``max_var_pct``, and
+        ``max_daily_loss_pct`` based on the rolling realised volatility of
+        the equity curve (measured from ``_daily_returns``).
+
+        Logic:
+          * Compute the annualised vol of the last ≤ 60 daily returns.
+          * Map it to a tightening/loosening multiplier in [0.5, 1.2]:
+              - vol < 1.0 × base_var_pct → calm → loosen slightly  (×1.1)
+              - 1.0 – 1.5 × base_var_pct → normal → stay at base   (×1.0)
+              - 1.5 – 2.5 × base_var_pct → elevated → tighten      (×0.80)
+              - > 2.5 × base_var_pct     → high-vol → tighten hard  (×0.60)
+          * All adjustments are anchored to the *base* (operator-configured)
+            limits, so the system can never permanently drift to laxer limits
+            than the operator intended.
+          * Requires ≥ 10 observations; returns 1.0 unchanged below that.
+
+        Returns the multiplier that was applied.
+        """
+        if len(self._daily_returns) < 10:
+            return self._adaptive_mult
+
+        window = self._daily_returns[-60:]
+        ann_vol = float(np.std(window, ddof=1) * (252 ** 0.5))
+
+        ref = self._base_max_var_pct or 0.05
+        ratio = ann_vol / ref if ref > 0 else 1.0
+
+        if ratio < 1.0:
+            mult = 1.10       # calm market: slightly loosen
+        elif ratio < 1.5:
+            mult = 1.00       # normal: stay at base
+        elif ratio < 2.5:
+            mult = 0.80       # elevated vol: tighten
+        else:
+            mult = 0.60       # high vol: tighten hard
+
+        self._max_drawdown_pct   = round(self._base_max_drawdown_pct   * mult, 4)
+        self._max_var_pct        = round(self._base_max_var_pct        * mult, 4)
+        self._max_daily_loss_pct = round(self._base_max_daily_loss_pct * mult, 4)
+        self._adaptive_mult      = mult
+
+        logger.debug(
+            "RiskEngine adaptive_adjust: ann_vol=%.3f ratio=%.2f mult=%.2f "
+            "dd_pct=%.3f var_pct=%.3f",
+            ann_vol, ratio, mult, self._max_drawdown_pct, self._max_var_pct,
+        )
+        return mult
 
     # ── Trade gating ──────────────────────────────────────────────────────
 
@@ -267,6 +328,7 @@ class RiskEngine:
                 "max_var_pct":        self._max_var_pct,
                 "max_prob_ruin":      self._max_prob_ruin,
             },
+            "adaptive_mult": round(self._adaptive_mult, 3),
         }
         # F3.3 — VaR/CVaR + Monte-Carlo tail risk
         try:
