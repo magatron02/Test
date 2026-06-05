@@ -51,8 +51,8 @@ export const DashboardScreen: React.FC = () => {
   const fetchData = async () => {
     try {
       const [pricesRes, statusRes] = await Promise.all([
-        api.getPrices(WATCHLIST),
-        api.getAgentStatus(),
+        api.getPrices(),
+        api.getStatus(),
       ]);
       if (pricesRes.data) setPrices(pricesRes.data);
       if (statusRes.data) setAgentStatus(statusRes.data);
@@ -68,22 +68,12 @@ export const DashboardScreen: React.FC = () => {
   const handleToggleAgent = async () => {
     setAgentLoading(true);
     try {
-      if (agentStatus.is_running) {
-        await api.stopAgent();
-      } else {
-        await api.startAgent({
-          watchlist: agentConfig.watchlist,
-          exchanges: agentConfig.exchanges,
-          risk_level: agentConfig.riskLevel,
-          portfolio_value: agentConfig.portfolioValue,
-          use_paper: agentConfig.usePaper,
-          interval_minutes: agentConfig.intervalMinutes,
-        });
-      }
-      const res = await api.getAgentStatus();
+      // The backend auto-starts via the startup event.
+      // The kill switch is the proper way to halt/resume trading.
+      const res = await api.getStatus();
       setAgentStatus(res.data);
     } catch (e) {
-      console.error("Agent toggle error:", e);
+      console.error("Status fetch error:", e);
     } finally {
       setAgentLoading(false);
     }

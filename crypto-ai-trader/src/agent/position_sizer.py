@@ -17,15 +17,17 @@ Final size is further adjusted by:
   - Cash guard:    never use more than 95% of available quote balance
 """
 import logging
+from pathlib import Path
 from typing import Optional
 
 from .market_analyzer import MarketAnalysis
+from ..core.persistence import atomic_write_json, safe_read_json
 
 logger = logging.getLogger(__name__)
 
 
 class PositionSizer:
-    def __init__(self, config: dict = None):
+    def __init__(self, config: dict = None, models_dir: Optional[Path] = None):
         cfg = config or {}
         self._kelly_fraction    = float(cfg.get("kelly_fraction",    0.25))
         self._min_trade_usdt    = float(cfg.get("min_trade_usdt",    10.0))
@@ -33,8 +35,26 @@ class PositionSizer:
         self._fallback_risk_pct = float(cfg.get("fallback_risk_pct", 0.02))
         self._target_atr_pct    = float(cfg.get("target_atr_pct",    2.0))
 
-        # Per-symbol running win/loss stats
-        self._stats: dict = {}
+        # Per-symbol running win/loss stats (persisted so Kelly survives restart)
+        self._stats_path: Optional[Path] = (
+            (Path(models_dir) / "position_sizer_stats.json") if models_dir else None
+        )
+        self._stats: dict = self._load_stats()
+
+    # ── Persistence ───────────────────────────────────────────────────────
+
+    def _load_stats(self) -> dict:
+        if self._stats_path is None:
+            return {}
+        data = safe_read_json(self._stats_path)
+        if isinstance(data, dict):
+            logger.info("PositionSizer: restored stats for %d symbols", len(data))
+            return data
+        return {}
+
+    def _save_stats(self):
+        if self._stats_path is not None:
+            atomic_write_json(self._stats_path, self._stats)
 
     # ── Outcome tracking ──────────────────────────────────────────────────
 
@@ -48,6 +68,7 @@ class PositionSizer:
         else:
             s["losses"]   += 1
             s["loss_sum"] += abs(pnl_pct)
+        self._save_stats()
 
     # ── Kelly calculation ─────────────────────────────────────────────────
 

@@ -145,7 +145,9 @@ async def startup():
     _trader.set_broadcast(broadcast)
 
     _training_loop_inst = TrainingLoop(_trader, broadcast_fn=broadcast)
-    _hourly_trainer_inst = HourlyTrainer(_trader._trainer, broadcast_fn=broadcast)
+    _hourly_trainer_inst = HourlyTrainer(
+        _trader._trainer, broadcast_fn=broadcast, trader=_trader
+    )
 
     set_trader(_trader)
     set_training_loop(_training_loop_inst)
@@ -169,7 +171,7 @@ async def startup():
 @app.on_event("shutdown")
 async def shutdown():
     if _trader:
-        _trader.stop()
+        _trader.stop()   # signals the event — unlocks the inter-cycle sleep
     if _trader_task:
         _trader_task.cancel()
     if _alert_monitor_inst:

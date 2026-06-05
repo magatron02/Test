@@ -6,6 +6,7 @@ Tracks:
   - Portfolio heat (total open risk as % of equity)
   - Per-symbol risk budget
   - Circuit-breaker: halts all new trades on limit breach
+  - VaR / CVaR + Monte-Carlo tail-risk (F3.3)
 
 Regime multipliers reduce/increase allowed risk based on detected market state.
 """
@@ -13,6 +14,10 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
+
+import numpy as np
+
+from .var_engine import summarize as _var_summarize
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +65,15 @@ class RiskEngine:
         self._equity_history: List[Tuple[datetime, float]] = []
         self._state = RiskState()
         self._open_risks: Dict[str, float] = {}   # symbol → risk in quote currency
+        self._daily_returns: List[float] = []     # for VaR/CVaR (F3.3)
+        self._prev_equity: Optional[float] = None
+
+        # F2.4 — adaptive meta-params: record the base (operator-configured)
+        # limits so adaptive_adjust() can always anchor to them.
+        self._base_max_drawdown_pct   = self._max_drawdown_pct
+        self._base_max_var_pct        = self._max_var_pct
+        self._base_max_daily_loss_pct = self._max_daily_loss_pct
+        self._adaptive_mult: float = 1.0   # last applied multiplier (for dashboard)
 
     # ── State update ──────────────────────────────────────────────────────
 
@@ -86,6 +100,14 @@ class RiskEngine:
         if equity > 0:
             self._state.daily_pnl_pct = daily_pnl / equity
 
+        # Track daily return for VaR/CVaR (F3.3)
+        if self._prev_equity and self._prev_equity > 0:
+            daily_ret = (equity - self._prev_equity) / self._prev_equity
+            self._daily_returns.append(daily_ret)
+            if len(self._daily_returns) > 365:
+                self._daily_returns = self._daily_returns[-365:]
+        self._prev_equity = equity
+
         heat = sum(self._open_risks.values()) / equity if equity > 0 else 0.0
         self._state.portfolio_heat_pct = heat
 
@@ -99,21 +121,103 @@ class RiskEngine:
 
     def _check_circuit_breaker(self):
         s = self._state
+
+        # 1. Realised drawdown from high-water mark
         if s.current_drawdown_pct >= self._max_drawdown_pct:
-            s.circuit_open = True
+            s.circuit_open   = True
             s.circuit_reason = (
                 f"Max drawdown {s.current_drawdown_pct:.1%} exceeded "
                 f"{self._max_drawdown_pct:.1%}"
             )
-        elif s.equity > 0 and (s.daily_pnl / s.equity) <= -self._max_daily_loss_pct:
-            s.circuit_open = True
+            return
+
+        # 2. Intraday loss limit
+        if s.equity > 0 and (s.daily_pnl / s.equity) <= -self._max_daily_loss_pct:
+            s.circuit_open   = True
             s.circuit_reason = (
                 f"Daily loss limit {s.daily_pnl_pct:.1%} reached "
                 f"(limit={self._max_daily_loss_pct:.1%})"
             )
+            return
+
+        # 3. F3.3 — VaR / Monte-Carlo tail-risk gate (proactive, not reactive)
+        #    Requires at least 20 observations so we don't trigger on noise.
+        if len(self._daily_returns) >= 20:
+            try:
+                tail = _var_summarize(self._daily_returns)
+                var    = tail.get("var_pct", 0.0)
+                p_ruin = tail.get("prob_ruin", 0.0)
+                if var > self._max_var_pct:
+                    s.circuit_open   = True
+                    s.circuit_reason = (
+                        f"VaR {var:.1%} exceeds limit {self._max_var_pct:.1%} "
+                        f"(tail-risk circuit)"
+                    )
+                    return
+                if p_ruin > self._max_prob_ruin:
+                    s.circuit_open   = True
+                    s.circuit_reason = (
+                        f"Monte Carlo ruin probability {p_ruin:.0%} exceeds "
+                        f"limit {self._max_prob_ruin:.0%}"
+                    )
+                    return
+            except Exception:
+                pass   # never let VaR failure block the circuit-breaker reset
+
+        s.circuit_open   = False
+        s.circuit_reason = ""
+
+    # ── F2.4 Adaptive meta-parameters ────────────────────────────────────
+
+    def adaptive_adjust(self) -> float:
+        """
+        Recalibrate ``max_drawdown_pct``, ``max_var_pct``, and
+        ``max_daily_loss_pct`` based on the rolling realised volatility of
+        the equity curve (measured from ``_daily_returns``).
+
+        Logic:
+          * Compute the annualised vol of the last ≤ 60 daily returns.
+          * Map it to a tightening/loosening multiplier in [0.5, 1.2]:
+              - vol < 1.0 × base_var_pct → calm → loosen slightly  (×1.1)
+              - 1.0 – 1.5 × base_var_pct → normal → stay at base   (×1.0)
+              - 1.5 – 2.5 × base_var_pct → elevated → tighten      (×0.80)
+              - > 2.5 × base_var_pct     → high-vol → tighten hard  (×0.60)
+          * All adjustments are anchored to the *base* (operator-configured)
+            limits, so the system can never permanently drift to laxer limits
+            than the operator intended.
+          * Requires ≥ 10 observations; returns 1.0 unchanged below that.
+
+        Returns the multiplier that was applied.
+        """
+        if len(self._daily_returns) < 10:
+            return self._adaptive_mult
+
+        window = self._daily_returns[-60:]
+        ann_vol = float(np.std(window, ddof=1) * (252 ** 0.5))
+
+        ref = self._base_max_var_pct or 0.05
+        ratio = ann_vol / ref if ref > 0 else 1.0
+
+        if ratio < 1.0:
+            mult = 1.10       # calm market: slightly loosen
+        elif ratio < 1.5:
+            mult = 1.00       # normal: stay at base
+        elif ratio < 2.5:
+            mult = 0.80       # elevated vol: tighten
         else:
-            s.circuit_open = False
-            s.circuit_reason = ""
+            mult = 0.60       # high vol: tighten hard
+
+        self._max_drawdown_pct   = round(self._base_max_drawdown_pct   * mult, 4)
+        self._max_var_pct        = round(self._base_max_var_pct        * mult, 4)
+        self._max_daily_loss_pct = round(self._base_max_daily_loss_pct * mult, 4)
+        self._adaptive_mult      = mult
+
+        logger.debug(
+            "RiskEngine adaptive_adjust: ann_vol=%.3f ratio=%.2f mult=%.2f "
+            "dd_pct=%.3f var_pct=%.3f",
+            ann_vol, ratio, mult, self._max_drawdown_pct, self._max_var_pct,
+        )
+        return mult
 
     # ── Trade gating ──────────────────────────────────────────────────────
 
@@ -203,7 +307,7 @@ class RiskEngine:
 
     def summary(self) -> dict:
         s = self._state
-        return {
+        result = {
             "equity":           round(s.equity, 2),
             "high_water_mark":  round(s.high_water_mark, 2),
             "drawdown_pct":     round(s.current_drawdown_pct, 4),
@@ -213,4 +317,17 @@ class RiskEngine:
             "circuit_open":     s.circuit_open,
             "circuit_reason":   s.circuit_reason,
             "regime":           s.regime,
+            "limits": {
+                "max_drawdown_pct":   self._max_drawdown_pct,
+                "max_daily_loss_pct": self._max_daily_loss_pct,
+                "max_var_pct":        self._max_var_pct,
+                "max_prob_ruin":      self._max_prob_ruin,
+            },
+            "adaptive_mult": round(self._adaptive_mult, 3),
         }
+        # F3.3 — VaR/CVaR + Monte-Carlo tail risk
+        try:
+            result["tail_risk"] = _var_summarize(self._daily_returns)
+        except Exception:
+            result["tail_risk"] = {}
+        return result

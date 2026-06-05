@@ -205,6 +205,7 @@ async def get_training_stats():
 
 
 @router.post("/training/trigger")
+@(_limiter.limit("6/minute") if _limiter else lambda f: f)
 async def trigger_training(request: Request):
     if not _trader:
         raise HTTPException(503, "Trader not running")
@@ -285,6 +286,58 @@ async def get_settings():
     return cfg
 
 
+# (section, key) → (type_coerce_fn, min_val, max_val)
+# None min/max means no range check.
+_SETTINGS_SCHEMA: Dict[tuple, tuple] = {
+    ("trading", "take_profit_pct"):    (float, 0.001, 0.50),
+    ("trading", "stop_loss_pct"):      (float, 0.001, 0.50),
+    ("trading", "min_confidence"):     (float, 0.10,  1.0),
+    ("trading", "analysis_interval"):  (int,   30,    86400),
+    ("trading", "risk_per_trade_pct"): (float, 0.001, 0.20),
+    ("trading", "max_daily_loss_pct"): (float, 0.001, 1.0),
+    ("trading", "max_open_trades"):    (int,   1,     50),
+    ("trading", "max_position_pct"):   (float, 0.01,  1.0),
+    ("trading", "dry_run"):            (bool,  None,  None),
+    ("trading", "live_max_budget_usdt"): (float, 0.0, 1e7),
+    ("risk",    "max_drawdown_pct"):   (float, 0.01,  1.0),
+    ("risk",    "max_daily_loss_pct"): (float, 0.001, 1.0),
+    ("risk",    "max_portfolio_heat"): (float, 0.01,  1.0),
+    ("risk",    "max_position_pct"):   (float, 0.01,  1.0),
+    ("backtest","fee_pct"):            (float, 0.0,   0.05),
+    ("backtest","slippage_pct"):       (float, 0.0,   0.05),
+    ("position_sizer", "kelly_fraction"):   (float, 0.01, 1.0),
+    ("position_sizer", "min_trade_usdt"):   (float, 1.0, 1e6),
+    ("position_sizer", "max_trade_usdt"):   (float, 1.0, 1e6),
+    ("position_sizer", "fallback_risk_pct"):(float, 0.001, 0.20),
+    ("position_sizer", "target_atr_pct"):   (float, 0.1,  20.0),
+}
+
+
+def _coerce_and_validate(section: str, key: str, value: Any) -> Any:
+    """Type-coerce and range-check a setting value. Raises HTTPException on failure."""
+    schema = _SETTINGS_SCHEMA.get((section, key))
+    if schema is None:
+        return value   # no schema for this key — pass through unchanged
+    coerce_fn, lo, hi = schema
+    try:
+        if coerce_fn is bool:
+            if isinstance(value, bool):
+                coerced = value
+            elif isinstance(value, str):
+                coerced = value.lower() in ("true", "1", "yes")
+            else:
+                coerced = bool(value)
+        else:
+            coerced = coerce_fn(value)
+    except (TypeError, ValueError):
+        raise HTTPException(400, f"'{section}.{key}' must be a {coerce_fn.__name__}")
+    if lo is not None and coerced < lo:
+        raise HTTPException(400, f"'{section}.{key}' must be >= {lo}")
+    if hi is not None and coerced > hi:
+        raise HTTPException(400, f"'{section}.{key}' must be <= {hi}")
+    return coerced
+
+
 _SETTINGS_ALLOWLIST: Dict[str, set] = {
     "trading": {
         "take_profit_pct", "stop_loss_pct", "min_confidence",
@@ -327,6 +380,7 @@ async def update_settings(data: Dict[str, Any]):
             for key, val in values.items():
                 if key not in allowed_keys:
                     raise HTTPException(400, f"Key '{section}.{key}' is not writable via API")
+                val = _coerce_and_validate(section, key, val)
                 settings.set(val, section, key)
         else:
             # scalar top-level key
@@ -584,6 +638,7 @@ async def get_mtf_analysis(symbol: str = "BTC/USDT"):
 
 
 @router.post("/backtest")
+@(_limiter.limit("10/minute") if _limiter else lambda f: f)
 async def run_backtest(request: Request, data: Dict[str, Any]):
     """POST /api/backtest — Backtest with Market Regime + Chart Patterns + Kelly Sizing.
 
@@ -624,6 +679,7 @@ async def run_backtest(request: Request, data: Dict[str, Any]):
 
 
 @router.get("/backtest/walkforward")
+@(_limiter.limit("4/minute") if _limiter else lambda f: f)
 async def backtest_walkforward(
     request: Request,
     symbol: str = "BTC/USDT",
@@ -822,6 +878,7 @@ async def set_trade_note(trade_id: int, data: Dict[str, Any], db: Session = Depe
 
 
 @router.post("/trade/manual")
+@(_limiter.limit("12/minute") if _limiter else lambda f: f)
 async def manual_trade(request: Request, data: Dict[str, Any]):
     """POST /api/trade/manual — manually open or close a position (demo-safe override).
     Body: {"action":"BUY"|"SELL"|"CLOSE", "symbol":"BTC/USDT", "amount_usdt": 200}
@@ -1063,7 +1120,7 @@ class ChatHandler:
                 trade_ctx = ", ".join(f"{t.symbol} {t.side} {t.pnl_pct:+.2f}%" for t in recent if t.pnl_pct is not None) or "ยังไม่มี"
             finally:
                 db.close()
-            sys_prompt = f"คุณคือ AI trading assistant ของ Aiterra ตอบสั้น กระชับ เป็นภาษาไทย recent trades: {trade_ctx}"
+            sys_prompt = f"คุณคือ Lunai v1.0.0 — AI trading assistant ภายใน Aiterra ตอบสั้น กระชับ เป็นภาษาไทย recent trades: {trade_ctx}"
             resp = await client.messages.create(
                 model=settings.claude_model, max_tokens=512,
                 system=sys_prompt,
@@ -1130,7 +1187,7 @@ async def test_exchanges():
 @router.post("/notifications/test")
 async def test_notifications(data: Dict[str, Any] = None):
     """Send a test message to configured LINE / Telegram channels."""
-    msg = "🧪 Aiterra — การแจ้งเตือนทดสอบ / Test notification ✅"
+    msg = "🧪 Lunai v1.0.0 (Aiterra) — การแจ้งเตือนทดสอบ / Test notification ✅"
     results = {}
 
     # LINE Messaging API
@@ -1491,52 +1548,81 @@ async def get_analytics(symbol: Optional[str] = None, days: int = 30):
 
 @router.get("/sentiment")
 async def get_sentiment(symbol: str = "BTC/USDT"):
-    """GET /api/sentiment — Fear & Greed index, funding rate, and open interest.
+    """GET /api/sentiment — all market intelligence data for a symbol.
 
-    symbol: crypto pair, e.g. BTC/USDT (used for funding rate fetch)
+    Returns Fear & Greed, funding, OI, derivatives flow, order book
+    microstructure (F1.2), on-chain metrics (F1.1), and news sentiment (F1.3).
+    symbol: crypto pair, e.g. BTC/USDT
     """
-    from ..data.sentiment import get_fear_greed, get_funding_rate, get_open_interest
+    from ..data.sentiment import (
+        get_fear_greed, get_funding_rate, get_open_interest,
+        get_long_short_ratio, get_taker_ratio, derivatives_bias, _record_oi,
+    )
+    from ..data.orderbook import get_order_book
+    from ..data.onchain import get_onchain
+    from ..data.social import get_news_sentiment
 
-    binance_symbol = symbol.replace("/", "")  # BTC/USDT → BTCUSDT
-
+    binance_symbol = symbol.replace("/", "")
     exchange = _trader._exchange if _trader else None
 
-    # Current price (for OI contracts → USDT notional)
     mark_price = None
     if _trader:
         a = _trader.analyses.get(symbol)
         if a:
             mark_price = a.price
 
-    # Gather concurrently; funding rate needs the exchange client
-    fng_task = get_fear_greed()
-    oi_task  = get_open_interest(binance_symbol, mark_price=mark_price)
+    # All sources fire concurrently
+    fng_task     = get_fear_greed()
+    oi_task      = get_open_interest(binance_symbol, mark_price=mark_price)
+    ls_task      = get_long_short_ratio(binance_symbol)
+    taker_task   = get_taker_ratio(binance_symbol)
+    ob_task      = get_order_book(binance_symbol)      # F1.2
+    onchain_task = get_onchain(symbol)                 # F1.1
+    social_task  = get_news_sentiment(symbol)          # F1.3
 
     if exchange:
         funding_task = get_funding_rate(exchange, symbol)
-        fng, oi, funding = await asyncio.gather(fng_task, oi_task, funding_task, return_exceptions=True)
+        fng, oi, ls, taker, funding, ob, oc, soc = await asyncio.gather(
+            fng_task, oi_task, ls_task, taker_task, funding_task,
+            ob_task, onchain_task, social_task, return_exceptions=True)
     else:
-        fng, oi = await asyncio.gather(fng_task, oi_task, return_exceptions=True)
+        fng, oi, ls, taker, ob, oc, soc = await asyncio.gather(
+            fng_task, oi_task, ls_task, taker_task,
+            ob_task, onchain_task, social_task, return_exceptions=True)
         funding = {"symbol": symbol, "funding_rate": None, "error": "exchange unavailable"}
 
     fng     = fng     if not isinstance(fng,     Exception) else {"value": None, "label": None, "error": str(fng)}
     oi      = oi      if not isinstance(oi,      Exception) else {"open_interest_usdt": None, "error": str(oi)}
+    ls      = ls      if not isinstance(ls,      Exception) else {"long_short_ratio": None, "error": str(ls)}
+    taker   = taker   if not isinstance(taker,   Exception) else {"taker_buy_sell_ratio": None, "error": str(taker)}
     funding = funding if not isinstance(funding, Exception) else {"funding_rate": None, "error": str(funding)}
+    # ob/oc/soc are dataclasses; on exception substitute a None-safe fallback
+    if isinstance(ob,  Exception): ob  = None
+    if isinstance(oc,  Exception): oc  = None
+    if isinstance(soc, Exception): soc = None
+
+    def _f(snap, attr):
+        try:
+            return getattr(snap, attr) if snap else None
+        except Exception:
+            return None
 
     # Derive trading bias from Fear & Greed
     fng_value = fng.get("value")
-    if fng_value is None:
-        bias = "NEUTRAL"
-    elif fng_value <= 25:
-        bias = "CONTRARIAN_BUY"
-    elif fng_value <= 45:
-        bias = "CAUTIOUS_BUY"
-    elif fng_value <= 55:
-        bias = "NEUTRAL"
-    elif fng_value <= 75:
-        bias = "CAUTIOUS_SELL"
-    else:
-        bias = "CONTRARIAN_SELL"
+    if fng_value is None:   bias = "NEUTRAL"
+    elif fng_value <= 25:   bias = "CONTRARIAN_BUY"
+    elif fng_value <= 45:   bias = "CAUTIOUS_BUY"
+    elif fng_value <= 55:   bias = "NEUTRAL"
+    elif fng_value <= 75:   bias = "CAUTIOUS_SELL"
+    else:                   bias = "CONTRARIAN_SELL"
+
+    oi_change = _record_oi(binance_symbol, oi.get("open_interest_contracts"))
+    deriv_label, deriv_score = derivatives_bias(
+        ls.get("long_short_ratio"),
+        taker.get("taker_buy_sell_ratio"),
+        oi_change,
+        funding.get("funding_rate"),
+    )
 
     return {
         "symbol": symbol,
@@ -1553,9 +1639,45 @@ async def get_sentiment(symbol: str = "BTC/USDT"):
             "error":        funding.get("error"),
         },
         "open_interest": {
-            "usdt":      oi.get("open_interest_usdt"),
-            "contracts": oi.get("open_interest_contracts"),
-            "error":     oi.get("error"),
+            "usdt":       oi.get("open_interest_usdt"),
+            "contracts":  oi.get("open_interest_contracts"),
+            "change_pct": oi_change,
+            "error":      oi.get("error"),
+        },
+        "derivatives": {
+            "long_short_ratio":     ls.get("long_short_ratio"),
+            "taker_buy_sell_ratio": taker.get("taker_buy_sell_ratio"),
+            "oi_change_pct":        oi_change,
+            "bias":                 deriv_label,
+            "score":                deriv_score,
+            "error":                ls.get("error") or taker.get("error"),
+        },
+        # F1.2 Order Book Microstructure
+        "order_book": {
+            "bid_ask_imbalance": _f(ob, "bid_ask_imbalance"),
+            "bid_wall_pct":      _f(ob, "bid_wall_pct"),
+            "ask_wall_pct":      _f(ob, "ask_wall_pct"),
+            "spread_bps":        _f(ob, "spread_bps"),
+            "signal":            _f(ob, "signal") or "NEUTRAL",
+            "error":             _f(ob, "error"),
+        },
+        # F1.1 On-chain Metrics
+        "onchain": {
+            "active_addr_change_pct": _f(oc, "active_addr_change_pct"),
+            "tx_count_change_pct":    _f(oc, "tx_count_change_pct"),
+            "hash_rate_change_pct":   _f(oc, "hash_rate_change_pct"),
+            "label":                  _f(oc, "label") or "NEUTRAL",
+            "score":                  _f(oc, "score"),
+            "error":                  _f(oc, "error"),
+        },
+        # F1.3 Social / News Sentiment
+        "social": {
+            "label":         _f(soc, "label") or "NEUTRAL",
+            "score":         _f(soc, "score"),
+            "article_count": _f(soc, "article_count"),
+            "bullish_count": _f(soc, "bullish_count"),
+            "bearish_count": _f(soc, "bearish_count"),
+            "error":         _f(soc, "error"),
         },
     }
 

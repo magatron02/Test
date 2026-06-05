@@ -5,6 +5,7 @@ from typing import Dict, Optional
 
 from .market_analyzer import MarketAnalysis
 from ..core.config import settings
+from ..core.persistence import atomic_write_json, safe_read_json
 
 logger = logging.getLogger(__name__)
 
@@ -20,13 +21,57 @@ class TradingSignal:
 
 
 class StrategyManager:
-    def __init__(self):
-        self._last_dca: Dict[str, datetime] = {}
+    def __init__(self, data_dir: Optional[Path] = None):
+        self._dca_path: Optional[Path] = (
+            Path(data_dir) / "dca_timers.json" if data_dir else None
+        )
+        self._last_dca: Dict[str, datetime] = self._load_dca_timers()
         self._strategy_weights = {
             "dca": 0.30,
             "trend": 0.35,
             "mean_reversion": 0.35,
         }
+        # Walk-forward optimizer overrides (F5.1) — None = use config/hardcoded defaults
+        self._opt_rsi_oversold:  Optional[float] = None
+        self._opt_rsi_overbought: Optional[float] = None
+
+    # ── DCA timer persistence ─────────────────────────────────────────────
+
+    def _load_dca_timers(self) -> Dict[str, datetime]:
+        if self._dca_path is None:
+            return {}
+        data = safe_read_json(self._dca_path)
+        if not isinstance(data, dict):
+            return {}
+        result: Dict[str, datetime] = {}
+        for sym, iso in data.items():
+            try:
+                result[sym] = datetime.fromisoformat(iso)
+            except Exception:
+                pass
+        if result:
+            logger.info("StrategyManager: restored DCA timers for %d symbols", len(result))
+        return result
+
+    def _save_dca_timers(self):
+        if self._dca_path is not None:
+            atomic_write_json(
+                self._dca_path,
+                {sym: dt.isoformat() for sym, dt in self._last_dca.items()},
+            )
+
+    def set_opt_params(
+        self,
+        rsi_oversold:  Optional[float] = None,
+        rsi_overbought: Optional[float] = None,
+    ):
+        """Apply walk-forward optimized RSI bands. Pass None to clear."""
+        self._opt_rsi_oversold  = rsi_oversold
+        self._opt_rsi_overbought = rsi_overbought
+        logger.info(
+            "StrategyManager: opt RSI bands updated oversold=%.0f overbought=%.0f",
+            rsi_oversold or 0.0, rsi_overbought or 0.0,
+        )
 
     def update_weights(self, weights: Dict[str, float]):
         """Updated by AI trainer based on performance."""
@@ -35,8 +80,11 @@ class StrategyManager:
 
     def dca_signal(self, analysis: MarketAnalysis) -> TradingSignal:
         cfg = settings.get("strategy", "dca") or {}
-        rsi_buy = float(cfg.get("rsi_buy_threshold", 35))
-        rsi_sell = float(cfg.get("rsi_sell_threshold", 65))
+        # Optimizer override takes precedence over the config value when present
+        rsi_buy  = self._opt_rsi_oversold  if self._opt_rsi_oversold  is not None \
+                   else float(cfg.get("rsi_buy_threshold",  35))
+        rsi_sell = self._opt_rsi_overbought if self._opt_rsi_overbought is not None \
+                   else float(cfg.get("rsi_sell_threshold", 65))
         interval_h = float(cfg.get("interval_hours", 24))
 
         symbol = analysis.symbol

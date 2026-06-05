@@ -20,6 +20,7 @@ import aiohttp
 from ..core.config import settings
 from ..core.database import SessionLocal, TrainingRecord
 from ..exchanges.base import OHLCV
+from .param_optimizer import ParamOptimizer
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +34,31 @@ _SOURCE_TAG = "hourly_real"   # marks records from this trainer
 
 
 class HourlyTrainer:
-    def __init__(self, trainer, broadcast_fn=None):
+    # Minimum bars needed before a walk-forward optimization run is worthwhile
+    _MIN_OPT_BARS = 60
+    # Rolling optimization buffer cap per symbol (~33 days of 1h candles)
+    _OPT_BUFFER_CAP = 800
+    # Hourly grid is intentionally lean: only the dimensions our cheap bar
+    # builder can exercise (RSI bands, ATR SL, confidence gate).
+    _HOURLY_GRID = {
+        "rsi_oversold":   [25, 30, 35],
+        "rsi_overbought": [65, 70, 75],
+        "atr_sl_mult":    [1.5, 2.0, 2.5],
+        "min_confidence": [0.50, 0.55, 0.60, 0.65, 0.70],
+    }
+
+    def __init__(self, trainer, broadcast_fn=None, *, trader=None):
         self._trainer   = trainer
+        self._trader    = trader   # optional AITrader ref — used to refresh opt params
         self._broadcast = broadcast_fn
         self._task: Optional[asyncio.Task] = None
+        self._param_opt = ParamOptimizer(
+            grid=self._HOURLY_GRID, n_splits=3, models_dir=settings.models_dir
+        )
+        # Rolling per-symbol bar buffer for walk-forward optimization. Only newly
+        # analyzed candles are appended each run (reusing existing analyze() work),
+        # so the buffer fills on the cold-start batch and keeps growing thereafter.
+        self._opt_bars: dict = {}
         self.status = {
             "running":          False,
             "last_run":         None,
@@ -46,6 +68,7 @@ class HourlyTrainer:
             "symbols_ok":       [],
             "error":            None,
             "next_run_in":      3600,
+            "param_opt":        self._param_opt.summary(),
         }
 
     # ── public ───────────────────────────────────────────────────────────
@@ -94,7 +117,13 @@ class HourlyTrainer:
                         candles = await self._fetch_klines(session, sym)
                         if len(candles) < LOOKAHEAD + 10:
                             continue
-                        added = self._label_and_store(sym, candles)
+                        sym_bars: list = []
+                        added = self._label_and_store(sym, candles, bars_out=sym_bars)
+                        if sym_bars:
+                            buf = self._opt_bars.setdefault(sym, [])
+                            buf.extend(sym_bars)
+                            if len(buf) > self._OPT_BUFFER_CAP:
+                                del buf[: len(buf) - self._OPT_BUFFER_CAP]
                         added_total += added
                         ok_syms.append(sym)
                         logger.info(f"  {sym}: {len(candles)} candles → {added} new records")
@@ -121,6 +150,7 @@ class HourlyTrainer:
                 "total_samples":  self._count_real_records(),
                 "model_accuracy": accuracy,
                 "symbols_ok":     ok_syms,
+                "param_opt":      self._param_opt.summary(),
             })
 
             await self._emit("hourly_train_done", {
@@ -137,6 +167,39 @@ class HourlyTrainer:
             self.status["running"] = False
             self.status["error"]   = str(e)
             return dict(self.status)
+
+    def _maybe_optimize_params(self):
+        """Run walk-forward param optimization on the rolling bar buffer (F5.1).
+
+        Optimization is gated behind ``ai.param_optimize`` (default on) and only
+        fires once a symbol's rolling buffer holds ``_MIN_OPT_BARS`` analyzed
+        candles, so it kicks in after the cold-start batch and re-runs as the
+        buffer keeps growing each hour.
+        """
+        if not settings.get("ai", "param_optimize", default=True):
+            return
+        if not self._opt_bars:
+            return
+        sym, bars = max(self._opt_bars.items(), key=lambda kv: len(kv[1]))
+        if len(bars) < self._MIN_OPT_BARS:
+            logger.debug(
+                "HourlyTrainer: skipping param-opt (%s has only %d bars)", sym, len(bars)
+            )
+            return
+        try:
+            result = self._param_opt.run(bars)
+            logger.info(
+                "HourlyTrainer: param-opt on %s (%d bars) → sharpe=%.3f params=%s",
+                sym, len(bars), result.get("best_sharpe", 0.0), result.get("best_params"),
+            )
+            # Propagate newly-saved params to the live trader immediately (F5.1)
+            if self._trader is not None and hasattr(self._trader, "_apply_opt_params"):
+                try:
+                    self._trader._apply_opt_params()
+                except Exception as ex:
+                    logger.warning("HourlyTrainer: failed to refresh trader opt params — %s", ex)
+        except Exception as e:
+            logger.warning("HourlyTrainer: param-opt failed — %s", e)
 
     async def _fetch_klines(self, session: aiohttp.ClientSession, symbol: str) -> List[OHLCV]:
         binance_sym = symbol.replace("/", "")
@@ -158,7 +221,9 @@ class HourlyTrainer:
             ))
         return candles
 
-    def _label_and_store(self, symbol: str, candles: List[OHLCV]) -> int:
+    def _label_and_store(
+        self, symbol: str, candles: List[OHLCV], bars_out: Optional[list] = None
+    ) -> int:
         from .market_analyzer import analyze
 
         added = 0
@@ -190,6 +255,17 @@ class HourlyTrainer:
                 price    = candle.close
                 change   = (candle.close - candles[0].close) / candles[0].close * 100
                 analysis = analyze(symbol, window, price, change)
+
+                # Collect a bar for walk-forward param optimization (F5.1).
+                # Reuses the analysis we already computed — no extra cost.
+                if bars_out is not None:
+                    feats = analysis.features or {}
+                    bars_out.append({
+                        "close":             float(price),
+                        "rsi":               float(feats.get("rsi", 50.0)),
+                        "atr_pct":           float(feats.get("atr_pct", 1.0)) / 100.0,
+                        "signal_confidence": float(self._trainer.score(feats)),
+                    })
 
                 # look-ahead label
                 future_close = candles[i + LOOKAHEAD].close

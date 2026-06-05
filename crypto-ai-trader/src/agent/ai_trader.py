@@ -15,9 +15,11 @@ from .rl_trainer import RLTrainer
 from .memory_manager import MemoryManager
 from .signal_cache import SignalCache
 from .strategy_manager import StrategyManager, TradingSignal
+from .trade_journal import TradeJournal
 from .trainer import AITrainer
 from ..core.config import settings
 from ..core.database import SessionLocal, Trade, Portfolio
+from ..core.persistence import atomic_write_json, safe_read_json
 from ..exchanges.base import BaseExchange
 from ..notifications import line_notify, telegram_notify
 
@@ -43,7 +45,7 @@ async def _notify_trade(action: str, symbol: str, price: float, pnl_pct: float =
 class AITrader:
     def __init__(self, exchange: BaseExchange):
         self._exchange    = exchange
-        self._strategy    = StrategyManager()
+        self._strategy    = StrategyManager(data_dir=settings.data_dir)
         self._trainer     = AITrainer()
         self._claude      = ClaudeAnalyzer(exchange=exchange)
 
@@ -69,17 +71,26 @@ class AITrader:
         self._broadcast_fn = None
         self._daily_pnl: float = 0.0
         self._daily_reset_date: str = ""
+        # Serialises open/close so parallel analysis can't double-open a symbol
+        # or mutate _open_trades concurrently.
+        self._trade_lock = asyncio.Lock()
+        # Crash-safe runtime snapshot (open positions + daily PnL survive restart)
+        self._state_path = settings.data_dir / "runtime_state.json"
 
         # Dry-run: paper trade without hitting the exchange
         self._dry_run: bool = bool(settings.get("trading", "dry_run", default=False))
         # Kill switch: halts all new trades when activated
         self._killed: bool  = False
+        # Used by stop() to unblock the sleep in start() immediately.
+        self._stop_event = asyncio.Event()
 
         # Signal funnel + agent activity (dashboard)
         self._signal_stats: Dict[str, object] = {
             "date": "", "analyzed": 0, "signals": 0, "approved": 0, "rejected": 0
         }
         self._last_signal_info: Optional[dict] = None
+        # Attribution: which sub-signals drove the last decision (F5.4)
+        self._signal_attribution: Optional[dict] = None
         self._agent_activity: Dict[str, dict] = {
             "analyzer":   {"status": "idle", "detail": "พร้อมทำงาน", "ts": None},
             "strategist": {"status": "idle", "detail": "พร้อมทำงาน", "ts": None},
@@ -87,6 +98,97 @@ class AITrader:
             "trainer":    {"status": "idle", "detail": "พร้อมทำงาน", "ts": None},
             "risk":       {"status": "idle", "detail": "พร้อมทำงาน", "ts": None},
         }
+
+        # Restore open positions + daily PnL from the last snapshot so a restart
+        # doesn't reset the daily-loss limit or orphan in-flight trades.
+        self._restore_runtime_state()
+
+    # ── Crash-safe runtime state ──────────────────────────────────────────
+
+    def _restore_runtime_state(self):
+        """Reload open trades, daily PnL and signal funnel from the snapshot."""
+        data = safe_read_json(self._state_path)
+        if not isinstance(data, dict):
+            return
+        try:
+            today = date.today().isoformat()
+            # Daily PnL only carries over within the same calendar day.
+            if data.get("daily_reset_date") == today:
+                self._daily_pnl        = float(data.get("daily_pnl", 0.0))
+                self._daily_reset_date = today
+                if isinstance(data.get("signal_stats"), dict):
+                    self._signal_stats = data["signal_stats"]
+            open_trades = data.get("open_trades", {})
+            if isinstance(open_trades, dict):
+                self._open_trades = open_trades
+                # Re-register open risk so portfolio heat is correct immediately,
+                # and rehydrate opened_at back into a datetime (JSON stored ISO).
+                for sym, tr in self._open_trades.items():
+                    oa = tr.get("opened_at")
+                    if isinstance(oa, str):
+                        try:
+                            tr["opened_at"] = datetime.fromisoformat(oa)
+                        except ValueError:
+                            tr["opened_at"] = datetime.utcnow()
+                    try:
+                        risk_amt = float(tr.get("cost", 0.0)) * float(tr.get("stop_loss_pct", 0.0) or 0.03)
+                        self._risk.register_open_trade(sym, risk_amt)
+                    except Exception:
+                        pass
+            logger.info(
+                "Restored runtime state: %d open positions, daily_pnl=%.2f",
+                len(self._open_trades), self._daily_pnl,
+            )
+        except Exception as exc:
+            logger.warning("Could not restore runtime state: %s", exc)
+            self._open_trades = {}
+
+    def _save_runtime_state(self):
+        """Atomically persist open trades + daily PnL (called after every open/close)."""
+        atomic_write_json(self._state_path, {
+            "daily_pnl":        self._daily_pnl,
+            "daily_reset_date": self._daily_reset_date,
+            "signal_stats":     self._signal_stats,
+            "open_trades":      self._open_trades,
+        })
+
+    def _apply_opt_params(self):
+        """
+        Load best_params.json (F5.1) and distribute the tuned values to every
+        subsystem that consumes them.  Safe to call at startup or after a new
+        optimization run — always overwrites with the latest values.
+        """
+        bp: dict = self._param_opt.best_params or {}
+
+        # confidence gate — only allowed to *tighten* vs. the operator config
+        cfg_min_conf = float(settings.get("trading", "min_confidence", default=0.60))
+        raw = bp.get("min_confidence")
+        self._opt_min_conf: Optional[float] = (
+            max(cfg_min_conf, float(raw)) if raw is not None else None
+        )
+
+        # RSI bands → market analyzer (signals) + strategy manager (DCA + mean_rev)
+        self._opt_rsi_oversold:  Optional[float] = (
+            float(bp["rsi_oversold"])  if "rsi_oversold"  in bp else None
+        )
+        self._opt_rsi_overbought: Optional[float] = (
+            float(bp["rsi_overbought"]) if "rsi_overbought" in bp else None
+        )
+        self._strategy.set_opt_params(
+            rsi_oversold  = self._opt_rsi_oversold,
+            rsi_overbought= self._opt_rsi_overbought,
+        )
+
+        # ATR SL multiplier → ExitManager (stored for use in attach_exits calls)
+        self._opt_atr_sl_mult: Optional[float] = (
+            float(bp["atr_sl_mult"]) if "atr_sl_mult" in bp else None
+        )
+
+        logger.info(
+            "ParamOpt applied: min_conf=%s rsi_ov=%s rsi_ob=%s atr_mult=%s",
+            self._opt_min_conf, self._opt_rsi_oversold,
+            self._opt_rsi_overbought, self._opt_atr_sl_mult,
+        )
 
     def set_broadcast(self, fn):
         self._broadcast_fn = fn
@@ -99,6 +201,7 @@ class AITrader:
             }
             self._daily_pnl = 0.0
             self._daily_reset_date = today
+            self._save_runtime_state()   # persist the cleared state immediately
 
     def _set_agent(self, name: str, status: str, detail: str):
         if name in self._agent_activity:
@@ -186,6 +289,8 @@ class AITrader:
                 rsi_period=int(cfg.get("rsi_period", 14)),
                 bb_period=int(cfg.get("bb_period",   20)),
                 atr_period=int(cfg.get("atr_period", 14)),
+                rsi_oversold  = self._opt_rsi_oversold  or 30.0,
+                rsi_overbought= self._opt_rsi_overbought or 70.0,
             )
             self._analyses[symbol] = analysis
 
@@ -298,7 +403,7 @@ class AITrader:
     # ── Risk checks ───────────────────────────────────────────────────────
 
     async def _update_risk_engine(self, portfolio: dict, regime: str):
-        """Push current state into the RiskEngine."""
+        """Push current state into the RiskEngine and run adaptive limit recalibration (F2.4)."""
         equity = portfolio.get("total_value", 0)
         self._risk.update(
             equity=equity,
@@ -306,6 +411,7 @@ class AITrader:
             open_trades=self._open_trades,
             regime=regime,
         )
+        self._risk.adaptive_adjust()
 
     async def _check_risk_limits(self, symbol: str, trade_risk: float = 0.0) -> Tuple[bool, str]:
         """Gate a new BUY through the advanced risk engine."""
@@ -398,46 +504,127 @@ class AITrader:
         ai_model  = settings.ai_model
         ml_signal = None
 
+        # Attribution: record every sub-signal that contributes to the decision
+        components: Dict[str, Optional[dict]] = {
+            "ml": None, "rule": None, "claude": None, "multi_model": None, "pairs": None,
+        }
+
+        def _capture(name, s, strategy=None):
+            if s is None:
+                return
+            entry = {"action": s.action, "confidence": round(s.confidence, 3)}
+            if strategy:
+                entry["strategy"] = strategy
+            components[name] = entry
+
         if ai_model in ("ml", "hybrid") and settings.get("ai", "ml", "enabled", default=True):
             ml_signal = self._trainer.predict(analysis.features)
+            _capture("ml", ml_signal)
 
-        # RL selects the best strategy for this regime
+        # RL bandit 1: best strategy for this regime
         rl_strategy = self._rl.select_strategy(regime.regime)
         logger.debug("RL selected strategy=%s for regime=%s", rl_strategy, regime.regime)
 
+        chosen = ai_model
         if ai_model == "claude":
             sig = await self._claude_signal_cached(analysis, portfolio, regime)
         elif ai_model == "rule_based":
             sig = self._strategy.get_signal(analysis)
+            _capture("rule", sig, strategy=sig.strategy)
+            chosen = "rule_based"
         elif ai_model == "ml" and ml_signal:
             sig = ml_signal
+            chosen = "ml"
         elif ai_model == "multi_model":
             from .multi_model import multi_model_signal
             sig = await multi_model_signal(analysis)
-        else:  # hybrid or fallback — let RL guide the primary strategy
-            # RL picks the strategy best suited to the current regime; dispatch
-            # to that single strategy instead of the blended hybrid (which lets
-            # conflicting sub-strategies cancel each other out to HOLD).
-            rule_sig = self._strategy.signal_for_strategy(rl_strategy, analysis, ml_signal)
+            _capture("multi_model", sig)
+            chosen = "multi_model"
+        else:
+            # Hybrid path — RL bandit 2 (F2.1): select which model to use
+            bandit_model = self._model_bandit.select_model(regime.regime)
+            logger.debug("ModelBandit selected model=%s for regime=%s",
+                         bandit_model, regime.regime)
 
-            if settings.claude_api_key and ai_model in ("claude", "hybrid"):
+            # Always compute rule signal (cheap, always available)
+            rule_sig = self._strategy.signal_for_strategy(rl_strategy, analysis, ml_signal)
+            _capture("rule", rule_sig, strategy=rl_strategy)
+
+            if bandit_model == "claude" and settings.claude_api_key:
                 try:
                     claude_sig = await self._claude_signal_cached(analysis, portfolio, regime)
                     sig = claude_sig if claude_sig.confidence > rule_sig.confidence else rule_sig
                 except Exception:
-                    sig = rule_sig
+                    sig, chosen = rule_sig, f"rule:{rl_strategy}"
+            elif bandit_model == "ml" and ml_signal:
+                sig, chosen = ml_signal, "ml"
             else:
-                sig = rule_sig
+                sig, chosen = rule_sig, f"rule:{rl_strategy}"
 
-        # In crash/volatile regimes, require higher confidence bar
+        # F3.1 — Pairs signal: blend stat-arb z-score into the decision when
+        # this symbol participates in a confirmed cointegrated pair.
+        pairs_sig = self._get_pairs_signal(analysis.symbol, sig)
+        if pairs_sig is not None:
+            _capture("pairs", pairs_sig)
+            # Align: pairs signal agrees with primary → small confidence boost
+            # Diverge: pairs signal disagrees → slight confidence penalty
+            if pairs_sig.action == sig.action and sig.action != "HOLD":
+                sig = TradingSignal(
+                    sig.action,
+                    min(1.0, sig.confidence + 0.05 * pairs_sig.confidence),
+                    sig.strategy,
+                    sig.reasoning + f" | pairs z={pairs_sig.reasoning}",
+                    sig.stop_loss_pct, sig.take_profit_pct,
+                )
+            elif pairs_sig.action not in ("HOLD", sig.action) and sig.action != "HOLD":
+                sig = TradingSignal(
+                    sig.action,
+                    max(0.0, sig.confidence - 0.05 * pairs_sig.confidence),
+                    sig.strategy,
+                    sig.reasoning,
+                    sig.stop_loss_pct, sig.take_profit_pct,
+                )
+
+        # Base confidence bar. The walk-forward optimizer (F5.1) may only
+        # *tighten* the gate — it can raise min_conf above the configured
+        # default but never loosen it below, so auto-tuning can't make the
+        # bot trade more recklessly than the operator allows. Regime
+        # escalation (CRASH/VOLATILE) still applies on top.
         min_conf = float(settings.get("trading", "min_confidence", default=0.60))
+        if getattr(self, "_opt_min_conf", None) is not None:
+            min_conf = max(min_conf, self._opt_min_conf)
         if regime.regime == "CRASH":
             min_conf = max(min_conf, 0.85)
         elif regime.regime == "VOLATILE":
             min_conf = max(min_conf, 0.75)
 
-        if sig.action != "HOLD" and sig.confidence < min_conf:
-            return TradingSignal(
+        # F2.3 — trade memory. Recall how this exact setup signature has
+        # performed historically. Like the optimizer, memory may only make the
+        # engine *more* cautious: a statistically losing setup is vetoed, and a
+        # negative-bias setup raises the confidence bar. Good history never
+        # loosens the gate below what the operator/optimizer already require.
+        mem = self._journal.recall(
+            regime     = regime.regime,
+            strategy   = sig.strategy,
+            confidence = sig.confidence,
+            rsi_signal = analysis.rsi_signal,
+        )
+        mem_veto = bool(sig.action != "HOLD" and mem.get("veto"))
+        if not mem_veto and mem.get("confident") and mem.get("bias", 0.0) < 0:
+            # scale a penalty up to +0.15 as bias → -1
+            min_conf = min(0.95, min_conf + 0.15 * abs(mem["bias"]))
+
+        gated = sig.action != "HOLD" and sig.confidence < min_conf
+        final_sig = sig
+        if mem_veto:
+            final_sig = TradingSignal(
+                "HOLD", sig.confidence, sig.strategy,
+                (f"Trade memory veto — setup {regime.regime}/{sig.strategy} "
+                 f"win-rate {mem.get('win_rate', 0):.0%} over {mem.get('n')} trades"),
+                sig.stop_loss_pct, sig.take_profit_pct,
+            )
+        elif gated:
+            final_sig = TradingSignal(
                 "HOLD", sig.confidence, sig.strategy,
                 f"Confidence {sig.confidence:.0%} below regime threshold {min_conf:.0%}",
                 sig.stop_loss_pct, sig.take_profit_pct,
@@ -463,11 +650,26 @@ class AITrader:
         regime: RegimeResult,
         force: bool = False,
     ) -> bool:
+        # Serialise the whole open path so concurrent callers (main loop +
+        # manual API trade) can't double-open a symbol or race on cash.
+        async with self._trade_lock:
+            return await self._execute_trade_locked(symbol, signal, analysis, regime, force)
+
+    async def _execute_trade_locked(
+        self,
+        symbol: str,
+        signal: TradingSignal,
+        analysis: MarketAnalysis,
+        regime: RegimeResult,
+        force: bool = False,
+    ) -> bool:
         if symbol in self._open_trades and signal.action == "BUY":
             return False
 
         if symbol in self._open_trades and signal.action == "SELL":
-            await self._close_trade(symbol, analysis.price, "signal_reversal")
+            # We already hold the trade lock — close without re-acquiring it.
+            await self._close_trade(symbol, analysis.price, "signal_reversal",
+                                    acquire_lock=False)
             return True
 
         if signal.action not in ("BUY", "SELL"):
@@ -563,6 +765,7 @@ class AITrader:
             else:
                 order = await self._exchange.create_order(symbol, signal.action.lower(), amount)
 
+            # Build base trade data then overlay ATR-based exits (F2.2)
             trade_data = {
                 "symbol":            symbol,
                 "side":              signal.action,
@@ -572,6 +775,7 @@ class AITrader:
                 "strategy":          signal.strategy,
                 "confidence":        signal.confidence,
                 "reasoning":         signal.reasoning,
+                "rsi_signal":        analysis.rsi_signal,   # F2.3 — setup memory key
                 "stop_loss_price":   order.price * (1 - signal.stop_loss_pct),
                 "take_profit_price": order.price * (1 + signal.take_profit_pct),
                 "regime":            regime.regime,
@@ -580,8 +784,24 @@ class AITrader:
                 "trailing_sl":       None,
             }
 
+            # Overlay ATR-based SL/TP (F2.2) — overwrites fixed-% levels.
+            # Optimizer's atr_sl_mult (F5.1) overrides the regime default when present.
+            if analysis.atr_pct and analysis.atr_pct > 0:
+                self._exit_mgr.attach_exits(
+                    trade_data, order.price, analysis.atr_pct, regime.regime,
+                    sl_mult_override=self._opt_atr_sl_mult,
+                )
+
             db = SessionLocal()
             try:
+                attr_summary = self._attribution_summary(self._signal_attribution)
+                reasoning = (f"{signal.reasoning} {attr_summary}".strip()
+                             if attr_summary else signal.reasoning)
+                # Enrich the audit JSON with the categorical setup context so
+                # TradeJournal (F2.3) can rebuild memory after a restart.
+                indicators = dict(analysis.features)
+                indicators["regime"]     = regime.regime
+                indicators["rsi_signal"] = analysis.rsi_signal
                 trade = Trade(
                     symbol=symbol,
                     side=signal.action,
@@ -593,8 +813,8 @@ class AITrader:
                     strategy=signal.strategy,
                     ai_model=settings.ai_model,
                     confidence=signal.confidence,
-                    reasoning=signal.reasoning,
-                    indicators=analysis.features,
+                    reasoning=reasoning,
+                    indicators=indicators,
                 )
                 db.add(trade)
                 db.commit()
@@ -605,26 +825,38 @@ class AITrader:
 
             self._trainer.record_trade(symbol, analysis.features, signal.action, trade_id)
             self._rl.record_trade(trade_id, signal.strategy, regime.regime)
+            # F2.1: record which model was chosen for this trade so we can reward it on close
+            _chosen_model = (self._signal_attribution or {}).get("chosen", "rule")
+            _model_key = _chosen_model.split(":")[0]  # "rule:trend" → "rule"
+            self._model_bandit.record_trade(trade_id, _model_key, regime.regime)
 
             if signal.action == "BUY":
-                self._open_trades[symbol] = {**trade_data, "trade_id": trade_id}
+                self._open_trades[symbol] = {
+                    **trade_data, "trade_id": trade_id,
+                    "stop_loss_pct": signal.stop_loss_pct,   # for exact risk re-register on restart
+                }
                 risk_amount = order.cost * signal.stop_loss_pct
                 self._risk.register_open_trade(symbol, risk_amount)
+                self._save_runtime_state()   # crash-safe snapshot after open
+
+            # Position state changed → drop cached decision so next cycle is fresh
+            self._signal_cache.invalidate(symbol)
 
             # Position state changed → drop cached decision so next cycle is fresh
             self._signal_cache.invalidate(symbol)
 
             await self._broadcast("trade_executed", {
-                "symbol":     symbol,
-                "side":       signal.action,
-                "price":      order.price,
-                "amount":     order.amount,
-                "cost":       order.cost,
-                "strategy":   signal.strategy,
-                "confidence": signal.confidence,
-                "reasoning":  signal.reasoning,
-                "mode":       settings.trading_mode,
-                "regime":     regime.regime,
+                "symbol":      symbol,
+                "side":        signal.action,
+                "price":       order.price,
+                "amount":      order.amount,
+                "cost":        order.cost,
+                "strategy":    signal.strategy,
+                "confidence":  signal.confidence,
+                "reasoning":   signal.reasoning,
+                "mode":        settings.trading_mode,
+                "regime":      regime.regime,
+                "attribution": self._signal_attribution,
             })
             logger.info(
                 "Trade executed: %s %s @ %.4f (conf=%.2f, regime=%s)",
@@ -641,7 +873,14 @@ class AITrader:
 
     # ── Trade exit ────────────────────────────────────────────────────────
 
-    async def _close_trade(self, symbol: str, price: float, reason: str) -> dict:
+    async def _close_trade(self, symbol: str, price: float, reason: str,
+                           *, acquire_lock: bool = True) -> dict:
+        if acquire_lock:
+            async with self._trade_lock:
+                return await self._close_trade_locked(symbol, price, reason)
+        return await self._close_trade_locked(symbol, price, reason)
+
+    async def _close_trade_locked(self, symbol: str, price: float, reason: str) -> dict:
         if symbol not in self._open_trades:
             return {}
         trade = self._open_trades[symbol]
@@ -684,12 +923,29 @@ class AITrader:
                     db.commit()
             finally:
                 db.close()
+        except Exception as e:
+            # Order or DB write failed — position is NOT closed; leave in-memory
+            # state intact so the next cycle retries. No orphan created.
+            logger.error("Close failed for %s: %s", symbol, e)
+            return {}
 
-            trade_id = trade["trade_id"]
-            regime   = trade.get("regime", "RANGING")
+        # ── Position is now closed on the exchange + DB. The in-memory truth
+        # MUST converge regardless of what the downstream bookkeeping does, or
+        # we orphan a closed position. Do the critical state mutation first.
+        trade_id = trade["trade_id"]
+        regime   = trade.get("regime", "RANGING")
+        self._daily_pnl += pnl
+        self._open_trades.pop(symbol, None)
+        self._risk.deregister_trade(symbol)
+        self._signal_cache.invalidate(symbol)   # context changed after exit
+        self._save_runtime_state()              # snapshot the closed state
 
+        # ── Best-effort learning + notifications. Failures here are logged but
+        # never resurrect the position or block the close.
+        try:
             self._trainer.update_outcome(trade_id, pnl_pct)
             self._rl.update_outcome(trade_id, pnl_pct, self._strategy)
+            self._model_bandit.update_outcome(trade_id, pnl_pct)  # F2.1
             self._sizer.update_outcome(symbol, pnl_pct)
             self._risk.deregister_trade(symbol)
 
@@ -704,6 +960,7 @@ class AITrader:
                 holding_hours=holding_h, entry=entry, exit_price=order.price,
             ))
 
+        try:
             await self._broadcast("trade_closed", {
                 "symbol":      symbol,
                 "reason":      reason,
@@ -713,12 +970,12 @@ class AITrader:
                 "pnl_pct":     pnl_pct,
                 "regime":      regime,
             })
-            logger.info("Closed %s: %s | PnL: %+.2f%%", symbol, reason, pnl_pct)
             await _notify_trade("SELL", symbol, order.price, pnl_pct)
-            return {"price": order.price, "pnl": pnl, "pnl_pct": pnl_pct}
         except Exception as e:
-            logger.error("Close failed for %s: %s", symbol, e)
-            return {}
+            logger.debug("Close notification failed for %s: %s", symbol, e)
+
+        logger.info("Closed %s: %s | PnL: %+.2f%%", symbol, reason, pnl_pct)
+        return {"price": order.price, "pnl": pnl, "pnl_pct": pnl_pct}
 
     async def _check_exit_conditions(self, symbol: str):
         if symbol not in self._open_trades:
@@ -728,21 +985,34 @@ class AITrader:
         if not analysis:
             return
         price  = analysis.price
-        sl     = trade["stop_loss_price"]
-        tp     = trade["take_profit_price"]
         entry  = trade["price"]
         opened = trade.get("opened_at", datetime.now(timezone.utc))
 
-        # ── 1. Fixed stop loss ────────────────────────────────────────────
-        if price <= sl:
-            await self._close_trade(symbol, price, f"Stop loss ({price:.4f} ≤ {sl:.4f})")
-            return
+        # ── 1. ATR-based SL / trailing / TP  (F2.2) ──────────────────────
+        # When trade was opened with atr_pct, ExitManager handles all three
+        # exit types in one call (SL, trailing, TP).
+        atr_pct = getattr(analysis, "atr_pct", None) or 0.0
+        if atr_pct > 0:
+            exit_reason = self._exit_mgr.check_exit(trade, price, atr_pct, regime)
+            if exit_reason:
+                await self._close_trade(symbol, price, exit_reason)
+                return
+        else:
+            # Fallback: fixed SL/TP for trades without ATR data
+            sl = trade.get("stop_loss_price")
+            tp = trade.get("take_profit_price")
+            if sl and price <= sl:
+                await self._close_trade(symbol, price, f"Stop loss ({price:.4f} ≤ {sl:.4f})")
+                return
+            if tp and price >= tp:
+                await self._close_trade(symbol, price, f"Take profit ({price:.4f} ≥ {tp:.4f})")
+                return
 
-        # ── 2. Trailing stop ──────────────────────────────────────────────
+        # ── 2. Legacy config trailing stop ───────────────────────────────
         trail_cfg = settings.get("strategy", "trailing_stop") or {}
-        if trail_cfg.get("enabled"):
-            trail_pct      = float(trail_cfg.get("pct", 0.02))
-            trail_act_pct  = float(trail_cfg.get("activate_pct", 0.01))
+        if trail_cfg.get("enabled") and atr_pct == 0:
+            trail_pct     = float(trail_cfg.get("pct", 0.02))
+            trail_act_pct = float(trail_cfg.get("activate_pct", 0.01))
             hw = max(trade.get("high_water", entry), price)
             trade["high_water"] = hw
             cur_profit = (hw - entry) / entry
@@ -753,7 +1023,8 @@ class AITrader:
                     trade["trailing_sl"] = new_trail
             trail_sl = trade.get("trailing_sl")
             if trail_sl and price <= trail_sl:
-                await self._close_trade(symbol, price, f"Trailing stop ({price:.4f} ≤ {trail_sl:.4f})")
+                await self._close_trade(symbol, price,
+                                        f"Trailing stop ({price:.4f} ≤ {trail_sl:.4f})")
                 return
 
         # ── 3. ROI table (time-based take profit) ─────────────────────────
@@ -775,10 +1046,6 @@ class AITrader:
                     await self._close_trade(symbol, price,
                         f"ROI table: {cur_pnl:.1%} ≥ {roi_thresh:.1%} at {age_minutes:.0f}min")
                     return
-
-        # ── 4. Fixed take profit ──────────────────────────────────────────
-        if price >= tp:
-            await self._close_trade(symbol, price, f"Take profit ({price:.4f} ≥ {tp:.4f})")
 
     # ── Main cycle ────────────────────────────────────────────────────────
 
@@ -910,6 +1177,7 @@ class AITrader:
 
     async def start(self):
         self._running = True
+        self._stop_event.clear()
         interval = settings.analysis_interval
         logger.info(
             "AI Trader started — interval=%ds, mode=%s, model=%s",
@@ -920,10 +1188,17 @@ class AITrader:
                 await self.run_cycle()
             except Exception as e:
                 logger.error("Trading cycle error: %s", e)
-            await asyncio.sleep(interval)
+            # Use an event-based wait so stop() can unblock immediately.
+            try:
+                await asyncio.wait_for(self._stop_event.wait(), timeout=interval)
+            except asyncio.TimeoutError:
+                pass   # normal timeout — proceed to next cycle
+            if self._stop_event.is_set():
+                break
 
     def stop(self):
         self._running = False
+        self._stop_event.set()
 
     def kill(self):
         """Activate kill switch — no new trades until resume() is called."""

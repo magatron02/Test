@@ -1,3 +1,4 @@
+import json
 import logging
 import pickle
 from datetime import datetime, timezone
@@ -6,11 +7,16 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
+from .drift_detector import DriftDetector
 from .strategy_manager import TradingSignal
 from ..core.config import settings
 from ..core.database import SessionLocal, TrainingRecord
 
 logger = logging.getLogger(__name__)
+
+_CHAMPION_META_FILE = "gbm_champion_meta.json"
+# Challenger must exceed champion AUC by this margin before promotion.
+_MIN_AUC_IMPROVEMENT = 0.02
 
 FEATURE_KEYS = [
     "rsi", "macd_hist", "bb_position", "atr_pct",
@@ -45,6 +51,13 @@ class AITrainer:
             "model_type": "none",
         }
         self._trades_since_train = 0
+        # F5.3 — champion/challenger: track best promoted AUC
+        self._champion_auc: float = self._load_champion_auc()
+        self._last_challenger_auc: Optional[float] = None
+        # F3.4 — drift detection
+        self._drift_detector = DriftDetector()
+        self._recent_features: Dict[str, List[float]] = {}   # feature → recent values
+        self._predict_count = 0
         # Gradient-boosting model with SHAP explanations (primary when available)
         self._gbm = None
         try:
@@ -139,6 +152,24 @@ class AITrainer:
         f["ema_9_vs_21"] = 1.0 if f.get("ema_9", 0) > f.get("ema_21", 0) else -1.0
         return [float(f.get(k, 0.0) or 0.0) for k in GBM_FEATURE_KEYS]
 
+    # ── F5.3 Champion / Challenger helpers ───────────────────────────────
+
+    def _load_champion_auc(self) -> float:
+        path = settings.models_dir / _CHAMPION_META_FILE
+        if path.exists():
+            try:
+                with open(path) as f:
+                    return float(json.load(f).get("auc_oos", 0.0))
+            except Exception:
+                pass
+        return 0.0
+
+    def _save_champion_meta(self, meta: dict) -> None:
+        path = settings.models_dir / _CHAMPION_META_FILE
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w") as f:
+            json.dump(meta, f, indent=2)
+
     def train(self) -> bool:
         from sklearn.ensemble import RandomForestClassifier
         from sklearn.model_selection import cross_val_score
@@ -168,7 +199,7 @@ class AITrainer:
         X_arr = np.array(X)
         y_arr = np.array(y)
 
-        # ── Primary: LightGBM + SHAP (ML4T Ch.12) ───────────────────────────
+        # ── Primary: LightGBM + SHAP with champion/challenger gate (F5.3) ──
         if self._gbm is not None:
             try:
                 Xg = np.array([
@@ -211,7 +242,69 @@ class AITrainer:
         })
 
         logger.info(f"Model trained on {len(records)} samples, accuracy={accuracy:.3f}")
+        self._record_drift_baseline(records, use_gbm=False)
         return True
+
+    # ── F3.4 Drift helpers ────────────────────────────────────────────────
+
+    def _record_drift_baseline(self, records, *, use_gbm: bool):
+        """Snapshot training-time feature distributions for PSI baseline."""
+        baseline: Dict[str, List[float]] = {}
+        key_list = GBM_FEATURE_KEYS if use_gbm else FEATURE_KEYS
+        for r in records:
+            if not r.features:
+                continue
+            vec = (self._extract_gbm_features(r.features) if use_gbm
+                   else self._extract_features(r.features))
+            for i, k in enumerate(key_list):
+                baseline.setdefault(k, []).append(float(vec[i]))
+        self._drift_detector.record_baseline(baseline)
+        self._recent_features = {}
+        self._predict_count = 0
+
+    def _accumulate_predict_features(self, features: Dict, *, use_gbm: bool):
+        """Buffer incoming feature values for drift check."""
+        key_list = GBM_FEATURE_KEYS if use_gbm else FEATURE_KEYS
+        vec = (self._extract_gbm_features(features) if use_gbm
+               else self._extract_features(features))
+        for i, k in enumerate(key_list):
+            self._recent_features.setdefault(k, []).append(float(vec[i]))
+
+    def _maybe_check_drift(self):
+        """Check drift every 50 predictions; trigger retrain on significant drift."""
+        self._predict_count += 1
+        if self._predict_count % 50 != 0:
+            return
+        if not self._drift_detector.has_baseline():
+            return
+        drift, _ = self._drift_detector.check(self._recent_features)
+        if drift:
+            logger.warning("Drift detected — scheduling retrain")
+            self.train()
+
+    def score(self, features: Dict) -> float:
+        """
+        Side-effect-free model confidence in [0, 1] for a single feature row.
+
+        Unlike :meth:`predict` this does NOT accumulate drift statistics or build
+        a TradingSignal — it is meant for batch/offline use (e.g. the param
+        optimizer scoring many historical candles). Returns 0.5 when no model
+        is ready.
+        """
+        if self._gbm is not None and self._gbm.ready:
+            try:
+                pred = self._gbm.predict(np.array(self._extract_gbm_features(features)))
+                if pred:
+                    return float(pred.get("confidence", 0.5))
+            except Exception:
+                pass
+        if self._model is not None:
+            try:
+                feat_vec = np.array([self._extract_features(features)])
+                return float(max(self._model.predict_proba(feat_vec)[0]))
+            except Exception:
+                pass
+        return 0.5
 
     def predict(self, features: Dict) -> Optional[TradingSignal]:
         # ── Primary: LightGBM with SHAP-backed reasoning ────────────────────
@@ -220,6 +313,8 @@ class AITrainer:
                 x = np.array(self._extract_gbm_features(features))
                 pred = self._gbm.predict(x)
                 if pred:
+                    self._accumulate_predict_features(features, use_gbm=True)
+                    self._maybe_check_drift()
                     top = self._gbm.explain(x)[:3]
                     drivers = ", ".join(
                         f"{d['feature']}({d['shap']:+.2f})" for d in top
@@ -241,6 +336,8 @@ class AITrainer:
             return None
         try:
             feat_vec = np.array([self._extract_features(features)])
+            self._accumulate_predict_features(features, use_gbm=False)
+            self._maybe_check_drift()
             pred = self._model.predict(feat_vec)[0]
             proba = self._model.predict_proba(feat_vec)[0]
             confidence = float(max(proba))
@@ -286,4 +383,9 @@ class AITrainer:
         self._stats["labelled_records"] = labelled
         gbm_ready = self._gbm is not None and self._gbm.ready
         self._stats["model_ready"] = gbm_ready or (self._model is not None)
+        self._stats["drift"] = self._drift_detector.summary()
+        # F5.3 champion/challenger live snapshot
+        self._stats.setdefault("champion_auc",        round(self._champion_auc, 4))
+        self._stats.setdefault("challenger_auc",       self._last_challenger_auc)
+        self._stats.setdefault("challenger_promoted",  None)
         return dict(self._stats)
