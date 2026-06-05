@@ -704,6 +704,21 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
     </div>
   </div>
 
+  <!-- Trade Memory Row (v2.0.0 F2.3) — learned setup performance -->
+  <div class="row g-3 mb-3" id="memoryRow">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-journal-bookmark me-2"></i>Trade Memory <span class="text-muted" style="font-size:0.65rem;font-weight:400">เรียนรู้จากผลเทรดจริง · regime × strategy × confidence × RSI</span></span>
+          <span id="memoryStatBadge" class="text-muted" style="font-size:0.65rem;font-weight:600"></span>
+        </div>
+        <div class="card-body p-2" id="tradeJournalPanel">
+          <div class="text-muted text-center small py-2">ยังไม่มีประวัติเทรดที่ปิดแล้ว</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Sentiment & On-chain Row -->
   <div class="row g-3 mb-3" id="sentimentRow">
     <div class="col-12">
@@ -4375,6 +4390,7 @@ function renderDashboardState(d) {
   if (d.risk && d.risk.tail_risk) renderTailRiskPanel(d.risk.tail_risk, d.risk.limits || {});
   if (d.trainer_drift)            renderDriftPanel(d.trainer_drift);
   if (d.param_opt)                renderParamOptPanel(d.param_opt);
+  if (d.trade_journal)            renderTradeJournalPanel(d.trade_journal);
 }
 
 // ── v1.4.0 Resilience panels ───────────────────────────────────────────────
@@ -4510,6 +4526,54 @@ function renderParamOptPanel(opt) {
     ${paramRows}
     <div class="mt-2" style="font-size:0.62rem;color:var(--text-muted);text-align:right">
       last opt: ${opt_at} · ${opt.n_combos || 0} combos
+    </div>`;
+}
+
+function renderTradeJournalPanel(mem) {
+  const panel = document.getElementById('tradeJournalPanel');
+  const badge = document.getElementById('memoryStatBadge');
+  if (!panel) return;
+
+  if (!mem || !mem.total_trades) {
+    panel.innerHTML = '<div class="text-muted text-center small py-2">ยังไม่มีประวัติเทรดที่ปิดแล้ว</div>';
+    if (badge) badge.textContent = '';
+    return;
+  }
+
+  const wr = (mem.overall_win_rate != null) ? (mem.overall_win_rate * 100).toFixed(0) + '%' : '—';
+  const wrColor = mem.overall_win_rate >= 0.5 ? '#39d98a' : '#ff4d6d';
+  if (badge) badge.textContent =
+    `${mem.total_trades} เทรด · ${mem.distinct_setups} setups · ${mem.confident_setups} ยืนยันแล้ว`;
+
+  const sigLabel = (s) => {
+    const [reg, strat, band, rsi] = String(s).split('|');
+    return `${reg} · ${strat} · ${band} · ${rsi}`;
+  };
+  const row = (d, good) => {
+    const exp = (d.expectancy >= 0 ? '+' : '') + d.expectancy.toFixed(2) + '%';
+    const c = good ? '#39d98a' : '#ff4d6d';
+    return `<div class="d-flex justify-content-between py-1" style="border-bottom:1px solid var(--border);font-size:0.68rem">
+        <span style="color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%">${sigLabel(d.signature)}</span>
+        <span style="font-family:var(--font-mono)"><strong style="color:${c}">${exp}</strong> <span style="color:var(--text-muted)">${(d.win_rate*100).toFixed(0)}% · n=${d.n}</span></span>
+      </div>`;
+  };
+  const best  = (mem.best  || []).map(d => row(d, true)).join('')  || '<div class="text-muted small py-1">—</div>';
+  const worst = (mem.worst || []).map(d => row(d, false)).join('') || '<div class="text-muted small py-1">—</div>';
+
+  panel.innerHTML = `
+    <div class="d-flex justify-content-between mb-2" style="font-size:0.75rem">
+      <span>Overall win-rate: <strong style="font-family:var(--font-mono);color:${wrColor}">${wr}</strong></span>
+      <span style="font-size:0.66rem;color:var(--text-muted)">veto กันเซ็ตอัพที่ขาดทุนซ้ำ (≥${mem.min_samples} ตัวอย่าง)</span>
+    </div>
+    <div class="row g-2">
+      <div class="col-md-6">
+        <div style="font-size:0.66rem;color:#39d98a;font-weight:700;margin-bottom:2px">✓ เซ็ตอัพที่ดีที่สุด</div>
+        ${best}
+      </div>
+      <div class="col-md-6">
+        <div style="font-size:0.66rem;color:#ff4d6d;font-weight:700;margin-bottom:2px">✗ เซ็ตอัพที่ควรเลี่ยง / veto</div>
+        ${worst}
+      </div>
     </div>`;
 }
 

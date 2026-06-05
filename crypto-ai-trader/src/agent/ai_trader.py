@@ -14,6 +14,7 @@ from .position_sizer import PositionSizer
 from .rl_trainer import ModelBandit, RLTrainer
 from .signal_cache import SignalCache
 from .strategy_manager import StrategyManager, TradingSignal
+from .trade_journal import TradeJournal
 from .trainer import AITrainer
 from ..core.config import settings
 from ..core.database import SessionLocal, Trade, Portfolio
@@ -57,6 +58,15 @@ class AITrader:
         # F5.1 — walk-forward optimized params (loaded from best_params.json)
         self._param_opt   = ParamOptimizer(models_dir=settings.models_dir)
         self._apply_opt_params()
+        # F2.3 — trade memory: learns win-rate/expectancy per setup signature
+        jrn_cfg = settings.get("trade_journal", default={}) or {}
+        self._journal = TradeJournal(
+            min_samples=int(jrn_cfg.get("min_samples", 5)),
+        )
+        try:
+            self._journal.load_from_db(SessionLocal, Trade)
+        except Exception as exc:   # never let memory hydration block startup
+            logger.warning("TradeJournal hydration skipped: %s", exc)
         # Fingerprint cache: skip the costly Claude call when the market is unchanged
         self._signal_cache = SignalCache(settings.get("ai", "signal_cache", default={}) or {})
 
@@ -210,6 +220,7 @@ class AITrader:
             "signal_cache":       self._signal_cache.stats,
             "param_opt":          self._param_opt.summary(),        # F5.1
             "trainer_drift":      ts.get("drift", {}),              # F3.4
+            "trade_journal":      self._journal.summary(),          # F2.3
         }
 
     async def _broadcast(self, event: str, data: dict):
@@ -501,9 +512,32 @@ class AITrader:
         elif regime.regime == "VOLATILE":
             min_conf = max(min_conf, 0.75)
 
+        # F2.3 — trade memory. Recall how this exact setup signature has
+        # performed historically. Like the optimizer, memory may only make the
+        # engine *more* cautious: a statistically losing setup is vetoed, and a
+        # negative-bias setup raises the confidence bar. Good history never
+        # loosens the gate below what the operator/optimizer already require.
+        mem = self._journal.recall(
+            regime     = regime.regime,
+            strategy   = sig.strategy,
+            confidence = sig.confidence,
+            rsi_signal = analysis.rsi_signal,
+        )
+        mem_veto = bool(sig.action != "HOLD" and mem.get("veto"))
+        if not mem_veto and mem.get("confident") and mem.get("bias", 0.0) < 0:
+            # scale a penalty up to +0.15 as bias → -1
+            min_conf = min(0.95, min_conf + 0.15 * abs(mem["bias"]))
+
         gated = sig.action != "HOLD" and sig.confidence < min_conf
         final_sig = sig
-        if gated:
+        if mem_veto:
+            final_sig = TradingSignal(
+                "HOLD", sig.confidence, sig.strategy,
+                (f"Trade memory veto — setup {regime.regime}/{sig.strategy} "
+                 f"win-rate {mem.get('win_rate', 0):.0%} over {mem.get('n')} trades"),
+                sig.stop_loss_pct, sig.take_profit_pct,
+            )
+        elif gated:
             final_sig = TradingSignal(
                 "HOLD", sig.confidence, sig.strategy,
                 f"Confidence {sig.confidence:.0%} below regime threshold {min_conf:.0%}",
@@ -519,6 +553,9 @@ class AITrader:
             "regime":       regime.regime,
             "min_conf":     round(min_conf, 2),
             "gated":        gated,
+            "mem_veto":     mem_veto,                # F2.3 — memory blocked it
+            "mem_bias":     round(mem.get("bias", 0.0), 3),
+            "mem_n":        mem.get("n", 0),
             "components":   components,
             "final":        {"action": final_sig.action,
                              "confidence": round(final_sig.confidence, 3)},
@@ -659,6 +696,7 @@ class AITrader:
                 "strategy":          signal.strategy,
                 "confidence":        signal.confidence,
                 "reasoning":         signal.reasoning,
+                "rsi_signal":        analysis.rsi_signal,   # F2.3 — setup memory key
                 "stop_loss_price":   order.price * (1 - signal.stop_loss_pct),
                 "take_profit_price": order.price * (1 + signal.take_profit_pct),
                 "regime":            regime.regime,
@@ -680,6 +718,11 @@ class AITrader:
                 attr_summary = self._attribution_summary(self._signal_attribution)
                 reasoning = (f"{signal.reasoning} {attr_summary}".strip()
                              if attr_summary else signal.reasoning)
+                # Enrich the audit JSON with the categorical setup context so
+                # TradeJournal (F2.3) can rebuild memory after a restart.
+                indicators = dict(analysis.features)
+                indicators["regime"]     = regime.regime
+                indicators["rsi_signal"] = analysis.rsi_signal
                 trade = Trade(
                     symbol=symbol,
                     side=signal.action,
@@ -692,7 +735,7 @@ class AITrader:
                     ai_model=settings.ai_model,
                     confidence=signal.confidence,
                     reasoning=reasoning,
-                    indicators=analysis.features,
+                    indicators=indicators,
                 )
                 db.add(trade)
                 db.commit()
@@ -796,6 +839,16 @@ class AITrader:
             self._model_bandit.update_outcome(trade_id, pnl_pct)  # F2.1
             self._sizer.update_outcome(symbol, pnl_pct)
             self._risk.deregister_trade(symbol)
+
+            # F2.3 — fold this outcome into trade memory so future setups with
+            # the same signature inherit its win-rate/expectancy.
+            self._journal.record(
+                regime     = regime,
+                strategy   = trade.get("strategy", "UNKNOWN"),
+                confidence = float(trade.get("confidence", 0.0)),
+                rsi_signal = trade.get("rsi_signal", "NEUTRAL"),
+                pnl_pct    = pnl_pct,
+            )
 
             self._daily_pnl += pnl
             del self._open_trades[symbol]
