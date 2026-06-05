@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Set
 
 from fastapi import WebSocket, WebSocketDisconnect
@@ -73,7 +73,7 @@ def _record_notification(event: str, data: dict):
     _notif_seq += 1
     entry["id"] = _notif_seq
     entry["event"] = event
-    entry["ts"] = datetime.utcnow().isoformat()
+    entry["ts"] = datetime.now(timezone.utc).isoformat()
     _notif_log.append(entry)
 
 

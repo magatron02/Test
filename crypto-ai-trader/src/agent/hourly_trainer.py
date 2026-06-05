@@ -113,7 +113,7 @@ class HourlyTrainer:
                 logger.info("HourlyTrainer: no new samples, skipping retrain")
                 accuracy = self._trainer.stats.get("accuracy")
 
-            now = datetime.utcnow().isoformat(timespec="seconds")
+            now = datetime.now(timezone.utc).isoformat(timespec="seconds")
             self.status.update({
                 "running":        False,
                 "last_run":       now,

@@ -11,7 +11,7 @@ Regime multipliers reduce/increase allowed risk based on detected market state.
 """
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -90,7 +90,7 @@ class RiskEngine:
         self._state.portfolio_heat_pct = heat
 
         # Rolling equity history (7-day window)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         self._equity_history.append((now, equity))
         cutoff = now - timedelta(days=7)
         self._equity_history = [(t, e) for t, e in self._equity_history if t > cutoff]

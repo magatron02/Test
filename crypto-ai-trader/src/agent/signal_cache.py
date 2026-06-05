@@ -14,7 +14,7 @@ Inspired by Understand-Anything's fingerprint-based incremental re-analysis:
 only re-run the costly semantic step when the underlying inputs actually change.
 """
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
@@ -65,7 +65,7 @@ class SignalCache:
         if not entry:
             return None
 
-        age = (datetime.utcnow() - entry["ts"]).total_seconds()
+        age = (datetime.now(timezone.utc) - entry["ts"]).total_seconds()
         if age > self.max_age_sec:
             return None
         if entry["fingerprint"] != self._fingerprint(analysis, regime):
@@ -89,7 +89,7 @@ class SignalCache:
             "fingerprint": self._fingerprint(analysis, regime),
             "price": analysis.price,
             "signal": signal,
-            "ts": datetime.utcnow(),
+            "ts": datetime.now(timezone.utc),
             "reuse": 0,
         }
 

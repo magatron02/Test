@@ -8,7 +8,7 @@ land in near-real-time even when the AI is only analysing every few minutes.
 """
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..core.database import PriceAlert, SessionLocal
 from ..notifications import line_notify, telegram_notify
@@ -66,7 +66,7 @@ class AlertMonitor:
                 if not crossed:
                     continue
 
-                a.triggered_at = datetime.utcnow()
+                a.triggered_at = datetime.now(timezone.utc)
                 if not a.repeat:
                     a.active = False  # one-shot
                 db.commit()

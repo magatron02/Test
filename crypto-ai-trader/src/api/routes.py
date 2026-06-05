@@ -3,7 +3,7 @@ import csv
 import io
 import logging
 import math
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -409,7 +409,7 @@ async def export_trades(db: Session = Depends(get_db)):
             t.closed_at.isoformat() if t.closed_at else "",
         ])
     buf.seek(0)
-    filename = f"trades_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
+    filename = f"trades_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.csv"
     return StreamingResponse(
         io.BytesIO(buf.getvalue().encode()),
         media_type="text/csv",
@@ -1428,7 +1428,7 @@ async def get_analytics(symbol: Optional[str] = None, days: int = 30):
         q = db.query(Trade).filter(Trade.status == "closed", Trade.pnl_pct.isnot(None))
         if symbol:
             q = q.filter(Trade.symbol == symbol)
-        cutoff = datetime.utcnow() - timedelta(days=days)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
         q = q.filter(Trade.closed_at >= cutoff)
         trades_db = q.order_by(Trade.opened_at).all()
 

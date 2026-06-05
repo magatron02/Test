@@ -1,6 +1,6 @@
 import logging
 import pickle
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -178,7 +178,7 @@ class AITrainer:
                 if res.get("accuracy") is not None:
                     self._trades_since_train = 0
                     self._stats.update({
-                        "last_trained":    datetime.utcnow().isoformat(),
+                        "last_trained":    datetime.now(timezone.utc).isoformat(),
                         "accuracy":        round(res["accuracy"], 3),
                         "training_trades": len(records),
                         "model_type":      "lightgbm",
@@ -202,7 +202,7 @@ class AITrainer:
         self._trades_since_train = 0
 
         self._stats.update({
-            "last_trained": datetime.utcnow().isoformat(),
+            "last_trained": datetime.now(timezone.utc).isoformat(),
             "accuracy": round(accuracy, 3),
             "training_trades": len(records),
             "model_type": "random_forest",

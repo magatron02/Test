@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional
 
 from .market_analyzer import MarketAnalysis
@@ -41,7 +41,7 @@ class StrategyManager:
 
         symbol = analysis.symbol
         last = self._last_dca.get(symbol)
-        if last and datetime.utcnow() - last < timedelta(hours=interval_h):
+        if last and datetime.now(timezone.utc) - last < timedelta(hours=interval_h):
             return TradingSignal("HOLD", 0.0, "dca", "DCA interval not reached", 0.03, 0.06)
 
         if analysis.rsi < rsi_buy:
@@ -163,7 +163,7 @@ class StrategyManager:
         return TradingSignal("HOLD", max(buy_score, sell_score), "hybrid", "Insufficient confidence", 0.03, 0.06)
 
     def record_dca(self, symbol: str):
-        self._last_dca[symbol] = datetime.utcnow()
+        self._last_dca[symbol] = datetime.now(timezone.utc)
 
     def ichimoku_strategy(self, analysis: MarketAnalysis) -> TradingSignal:
         """Ichimoku Cloud strategy — all-in-one Japanese trend system."""
