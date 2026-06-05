@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
@@ -38,7 +38,7 @@ class Trade(Base):
     pnl = Column(Float, nullable=True)
     pnl_pct = Column(Float, nullable=True)
     indicators = Column(JSON, nullable=True)
-    opened_at = Column(DateTime, default=datetime.utcnow)
+    opened_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     closed_at = Column(DateTime, nullable=True)
 
 
@@ -52,7 +52,7 @@ class Portfolio(Base):
     positions = Column(JSON)         # {symbol: {amount, avg_price, value}}
     pnl_today = Column(Float, default=0.0)
     pnl_total = Column(Float, default=0.0)
-    recorded_at = Column(DateTime, default=datetime.utcnow, index=True)
+    recorded_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
 
 class TrainingRecord(Base):
@@ -64,7 +64,7 @@ class TrainingRecord(Base):
     outcome = Column(Float)          # pnl_pct (filled after trade closes)
     label = Column(Integer, nullable=True)  # 1=profitable, 0=loss (filled later)
     trade_id = Column(Integer, nullable=True)
-    recorded_at = Column(DateTime, default=datetime.utcnow)
+    recorded_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class PriceAlert(Base):
@@ -77,7 +77,7 @@ class PriceAlert(Base):
     active = Column(Boolean, default=True)
     repeat = Column(Boolean, default=False)   # False = one-shot (auto-disable after firing)
     triggered_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class PriceCache(Base):
@@ -89,7 +89,7 @@ class PriceCache(Base):
     volume_24h = Column(Float)
     high_24h = Column(Float)
     low_24h = Column(Float)
-    updated_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class ModelVersion(Base):
@@ -105,7 +105,7 @@ class ModelVersion(Base):
     is_active = Column(Boolean, default=True)
     kept = Column(Boolean, default=True)  # False = rejected (worse than prev best)
     notes = Column(String(300), nullable=True)
-    saved_at = Column(DateTime, default=datetime.utcnow, index=True)
+    saved_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
 
 def _ensure_columns():

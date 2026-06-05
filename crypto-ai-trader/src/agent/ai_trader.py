@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from typing import Dict, List, Optional, Tuple
 
 from .claude_analyzer import ClaudeAnalyzer
@@ -217,7 +217,7 @@ class AITrader:
         if name in self._agent_activity:
             self._agent_activity[name] = {
                 "status": status, "detail": detail,
-                "ts": datetime.utcnow().isoformat(),
+                "ts": datetime.now(timezone.utc).isoformat(),
             }
 
     async def get_dashboard_state(self) -> dict:
@@ -865,7 +865,7 @@ class AITrader:
                 "stop_loss_price":   order.price * (1 - signal.stop_loss_pct),
                 "take_profit_price": order.price * (1 + signal.take_profit_pct),
                 "regime":            regime.regime,
-                "opened_at":         datetime.utcnow(),
+                "opened_at":         datetime.now(timezone.utc),
                 "high_water":        order.price,
                 "trailing_sl":       None,
             }
@@ -1002,7 +1002,7 @@ class AITrader:
                     db_trade.close_price = order.price
                     db_trade.pnl         = pnl
                     db_trade.pnl_pct     = pnl_pct
-                    db_trade.closed_at   = datetime.utcnow()
+                    db_trade.closed_at   = datetime.now(timezone.utc)
                     db.commit()
             finally:
                 db.close()
@@ -1066,7 +1066,7 @@ class AITrader:
             return
         price  = analysis.price
         entry  = trade["price"]
-        opened = trade.get("opened_at", datetime.utcnow())
+        opened = trade.get("opened_at", datetime.now(timezone.utc))
         regime = trade.get("regime", "RANGING")
 
         # ── 1. ATR-based SL / trailing / TP  (F2.2) ──────────────────────
@@ -1115,7 +1115,7 @@ class AITrader:
                 [(int(k), float(v)) for k, v in roi_tbl.items()],
                 reverse=True,
             )
-            age_minutes = (datetime.utcnow() - opened).total_seconds() / 60.0
+            age_minutes = (datetime.now(timezone.utc) - opened).total_seconds() / 60.0
             roi_thresh = None
             for min_age, roi_pct in roi_sorted:
                 if age_minutes >= min_age:
@@ -1187,7 +1187,7 @@ class AITrader:
                 "action":      signal.action,
                 "confidence":  round(signal.confidence, 2),
                 "regime":      regime.regime,
-                "ts":          datetime.utcnow().isoformat(),
+                "ts":          datetime.now(timezone.utc).isoformat(),
                 "attribution": self._signal_attribution,
             }
 

@@ -19,7 +19,7 @@ Arm state is persisted to disk so learning survives restarts.
 import logging
 import math
 import pickle
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -121,7 +121,7 @@ class RLTrainer:
             arm.update(reward)
             self._total_pulls += 1
             self._stats["total_updates"] += 1
-            self._stats["last_updated"]   = datetime.utcnow().isoformat()
+            self._stats["last_updated"]   = datetime.now(timezone.utc).isoformat()
             logger.debug("RL update arm=(%s,%s) reward=%.3f total_pulls=%d",
                          strategy, regime, reward, self._total_pulls)
 

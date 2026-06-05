@@ -47,8 +47,10 @@ try:
     if _route_limiter:
         app.state.limiter = _route_limiter
         app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-except Exception:
+except ImportError:
     pass  # slowapi optional — graceful degradation if not installed
+except Exception:
+    logger.warning("slowapi rate-limiter setup failed; running without rate limits", exc_info=True)
 
 app.add_middleware(
     CORSMiddleware,
@@ -120,10 +122,11 @@ async def _snapshot_loop():
                     db.commit()
                 except Exception:
                     db.rollback()
+                    logger.warning("Portfolio snapshot DB write failed", exc_info=True)
                 finally:
                     db.close()
         except Exception as e:
-            logger.debug(f"Snapshot error: {e}")
+            logger.warning("Snapshot loop error: %s", e)
         await asyncio.sleep(300)  # every 5 minutes
 
 @app.on_event("startup")

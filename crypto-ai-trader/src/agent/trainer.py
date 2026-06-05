@@ -1,7 +1,7 @@
 import json
 import logging
 import pickle
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -216,7 +216,7 @@ class AITrainer:
                     challenger_wins = auc_oos > self._champion_auc + _MIN_AUC_IMPROVEMENT
                     if challenger_wins:
                         self._gbm.save()
-                        now = datetime.utcnow().isoformat()
+                        now = datetime.now(timezone.utc).isoformat()
                         self._save_champion_meta({
                             "auc_oos":       auc_oos,
                             "accuracy":      res.get("accuracy"),
@@ -269,7 +269,7 @@ class AITrainer:
         self._trades_since_train = 0
 
         self._stats.update({
-            "last_trained": datetime.utcnow().isoformat(),
+            "last_trained": datetime.now(timezone.utc).isoformat(),
             "accuracy": round(accuracy, 3),
             "training_trades": len(records),
             "model_type": "random_forest",

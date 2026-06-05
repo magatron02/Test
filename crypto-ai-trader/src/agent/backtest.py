@@ -58,7 +58,7 @@ def _simulate_ohlcv(days: int, base_price: float, tf_minutes: int = 60) -> List[
     n = days * 24 * 60 // tf_minutes
     candles, p = [], base_price
     regime, remaining = "RANGE", random.randint(20, 50)
-    start = datetime.utcnow() - timedelta(days=days)
+    start = datetime.now(timezone.utc) - timedelta(days=days)
     for i in range(n):
         if remaining <= 0:
             names, weights = zip(*_SIM_TRANSITIONS[regime])
