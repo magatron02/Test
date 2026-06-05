@@ -472,6 +472,39 @@ ol.small, ul.small, .small.text-muted,
   .brand-name { font-size: 1rem; }
   .stat-value { font-size: 1.15rem; }
 }
+
+/* ── Market Narrative ── */
+.narrative-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 9px 12px; border-radius: 0 8px 8px 0;
+  border-left: 3px solid var(--border2);
+  background: rgba(255,255,255,0.02);
+  margin-bottom: 6px; transition: background 0.15s;
+}
+.narrative-item:last-child { margin-bottom: 0; }
+.narrative-item.nar-buy  { border-left-color: var(--accent-buy);  background: rgba(57,217,138,0.04); }
+.narrative-item.nar-sell { border-left-color: var(--accent-red);  background: rgba(255,107,53,0.04); }
+.narrative-item.nar-hold { border-left-color: var(--border2);     background: rgba(255,255,255,0.02); }
+.narrative-sym { min-width: 42px; text-align: center; }
+.narrative-sym .sym-name { font-family: var(--font-headline); font-weight: 700; font-size: 0.88rem; }
+.narrative-text { font-size: 0.79rem; color: var(--text-muted); line-height: 1.55; flex: 1; }
+
+/* ── Cache Stats Box ── */
+.cache-stat-box {
+  margin-top: 10px; padding: 8px 10px;
+  background: rgba(168,255,83,0.05);
+  border: 1px solid rgba(168,255,83,0.15);
+  border-radius: 8px;
+}
+.cache-hit-bar { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; margin-top: 4px; }
+.cache-hit-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.5s; }
+
+/* ── Confidence bar in price cards ── */
+.conf-bar { height: 3px; border-radius: 2px; background: var(--border); overflow: hidden; margin-top: 5px; }
+.conf-fill { height: 100%; border-radius: 2px; transition: width 0.5s; }
+
+/* ── Correlation cell upgrade ── */
+.corr-cell { padding: 6px 8px; border-radius: 4px; text-align: center; font-family: var(--font-mono); font-size: 0.65rem; font-weight: 600; cursor: default; }
 </style>
 </head>
 <body>
@@ -644,6 +677,23 @@ ol.small, ul.small, .small.text-muted,
     </div>
   </div>
 
+  <!-- Market Narrative Row -->
+  <div class="row g-3 mb-3" id="narrativeRow">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-chat-left-text me-2"></i>Market Narrative
+            <span class="text-muted" style="font-size:0.68rem;font-weight:400;letter-spacing:0;text-transform:none"> — สรุปสภาพตลาดภาษาไทย (rule-based · ไม่ใช้ API)</span>
+          </span>
+          <span class="text-muted" style="font-size:0.65rem;font-family:var(--font-mono)" id="narrativeUpdated">—</span>
+        </div>
+        <div class="card-body p-2" id="narrativePanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Risk Analytics Row -->
   <div class="row g-3 mb-3" id="analyticsRow">
     <div class="col-12">
@@ -712,7 +762,14 @@ ol.small, ul.small, .small.text-muted,
             </div>
           </div>
           <div class="text-muted mt-2 text-center" style="font-size:0.7rem;font-family:var(--font-mono)" id="funLastSignal">รอสัญญาณ...</div>
-          <div class="text-muted text-center" style="font-size:0.68rem;font-family:var(--font-mono)" id="funCacheSaved"></div>
+          <div class="cache-stat-box d-none" id="funCacheBox">
+            <div class="d-flex justify-content-between align-items-center">
+              <span style="font-size:0.6rem;font-family:var(--font-mono);color:var(--accent);letter-spacing:0.8px;text-transform:uppercase">⚡ Signal Cache</span>
+              <span style="font-size:0.7rem;font-family:var(--font-mono);color:var(--text-main)" id="funCacheHitRate">—</span>
+            </div>
+            <div class="cache-hit-bar"><div class="cache-hit-fill" id="funCacheBar" style="width:0%"></div></div>
+            <div class="text-muted mt-1 text-center" style="font-size:0.65rem;font-family:var(--font-mono)" id="funCacheSaved"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -846,7 +903,10 @@ ol.small, ul.small, .small.text-muted,
     </div>
     <div class="col-md-4">
       <div class="card mb-3">
-        <div class="card-header"><i class="bi bi-cpu me-2"></i>AI Analysis</div>
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-cpu me-2"></i>AI Analysis</span>
+          <span class="text-muted" style="font-size:0.65rem;font-family:var(--font-mono)" id="aiAnalysisTimestamp">—</span>
+        </div>
         <div class="card-body" id="aiAnalysisPanel">
           <div class="text-muted text-center small py-2">รอการวิเคราะห์...</div>
         </div>
@@ -2222,7 +2282,38 @@ async function fetchNarratives() {
       allAnalyses[sym] = { ...(allAnalyses[sym] || {}), narrative };
     }
     if (currentSymbol && allAnalyses[currentSymbol]) updateAIPanel(currentSymbol);
+    renderNarrativePanel(data);
+    const el = document.getElementById('narrativeUpdated');
+    if (el) el.textContent = new Date().toLocaleTimeString('th', {hour:'2-digit', minute:'2-digit'});
   } catch {}
+}
+
+function renderNarrativePanel(data) {
+  const panel = document.getElementById('narrativePanel');
+  if (!panel) return;
+  const entries = Object.entries(data).filter(([, v]) => v);
+  if (!entries.length) {
+    panel.innerHTML = '<div class="text-muted text-center small py-2">รอการวิเคราะห์รอบแรก...</div>';
+    return;
+  }
+  panel.innerHTML = '<div class="row g-2">' + entries.map(([sym, narrative]) => {
+    const a = allAnalyses[sym] || {};
+    const sig = a.signal || 'HOLD';
+    const cls = sig === 'BUY' ? 'nar-buy' : sig === 'SELL' ? 'nar-sell' : 'nar-hold';
+    const sigCls = sig === 'BUY' ? 'signal-buy' : sig === 'SELL' ? 'signal-sell' : 'signal-hold';
+    const conf = a.confidence != null ? `<div class="conf-bar mt-1"><div class="conf-fill" style="width:${(a.confidence*100).toFixed(0)}%;background:${sig==='BUY'?'var(--accent-buy)':sig==='SELL'?'var(--accent-red)':'var(--border2)'}"></div></div>` : '';
+    const base = sym.split('/')[0];
+    return `<div class="col-12 col-lg-6">
+      <div class="narrative-item ${cls}">
+        <div class="narrative-sym">
+          <div class="sym-name">${base}</div>
+          <span class="badge-signal ${sigCls}" style="font-size:0.55rem">${sig}</span>
+          ${conf}
+        </div>
+        <div class="narrative-text">${narrative}</div>
+      </div>
+    </div>`;
+  }).join('') + '</div>';
 }
 
 // Correlation matrix — pairwise price-return correlation across tracked symbols
@@ -2236,13 +2327,19 @@ async function fetchCorrelations() {
 }
 
 function _corrCell(v) {
-  if (v == null) return {bg:'transparent', txt:'·', color:'var(--text-muted)'};
-  // Red = highly correlated (crowded), green = diversifying (negative/low)
+  if (v == null) return { bg: 'transparent', txt: '·', color: 'var(--text-muted)', title: '' };
   const a = Math.abs(v);
-  let bg;
-  if (v >= 0) bg = `rgba(255,107,53,${(a*0.85).toFixed(2)})`;   // positive → orange/red
-  else        bg = `rgba(57,217,138,${(a*0.85).toFixed(2)})`;   // negative → green
-  return {bg, txt:v.toFixed(2), color: a > 0.5 ? '#fff' : 'var(--text)'};
+  const isDiag = v === 1.0;
+  let bg, color;
+  if (isDiag) {
+    bg = 'rgba(168,255,83,0.15)'; color = 'var(--accent)';
+  } else if (v >= 0) {
+    bg = `rgba(255,107,53,${(a * 0.9).toFixed(2)})`; color = a > 0.45 ? '#fff' : 'var(--text-muted)';
+  } else {
+    bg = `rgba(57,217,138,${(a * 0.9).toFixed(2)})`; color = a > 0.45 ? '#fff' : 'var(--text-muted)';
+  }
+  const risk = a >= 0.8 ? '⚠ สูงมาก' : a >= 0.6 ? 'สูง' : a >= 0.3 ? 'ปานกลาง' : 'ต่ำ';
+  return { bg, txt: isDiag ? '—' : v.toFixed(2), color, title: isDiag ? '' : `corr ${v.toFixed(2)} (${risk})` };
 }
 
 function renderCorrelationPanel(d) {
@@ -2251,28 +2348,52 @@ function renderCorrelationPanel(d) {
   const syms = (d && d.symbols) || [];
   const m = (d && d.matrix) || [];
   if (syms.length < 2) {
-    panel.innerHTML = '<div class="text-muted text-center small py-2">ต้องมีข้อมูลราคาอย่างน้อย 2 เหรียญ</div>';
+    panel.innerHTML = '<div class="text-muted text-center small py-3">ต้องมีข้อมูลราคาอย่างน้อย 2 เหรียญ (รอ 5-6 แท่งเทียน)</div>';
     return;
   }
   const short = s => s.split('/')[0];
-  let head = '<th style="font-size:0.65rem"></th>' +
-    syms.map(s => `<th class="text-center" style="font-size:0.62rem;font-family:var(--font-mono)">${short(s)}</th>`).join('');
-  let rows = '';
-  for (let i = 0; i < syms.length; i++) {
-    let cells = `<td class="fw-bold" style="font-size:0.62rem;font-family:var(--font-mono)">${short(syms[i])}</td>`;
-    for (let j = 0; j < syms.length; j++) {
+  // Grid layout: header row + matrix rows
+  const N = syms.length;
+  const cellStyle = 'display:inline-flex;align-items:center;justify-content:center;min-width:52px;min-height:36px;border-radius:6px;';
+  const headerCells = syms.map(s => `<div style="${cellStyle}font-family:var(--font-mono);font-size:0.65rem;color:var(--text-muted);font-weight:600">${short(s)}</div>`).join('');
+
+  let rowsHtml = '';
+  for (let i = 0; i < N; i++) {
+    const rowLabel = `<div style="${cellStyle}min-width:48px;font-family:var(--font-mono);font-size:0.65rem;font-weight:700">${short(syms[i])}</div>`;
+    const cells = syms.map((_, j) => {
       const c = _corrCell(m[i] ? m[i][j] : null);
-      cells += `<td class="text-center" style="background:${c.bg};color:${c.color};font-size:0.62rem;font-family:var(--font-mono);border-radius:3px">${c.txt}</td>`;
-    }
-    rows += `<tr>${cells}</tr>`;
+      return `<div class="corr-cell" style="${cellStyle}background:${c.bg};color:${c.color}" title="${c.title}">${c.txt}</div>`;
+    }).join('');
+    rowsHtml += `<div class="d-flex align-items-center gap-1 mb-1">${rowLabel}${cells}</div>`;
   }
-  panel.innerHTML =
-    `<div class="table-responsive"><table class="table table-sm table-borderless mb-1" style="min-width:max-content">
-       <thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>
-     <div class="text-muted" style="font-size:0.62rem">
-       <span style="color:#ff6b35">■</span> วิ่งทางเดียวกัน (เสี่ยงกระจุก) ·
-       <span style="color:#39d98a">■</span> สวนทางกัน (กระจายเสี่ยง)
-     </div>`;
+
+  const highPairs = [];
+  for (let i = 0; i < N; i++) {
+    for (let j = i + 1; j < N; j++) {
+      const v = m[i] && m[i][j] != null ? m[i][j] : null;
+      if (v != null && Math.abs(v) >= 0.8) highPairs.push(`${short(syms[i])}↔${short(syms[j])} (${v.toFixed(2)})`);
+    }
+  }
+  const warning = highPairs.length
+    ? `<div class="mt-2 small" style="color:var(--accent-red)"><i class="bi bi-exclamation-triangle me-1"></i>Correlation Guard อาจบล็อก: ${highPairs.join(', ')}</div>`
+    : '';
+
+  panel.innerHTML = `
+    <div style="overflow-x:auto">
+      <div class="d-flex align-items-center gap-1 mb-1">
+        <div style="min-width:48px"></div>${headerCells}
+      </div>
+      ${rowsHtml}
+    </div>
+    <div class="d-flex align-items-center gap-3 mt-2">
+      <span style="font-size:0.62rem;color:var(--text-muted)">
+        <span style="display:inline-block;width:10px;height:10px;background:rgba(255,107,53,0.8);border-radius:2px;vertical-align:middle;margin-right:3px"></span>วิ่งทางเดียวกัน (ควรหลีกเลี่ยง)
+      </span>
+      <span style="font-size:0.62rem;color:var(--text-muted)">
+        <span style="display:inline-block;width:10px;height:10px;background:rgba(57,217,138,0.8);border-radius:2px;vertical-align:middle;margin-right:3px"></span>สวนทางกัน (กระจายเสี่ยงดี)
+      </span>
+    </div>
+    ${warning}`;
 }
 
 async function fetchPatterns(symbol) {
@@ -2640,6 +2761,11 @@ function renderPriceCards() {
     const rm = regime ? (_REGIME_BADGE[regime.regime] || {cls:'regime-range', txt:regime.regime}) : null;
     const regimeBadge = rm ? `<span class="regime-badge ${rm.cls}" style="margin-top:4px;display:inline-block">${rm.txt}</span>` : '';
 
+    const a = allAnalyses[sym] || {};
+    const conf = a.confidence != null ? a.confidence : (d.confidence != null ? d.confidence : null);
+    const confBar = conf != null
+      ? `<div class="conf-bar"><div class="conf-fill" style="width:${(conf*100).toFixed(0)}%;background:${d.signal==='BUY'?'var(--accent-buy)':d.signal==='SELL'?'var(--accent-red)':'var(--border2)'}"></div></div>`
+      : '';
     const card = document.createElement('div');
     card.className = 'col-6 col-md-4 col-lg-2';
     card.innerHTML = `
@@ -2653,6 +2779,7 @@ function renderPriceCards() {
           <div class="small ${up?'price-up':'price-down'}">${up?'+':''}${d.change_24h.toFixed(2)}%</div>
           ${regimeBadge}
         </div>
+        ${confBar}
       </div>`;
     container.appendChild(card);
 
@@ -2726,27 +2853,52 @@ function updateIndicatorPanel(sym) {
 function updateAIPanel(sym) {
   const a = allAnalyses[sym];
   if (!a) return;
-  const signalColor = a.signal === 'BUY' ? '#A8FF53' : a.signal === 'SELL' ? '#ff6b35' : '#555555';
+  const sig = a.signal;
+  const signalColor = sig === 'BUY' ? 'var(--accent-buy)' : sig === 'SELL' ? 'var(--accent-red)' : 'var(--text-muted)';
+  const sigCls      = sig === 'BUY' ? 'signal-buy' : sig === 'SELL' ? 'signal-sell' : 'signal-hold';
+
+  // Narrative block
   const narrativeBlock = a.narrative
-    ? `<div class="small mb-2 p-2" style="background:rgba(168,255,83,0.07);border-left:3px solid ${signalColor};border-radius:6px;line-height:1.5">
-         <i class="bi bi-chat-left-text me-1"></i>${a.narrative}
+    ? `<div class="mb-3 p-2" style="background:rgba(168,255,83,0.06);border-left:3px solid ${signalColor};border-radius:0 8px 8px 0;line-height:1.55">
+         <div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-mono);margin-bottom:3px">Market Narrative</div>
+         <span class="small">${a.narrative}</span>
        </div>`
     : '';
-  // On cold load only the narrative may exist (no analysis cycle yet) — show it alone.
-  const hasSignal = a.signal != null;
+
+  const hasSignal = sig != null;
   const header = hasSignal ? `
-    <div class="d-flex justify-content-between mb-2">
-      <strong style="color:${signalColor}">${a.signal}</strong>
-      <span class="text-muted small">${((a.confidence||0)*100).toFixed(0)}% confidence</span>
-    </div>` : '';
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <span class="badge-signal ${sigCls}" style="font-size:0.75rem;padding:4px 12px">${sig}</span>
+      </div>
+      <div class="text-end">
+        <div style="font-family:var(--font-mono);font-size:1.1rem;color:${signalColor};font-weight:700">${((a.confidence||0)*100).toFixed(0)}%</div>
+        <div class="text-muted" style="font-size:0.6rem">confidence</div>
+      </div>
+    </div>
+    ${a.confidence != null ? `<div class="conf-bar mb-3"><div class="conf-fill" style="width:${(a.confidence*100).toFixed(0)}%;background:${signalColor}"></div></div>` : ''}` : '';
+
+  const _irow = (label, val, cls) =>
+    `<div class="indicator-row"><span class="text-muted">${label}</span><span class="${cls||''}">${val||'—'}</span></div>`;
+  const _ibar = (label, val) => {
+    const pct = ((val||0.5)*100).toFixed(0);
+    return `<div class="indicator-row"><span class="text-muted">${label}</span>
+      <span>${pct}% <span class="indicator-bar"><span class="indicator-fill" style="width:${pct}%;background:var(--accent)"></span></span></span></div>`;
+  };
+
   const indicators = hasSignal ? `
-    <div class="small text-muted mb-2">${a.reasoning || ''}</div>
-    <div class="indicator-row"><span>EMA Trend</span><span class="${a.ema_trend==='BULLISH'?'price-up':a.ema_trend==='BEARISH'?'price-down':'text-muted'}">${a.ema_trend||'—'}</span></div>
-    <div class="indicator-row"><span>Volatility</span><span>${a.volatility||'—'}</span></div>
-    <div class="indicator-row"><span>BB Position</span>
-      <span>${((a.bb_position||0.5)*100).toFixed(0)}%
-        <span class="indicator-bar"><span class="indicator-fill" style="width:${(a.bb_position||0.5)*100}%;background:#A8FF53"></span></span>
-      </span></div>` : '';
+    ${a.reasoning ? `<div class="small text-muted mb-2" style="border-bottom:1px solid var(--border);padding-bottom:8px">${a.reasoning}</div>` : ''}
+    <div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-mono);margin-bottom:6px">Indicators</div>
+    ${_irow('EMA Trend', a.ema_trend, a.ema_trend==='BULLISH'?'price-up':a.ema_trend==='BEARISH'?'price-down':'')}
+    ${_irow('RSI Signal', a.rsi_signal, a.rsi_signal==='OVERSOLD'?'price-up':a.rsi_signal==='OVERBOUGHT'?'price-down':'')}
+    ${_irow('MACD', a.macd_trend, a.macd_trend==='BULLISH'?'price-up':a.macd_trend==='BEARISH'?'price-down':'')}
+    ${_irow('Volume', a.volume_signal)}
+    ${_irow('vs VWAP', a.price_vs_vwap, a.price_vs_vwap==='ABOVE'?'price-up':a.price_vs_vwap==='BELOW'?'price-down':'')}
+    ${_irow('Volatility', a.volatility)}
+    ${_ibar('BB Position', a.bb_position)}` : '';
+
+  const ts = document.getElementById('aiAnalysisTimestamp');
+  if (ts) ts.textContent = new Date().toLocaleTimeString('th', {hour:'2-digit', minute:'2-digit'});
   document.getElementById('aiAnalysisPanel').innerHTML = header + narrativeBlock + indicators;
 }
 
@@ -3931,10 +4083,15 @@ function renderDashboardState(d) {
   // Signal cache savings (incremental analysis)
   if (d.signal_cache) {
     const sc = d.signal_cache;
-    const el = document.getElementById('funCacheSaved');
-    if (el) el.textContent = (sc.enabled && sc.calls_saved > 0)
-      ? `⚡ ประหยัด Claude API ${sc.calls_saved} ครั้ง (hit ${(sc.hit_rate*100).toFixed(0)}%)`
-      : '';
+    const box  = document.getElementById('funCacheBox');
+    const hr   = document.getElementById('funCacheHitRate');
+    const bar  = document.getElementById('funCacheBar');
+    const txt  = document.getElementById('funCacheSaved');
+    const show = sc.enabled && (sc.hits > 0 || sc.calls_saved > 0);
+    if (box) box.classList.toggle('d-none', !show);
+    if (hr)  hr.textContent  = `hit ${(sc.hit_rate * 100).toFixed(0)}%`;
+    if (bar) bar.style.width = `${(sc.hit_rate * 100).toFixed(0)}%`;
+    if (txt) txt.textContent = sc.calls_saved > 0 ? `ประหยัด Claude API ไป ${sc.calls_saved} ครั้ง` : 'รอข้อมูล...';
   }
   // Agents
   if (d.agents) renderAgents(d.agents);
