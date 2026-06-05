@@ -1,12 +1,12 @@
 @echo off
 cd /d "%~dp0"
-title Aiterra v1.2.0 - Running
+title Aiterra v2.0.0 - Running
 color 0A
 
 cls
 echo.
 echo  ============================================================
-echo   Aiterra v1.2.0  --  AI Crypto Trader
+echo   Aiterra v2.0.0  --  AI Crypto Trader
 echo  ============================================================
 echo.
 

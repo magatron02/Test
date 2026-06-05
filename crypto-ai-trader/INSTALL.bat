@@ -1,13 +1,13 @@
 @echo off
 cd /d "%~dp0"
 setlocal enabledelayedexpansion
-title Aiterra v1.2.0 - Install
+title Aiterra v2.0.0 - Install
 color 0A
 
 cls
 echo.
 echo  ============================================================
-echo   Aiterra v1.2.0  --  AI Crypto Trader
+echo   Aiterra v2.0.0  --  AI Crypto Trader
 echo   First Time Setup / Install
 echo  ============================================================
 echo.
@@ -136,7 +136,7 @@ set /p STARTAPP=  Start Aiterra now? [Y/N] :
 if /i "!STARTAPP!"=="Y" (
     echo.
     echo  Starting Aiterra...
-    start "" cmd /k "title Aiterra v1.2.0 && call venv\Scripts\activate.bat && python -m src.main"
+    start "" cmd /k "title Aiterra v2.0.0 && call venv\Scripts\activate.bat && python -m src.main"
     timeout /t 4 /nobreak >nul
     start "" "http://localhost:8888"
 ) else (
