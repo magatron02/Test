@@ -81,6 +81,7 @@ trading:
   # - "BNB/THB"
   # - "XRP/THB"
   # - "SOL/THB"
+  # - "TAO/THB"
   base_currency: "USDT"
   max_position_pct: 0.15    # สูงสุด 15% ของพอร์ตต่อ trade
   stop_loss_pct: 0.03       # Stop loss 3%

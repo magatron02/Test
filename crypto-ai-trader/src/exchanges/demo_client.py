@@ -29,6 +29,7 @@ _SEED_PRICES = {
     "SOL/THB":     5_950.0,
     "XRP/THB":        78.0,
     "USDT/THB":       34.0,
+    "TAO/THB":    15_300.0,
 }
 
 # Per-symbol simulated state (price walk)

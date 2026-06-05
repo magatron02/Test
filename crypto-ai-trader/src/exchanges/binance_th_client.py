@@ -29,6 +29,7 @@ SYMBOL_MAP = {
     "DOGE/THB":  "DOGETHB",
     "MATIC/THB": "MATICTHB",
     "DOT/THB":   "DOTTHB",
+    "TAO/THB":   "TAOTHB",
 }
 
 TIMEFRAME_MAP = {
