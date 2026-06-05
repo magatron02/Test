@@ -505,58 +505,161 @@ ol.small, ul.small, .small.text-muted,
 
 /* ── Correlation cell upgrade ── */
 .corr-cell { padding: 6px 8px; border-radius: 4px; text-align: center; font-family: var(--font-mono); font-size: 0.65rem; font-weight: 600; cursor: default; }
+
+/* ══════════════════════════════════════════
+   SIDEBAR LAYOUT  (replaces topnav)
+═══════════════════════════════════════════ */
+body { overflow: hidden; }
+
+.app { display: grid; grid-template-columns: 238px 1fr; height: 100vh; }
+
+.sidebar {
+  background: linear-gradient(180deg, #0a0a0a 0%, #000 100%);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  padding: 18px 13px; overflow-y: auto; overflow-x: hidden;
+}
+.sidebar::-webkit-scrollbar { width: 3px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border2); }
+
+.sb-brand { display: flex; align-items: center; gap: 11px; padding: 4px 6px 20px; text-decoration: none; }
+.sb-logo {
+  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-buy) 100%);
+  display: grid; place-items: center;
+  font-weight: 800; font-size: 12px; color: #000; font-family: var(--font-mono);
+  box-shadow: 0 4px 16px -4px rgba(168,255,83,0.55);
+}
+.sb-title { font-family: var(--font-headline); font-weight: 700; font-size: 14px; color: var(--text-main); }
+.sb-sub   { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px; }
+
+.snav { display: flex; flex-direction: column; gap: 2px; }
+.snav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 7px;
+  color: var(--text-muted); cursor: pointer;
+  font-size: 13px; font-weight: 500; font-family: var(--font-headline);
+  transition: background 0.15s, color 0.15s;
+  position: relative; user-select: none;
+}
+.snav-item svg { width: 15px; height: 15px; flex: none; opacity: 0.75; }
+.snav-item:hover { background: rgba(255,255,255,0.04); color: var(--text-main); }
+.snav-item.active { background: rgba(168,255,83,0.07); color: var(--accent); }
+.snav-item.active svg { opacity: 1; }
+.snav-item.active::before {
+  content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 18px; border-radius: 0 3px 3px 0;
+  background: var(--accent); box-shadow: 0 0 10px rgba(168,255,83,0.55);
+}
+.snav-sep { height: 1px; background: var(--border); margin: 8px 6px; }
+
+.sb-footer {
+  margin-top: auto; padding-top: 14px;
+  background: var(--bg-card2); border: 1px solid var(--border);
+  border-radius: 9px; padding: 12px; font-size: 10.5px;
+}
+.sb-footer .sf-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
+.sf-k { color: var(--text-muted); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.5px; font-family: var(--font-mono); }
+.sf-v { font-family: var(--font-mono); font-size: 10.5px; font-weight: 600; }
+.sf-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 4px; vertical-align: middle; }
+.sf-dot.on { background: var(--accent-buy); box-shadow: 0 0 6px var(--accent-buy); animation: pulse 2s infinite; }
+
+.main { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+.topbar-slim {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 22px; border-bottom: 1px solid var(--border);
+  flex: none; font-size: 11.5px; background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(20px);
+}
+.topbar-slim .ts-sep { width: 1px; height: 13px; background: var(--border2); }
+.topbar-slim .ts-stat { display: flex; align-items: center; gap: 7px; color: var(--text-muted); }
+.topbar-slim .ml-auto { margin-left: auto; }
+.topbar-slim select.form-select { font-size: 0.7rem; padding: 3px 8px; height: auto; }
+
+.content-scroll { flex: 1; overflow-y: auto; }
+.main-content { padding: 26px 30px; min-height: 0; }
+
+/* hide old topnav */
+.topnav, .mobile-menu, .topnav-hamburger { display: none !important; }
+
 </style>
 </head>
 <body>
 
-<!-- Mobile Nav Drawer (hidden on desktop) -->
-<div id="mobileMenu" class="mobile-menu"></div>
+<div class="app">
 
-<!-- Top Nav -->
-<nav class="topnav">
-  <button class="topnav-hamburger" id="hamburgerBtn" onclick="toggleMobileMenu()" aria-label="Menu">
-    <i class="bi bi-list"></i>
-  </button>
-  <a class="brand-wrap" href="#">
-    <div class="brand-icon">AT</div>
-    <span class="brand-name">Aiterra <small>v2.0.0</small></span>
+<!-- ── Sidebar ── -->
+<aside class="sidebar">
+  <a class="sb-brand" href="#">
+    <div class="sb-logo">AT</div>
+    <div><div class="sb-title">Aiterra</div><div class="sb-sub">Lunai v2.0.0</div></div>
   </a>
 
-  <div class="topnav-pills">
-    <a class="pill-link nav-link active" onclick="showSection('dashboard',this)">Dashboard</a>
-    <a class="pill-link nav-link" onclick="showSection('trading',this)">Trading</a>
-    <a class="pill-link nav-link" onclick="showSection('portfolio',this)">Portfolio</a>
-    <a class="pill-link nav-link" onclick="showSection('analytics',this)">Analytics</a>
-    <a class="pill-link nav-link" onclick="showSection('trade-history',this)">History</a>
-    <a class="pill-link nav-link" onclick="showSection('positions',this)">Positions</a>
-    <a class="pill-link nav-link" onclick="showSection('alerts',this)" id="navAlerts">Alerts</a>
-    <a class="pill-link nav-link" onclick="showSection('notifications',this)" id="navNotifications">Notifications</a>
-    <a class="pill-link nav-link" onclick="showSection('settings',this)">Settings</a>
-    <a class="pill-link nav-link" href="/terminal" target="_blank" style="opacity:0.75;border-left:1px solid var(--border2);padding-left:12px;margin-left:4px">⌁ Terminal</a>
-  </div>
+  <nav class="snav" id="sideNav">
+    <div class="snav-item active" data-section="dashboard" onclick="showSection('dashboard',null)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Dashboard
+    </div>
+    <div class="snav-item" data-section="trading" onclick="showSection('trading',null)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>Trading
+    </div>
+    <div class="snav-item" data-section="portfolio" onclick="showSection('portfolio',null)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>Portfolio
+    </div>
+    <div class="snav-item" data-section="analytics" onclick="showSection('analytics',null)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>Analytics
+    </div>
+    <div class="snav-sep"></div>
+    <div class="snav-item" data-section="trade-history" onclick="showSection('trade-history',null)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>History
+    </div>
+    <div class="snav-item" data-section="positions" onclick="showSection('positions',null)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Positions
+    </div>
+    <div class="snav-item" data-section="alerts" onclick="showSection('alerts',null)" id="navAlerts">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>Alerts
+    </div>
+    <div class="snav-item" data-section="notifications" onclick="showSection('notifications',null)" id="navNotifications">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>Notifications
+    </div>
+    <div class="snav-sep"></div>
+    <div class="snav-item" data-section="settings" onclick="showSection('settings',null)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Settings
+    </div>
+  </nav>
 
-  <div class="topnav-right">
-    <span class="text-muted" style="font-size:0.72rem" id="lastUpdate">--</span>
-    <span class="ws-dot ws-disconnected" id="wsDot" title="WebSocket"></span>
-    <button class="btn btn-link p-0" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark" style="color:var(--text-muted);font-size:1rem;line-height:1;text-decoration:none"><i class="bi bi-sun-fill" id="themeIcon"></i></button>
+  <div class="sb-footer">
+    <div class="sf-row"><span class="sf-k">Engine</span><span class="sf-v"><span class="sf-dot on"></span><span id="sbEngStatus">Online</span></span></div>
+    <div class="sf-row"><span class="sf-k">Mode</span><span class="sf-v" id="sbMode">Demo</span></div>
+    <div class="sf-row"><span class="sf-k">WS</span><span class="sf-v"><span class="ws-dot ws-disconnected" id="wsDot" title="WebSocket"></span></span></div>
+  </div>
+</aside>
+
+<!-- ── Main ── -->
+<div class="main">
+  <div class="topbar-slim">
+    <span class="ts-stat"><span id="lastUpdate" class="text-muted">--</span></span>
+    <span class="ts-sep"></span>
     <span class="mode-badge mode-demo" id="modeTag">DEMO</span>
-    <select class="form-select form-select-sm" style="width:auto;font-size:0.72rem" id="aiModelSelect">
+    <select class="form-select form-select-sm" style="width:auto" id="aiModelSelect">
       <option value="hybrid">Hybrid AI</option>
       <option value="rule_based">Rule-based</option>
       <option value="ml">ML</option>
       <option value="claude">Claude API</option>
-      <option value="multi_model">Multi-Model Consensus</option>
+      <option value="multi_model">Multi-Model</option>
     </select>
-    <select class="form-select form-select-sm" style="width:auto;font-size:0.72rem" id="strategySelect">
+    <select class="form-select form-select-sm" style="width:auto" id="strategySelect">
       <option value="hybrid">Hybrid</option>
       <option value="dca">DCA</option>
       <option value="trend">Trend</option>
       <option value="mean_reversion">MeanRev</option>
     </select>
+    <span class="ml-auto d-flex align-items-center gap-2">
+      <button class="btn btn-link p-0" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark" style="color:var(--text-muted);font-size:0.95rem;line-height:1;text-decoration:none"><i class="bi bi-sun-fill" id="themeIcon"></i></button>
+    </span>
   </div>
-</nav>
 
-<!-- Main -->
+  <div class="content-scroll">
 <main class="main-content">
 
 <!-- DASHBOARD -->
@@ -572,10 +675,10 @@ ol.small, ul.small, .small.text-muted,
       </div>
       <div class="text-muted mt-1" style="font-size:0.85rem;font-family:var(--font-body)">Available: <strong id="cashValue" style="color:var(--text-main)">$0.00</strong>&nbsp;&nbsp;|&nbsp;&nbsp;<span id="positionCount">0 positions</span></div>
       <div class="d-flex gap-2 mt-3">
-        <button class="btn btn-sm px-3" style="background:var(--accent);color:#000;font-weight:700;border:none;border-radius:100px" onclick="showSection('trading',document.querySelector('.pill-link:nth-child(2)'))">
+        <button class="btn btn-sm px-3" style="background:var(--accent);color:#000;font-weight:700;border:none;border-radius:100px" onclick="showSection('trading',null)">
           Buy / Sell ↑
         </button>
-        <button class="btn btn-sm px-3" style="background:var(--bg-card);color:var(--text-main);border:1px solid var(--border);border-radius:100px" onclick="showSection('portfolio',document.querySelector('.pill-link:nth-child(3)'))">
+        <button class="btn btn-sm px-3" style="background:var(--bg-card);color:var(--text-main);border:1px solid var(--border);border-radius:100px" onclick="showSection('portfolio',null)">
           Portfolio →
         </button>
       </div>
@@ -1999,6 +2102,9 @@ ol.small, ul.small, .small.text-muted,
 </section>
 
 </main>
+  </div><!-- /.content-scroll -->
+</div><!-- /.main -->
+</div><!-- /.app -->
 
 <!-- Notification Toast Container -->
 <div id="toastContainer" class="notification"></div>
@@ -2097,19 +2203,13 @@ function connectWS() {
 // Navigation
 // ============================================================
 function showSection(name, el) {
-  closeMobileMenu();
-  _syncMobileMenuActive(name);
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
   const target = document.getElementById('sec-' + name);
   if (target) target.classList.add('active');
-  // also handle pill links that may not have el passed
-  if (el) el.classList.add('active');
-  else {
-    document.querySelectorAll('.pill-link').forEach(l => {
-      if (l.getAttribute('onclick') && l.getAttribute('onclick').includes("'" + name + "'")) l.classList.add('active');
-    });
-  }
+  // sync sidebar nav active state
+  document.querySelectorAll('.snav-item').forEach(n => {
+    n.classList.toggle('active', n.dataset.section === name);
+  });
   if (name === 'portfolio') refreshPortfolio();
   if (name === 'trade-history') refreshHistory();
   if (name === 'analytics') { refreshTraining(); refreshLoopStatus(); refreshHourlyTrainer(); }
@@ -3339,6 +3439,8 @@ async function _doModeSwap(mode, budgetUsdt) {
 function _updateModeBadge(mode) {
   const tag = document.getElementById('modeTag');
   if (tag) { tag.textContent = mode.toUpperCase(); tag.className = 'mode-badge mode-' + mode; }
+  const sbMode = document.getElementById('sbMode');
+  if (sbMode) sbMode.textContent = mode.charAt(0).toUpperCase() + mode.slice(1);
   const btnDemo = document.getElementById('btnDemo');
   const btnLive = document.getElementById('btnLive');
   if (btnDemo) btnDemo.className = mode === 'demo' ? 'btn btn-success btn-sm' : 'btn btn-outline-success btn-sm';
@@ -4342,36 +4444,9 @@ function _addNotifBadge() {
 // ============================================================
 let _mobileMenuOpen = false;
 
-function toggleMobileMenu() {
-  _mobileMenuOpen = !_mobileMenuOpen;
-  const menu = document.getElementById('mobileMenu');
-  const btn  = document.getElementById('hamburgerBtn');
-  if (_mobileMenuOpen) {
-    // Build the mobile menu from the desktop pills
-    const pills = document.querySelectorAll('.topnav-pills .pill-link');
-    menu.innerHTML = [...pills].map(p =>
-      `<a class="pill-link ${p.classList.contains('active') ? 'active' : ''}"
-          onclick="${p.getAttribute('onclick')};closeMobileMenu()">${p.textContent.trim()}</a>`
-    ).join('');
-    menu.classList.add('open');
-    btn.innerHTML = '<i class="bi bi-x-lg"></i>';
-  } else {
-    closeMobileMenu();
-  }
-}
-
-function closeMobileMenu() {
-  _mobileMenuOpen = false;
-  document.getElementById('mobileMenu').classList.remove('open');
-  const btn = document.getElementById('hamburgerBtn');
-  if (btn) btn.innerHTML = '<i class="bi bi-list"></i>';
-}
-
-// Keep mobile menu active state in sync when navigating
+function toggleMobileMenu() {}
+function closeMobileMenu() {}
 function _syncMobileMenuActive(name) {
-  document.querySelectorAll('#mobileMenu .pill-link').forEach(l => {
-    l.classList.toggle('active', (l.getAttribute('onclick') || '').includes("'" + name + "'"));
-  });
 }
 
 // ============================================================

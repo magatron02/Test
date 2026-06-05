@@ -71,10 +71,6 @@ async def index():
     return FileResponse(WEB_DIR / "index.html")
 
 
-@app.get("/terminal", response_class=FileResponse)
-async def terminal():
-    return FileResponse(WEB_DIR / "terminal.html")
-
 
 @app.websocket("/ws")
 async def ws_endpoint(websocket: WebSocket):
