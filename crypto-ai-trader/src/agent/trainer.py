@@ -27,6 +27,8 @@ GBM_FEATURE_KEYS = [
     "ichimoku_bull", "supertrend_buy", "rsi_div_bull", "rsi_div_bear",
     "kalman_velocity", "kalman_dev_pct", "garch_vol_ratio",
     "wq_alpha101", "wq_mom_5", "wq_mom_10", "wq_vol_zscore", "wq_close_to_high",
+    # Microstructure features (F-MICRO)
+    "book_imbalance", "whale_bid", "whale_ask", "twap_detected", "twap_score",
 ]
 
 

@@ -3,8 +3,10 @@ import logging
 from datetime import datetime, date, timezone
 from typing import Dict, List, Optional, Tuple
 
+from collections import deque
+
 from .claude_analyzer import ClaudeAnalyzer
-from .market_analyzer import MarketAnalysis, analyze
+from .market_analyzer import MarketAnalysis, analyze, analyze_order_book
 from .market_regime import RegimeResult, detect_regime
 from .narrative import build_narrative
 from .risk_engine import RiskEngine
@@ -62,6 +64,8 @@ class AITrader:
         self._open_trades: Dict[str, dict] = {}
         self._price_history: Dict[str, list] = {}   # symbol → recent closes (HRP/pairs)
         self._hrp_weights:   Dict[str, float] = {}  # symbol → correlation-aware weight
+        # Microstructure: rolling order book snapshots for heatmap (last 60 × 30 s = 30 min)
+        self._ob_history: Dict[str, deque] = {}     # symbol → deque of (bids, asks) snapshots
         self._broadcast_fn = None
         self._daily_pnl: float = 0.0
         self._daily_reset_date: str = ""
@@ -188,6 +192,22 @@ class AITrader:
             # Maintain a rolling close-price history for HRP allocation & pairs
             closes = [c.close for c in candles]
             self._price_history[symbol] = closes[-200:]
+
+            # ── Microstructure: order book L2 ─────────────────────────────────
+            try:
+                ob = await self._exchange.get_order_book(symbol, limit=20)
+                if ob:
+                    analyze_order_book(analysis, ob.bids, ob.asks)
+                    # Update feature dict with fresh microstructure values
+                    analysis.features["book_imbalance"] = analysis.book_imbalance
+                    analysis.features["whale_bid"]      = 1 if analysis.whale_bid_size > 0 else 0
+                    analysis.features["whale_ask"]      = 1 if analysis.whale_ask_size > 0 else 0
+                    # Rolling snapshot for heatmap broadcast
+                    hist = self._ob_history.setdefault(symbol, deque(maxlen=60))
+                    hist.append({"bids": ob.bids[:20], "asks": ob.asks[:20],
+                                 "ts": ob.timestamp.isoformat()})
+            except Exception as e:
+                logger.debug("Order book fetch skipped for %s: %s", symbol, e)
 
             # Detect market regime for this symbol
             regime = detect_regime(candles, analysis)
@@ -827,21 +847,29 @@ class AITrader:
             self._narratives[symbol] = narrative
 
             await self._broadcast("analysis_update", {
-                "symbol":      symbol,
-                "price":       analysis.price,
-                "change_24h":  analysis.change_24h,
-                "signal":      signal.action,
-                "confidence":  signal.confidence,
-                "reasoning":   signal.reasoning,
-                "narrative":   narrative,
-                "rsi":         analysis.rsi,
-                "macd_hist":   analysis.macd_hist,
-                "bb_position": analysis.bb_position,
-                "ema_trend":   analysis.ema_trend,
-                "volatility":  analysis.volatility,
-                "regime":      regime.regime,
-                "regime_conf": round(regime.confidence, 2),
-                "adx":         round(regime.adx, 1),
+                "symbol":          symbol,
+                "price":           analysis.price,
+                "change_24h":      analysis.change_24h,
+                "signal":          signal.action,
+                "confidence":      signal.confidence,
+                "reasoning":       signal.reasoning,
+                "narrative":       narrative,
+                "rsi":             analysis.rsi,
+                "macd_hist":       analysis.macd_hist,
+                "bb_position":     analysis.bb_position,
+                "ema_trend":       analysis.ema_trend,
+                "volatility":      analysis.volatility,
+                "regime":          regime.regime,
+                "regime_conf":     round(regime.confidence, 2),
+                "adx":             round(regime.adx, 1),
+                # Microstructure
+                "book_imbalance":  round(analysis.book_imbalance, 3),
+                "whale_bid_price": analysis.whale_bid_price,
+                "whale_bid_size":  analysis.whale_bid_size,
+                "whale_ask_price": analysis.whale_ask_price,
+                "whale_ask_size":  analysis.whale_ask_size,
+                "twap_detected":   analysis.twap_detected,
+                "twap_score":      round(analysis.twap_score, 2),
             })
 
             if signal.action != "HOLD":

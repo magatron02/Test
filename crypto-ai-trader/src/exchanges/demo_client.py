@@ -8,7 +8,7 @@ from typing import Dict, List, Optional
 
 import aiohttp
 
-from .base import Balance, BaseExchange, OHLCV, Order, Ticker
+from .base import Balance, BaseExchange, OHLCV, Order, OrderBook, Ticker
 from ..core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -260,6 +260,25 @@ class DemoExchange(BaseExchange):
             "positions": dict(self._positions),
             "total_orders": len(self._orders),
         }
+
+    async def get_order_book(self, symbol: str, limit: int = 20) -> Optional[OrderBook]:
+        usdt_sym, rate = self._to_usdt_symbol(symbol)
+        ccxt_sym = usdt_sym.replace("/", "")
+        session = await self._get_session()
+        try:
+            async with session.get(
+                f"{BINANCE_BASE}/api/v3/depth",
+                params={"symbol": ccxt_sym, "limit": max(limit, 20)},
+            ) as resp:
+                if resp.status != 200:
+                    return None
+                data = await resp.json()
+            bids = [(float(p) * rate, float(q)) for p, q in data.get("bids", [])]
+            asks = [(float(p) * rate, float(q)) for p, q in data.get("asks", [])]
+            return OrderBook(symbol=symbol, bids=bids[:limit], asks=asks[:limit])
+        except Exception as e:
+            logger.debug("get_order_book failed for %s: %s", symbol, e)
+            return None
 
     def reset(self):
         self._cash = self._initial_cash

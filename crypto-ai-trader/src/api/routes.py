@@ -1562,3 +1562,41 @@ async def set_dry_run(enabled: bool = True):
         "message": f"Dry-run {'enabled' if enabled else 'disabled'}",
     }
 
+
+
+
+@router.get("/orderbook/heatmap")
+async def get_orderbook_heatmap(symbol: str = "BTC/USDT"):
+    """GET /api/orderbook/heatmap?symbol=BTC/USDT
+    Returns the rolling order book snapshot history for the heatmap canvas.
+    """
+    if not _trader:
+        raise HTTPException(503, "Trader not initialised")
+    hist = _trader._ob_history.get(symbol, [])
+    return {
+        "symbol": symbol,
+        "snapshots": list(hist),
+        "count": len(hist),
+    }
+
+
+@router.get("/microstructure")
+async def get_microstructure(symbol: str = "BTC/USDT"):
+    """GET /api/microstructure?symbol=BTC/USDT
+    Returns current microstructure metrics for a symbol.
+    """
+    if not _trader:
+        raise HTTPException(503, "Trader not initialised")
+    analysis = _trader.analyses.get(symbol)
+    if not analysis:
+        raise HTTPException(404, "No analysis for symbol")
+    return {
+        "symbol":          symbol,
+        "book_imbalance":  round(analysis.book_imbalance, 4),
+        "whale_bid_price": analysis.whale_bid_price,
+        "whale_bid_size":  analysis.whale_bid_size,
+        "whale_ask_price": analysis.whale_ask_price,
+        "whale_ask_size":  analysis.whale_ask_size,
+        "twap_detected":   analysis.twap_detected,
+        "twap_score":      round(analysis.twap_score, 2),
+    }

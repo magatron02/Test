@@ -1004,6 +1004,22 @@ body { overflow: hidden; }
           <div class="text-muted text-center small py-2">เลือก symbol เพื่อดู indicators</div>
         </div>
       </div>
+      <!-- Order Book Heatmap -->
+      <div class="card mt-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-grid-3x3 me-2"></i>Order Book Heatmap <span class="badge bg-secondary ms-1" style="font-size:0.6rem">30 min</span></span>
+          <button class="btn btn-outline-secondary btn-sm" onclick="refreshHeatmap()"><i class="bi bi-arrow-clockwise"></i></button>
+        </div>
+        <div class="card-body p-2">
+          <canvas id="obHeatmapCanvas" style="width:100%;height:160px;display:block;border-radius:4px;background:#0a0a0a"></canvas>
+          <div class="d-flex justify-content-between mt-1" style="font-size:0.65rem;color:var(--text-muted)">
+            <span>-30 min</span>
+            <span style="color:#3ad98a">■ Bid</span>
+            <span style="color:#ff6b35">■ Ask</span>
+            <span>Now</span>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="col-md-4">
       <div class="card mb-3">
@@ -1013,6 +1029,40 @@ body { overflow: hidden; }
         </div>
         <div class="card-body" id="aiAnalysisPanel">
           <div class="text-muted text-center small py-2">รอการวิเคราะห์...</div>
+        </div>
+      </div>
+      <!-- Microstructure Panel -->
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-radar me-2"></i>Microstructure</div>
+        <div class="card-body p-2" id="microstructurePanel">
+          <!-- Book Imbalance Bar -->
+          <div class="mb-2">
+            <div class="d-flex justify-content-between" style="font-size:0.7rem;color:var(--text-muted)">
+              <span>Book Imbalance</span>
+              <span id="msImbalanceVal">—</span>
+            </div>
+            <div style="height:6px;background:#1a1a1a;border-radius:3px;overflow:hidden;margin-top:3px">
+              <div id="msImbalanceBar" style="height:100%;width:50%;background:linear-gradient(90deg,#3ad98a,#a8ff53);transition:width 0.4s"></div>
+            </div>
+            <div class="d-flex justify-content-between" style="font-size:0.6rem;color:#444;margin-top:1px"><span>Sell</span><span>Buy</span></div>
+          </div>
+          <!-- Whale Walls -->
+          <div class="mb-2" id="msWhaleSection">
+            <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:4px">Whale Walls</div>
+            <div id="msWhaleBid" class="d-none" style="background:rgba(58,217,138,0.08);border:1px solid rgba(58,217,138,0.2);border-radius:5px;padding:4px 8px;font-size:0.7rem;margin-bottom:3px">
+              <span style="color:#3ad98a">▲ BID</span> <span id="msWhaleBidPrice" class="ms-1" style="font-family:var(--font-mono)">—</span> <span class="text-muted ms-1">×</span> <span id="msWhaleBidSize" style="font-family:var(--font-mono)">—</span>
+            </div>
+            <div id="msWhaleAsk" class="d-none" style="background:rgba(255,107,53,0.08);border:1px solid rgba(255,107,53,0.2);border-radius:5px;padding:4px 8px;font-size:0.7rem;margin-bottom:3px">
+              <span style="color:#ff6b35">▼ ASK</span> <span id="msWhaleAskPrice" class="ms-1" style="font-family:var(--font-mono)">—</span> <span class="text-muted ms-1">×</span> <span id="msWhaleAskSize" style="font-family:var(--font-mono)">—</span>
+            </div>
+            <div id="msNoWhale" style="font-size:0.7rem;color:#555">ไม่พบ whale wall</div>
+          </div>
+          <!-- TWAP Alert -->
+          <div id="msTwapAlert" class="d-none" style="background:rgba(255,193,7,0.08);border:1px solid rgba(255,193,7,0.2);border-radius:5px;padding:5px 8px;font-size:0.7rem">
+            <i class="bi bi-robot me-1" style="color:#ffc107"></i><span style="color:#ffc107">TWAP Detected</span>
+            <span class="text-muted ms-1">— algo bot กำลัง execute</span>
+            <div class="text-muted" style="font-size:0.65rem">score: <span id="msTwapScore">—</span>σ</div>
+          </div>
         </div>
       </div>
       <div class="card mb-3">
@@ -2214,7 +2264,7 @@ function showSection(name, el) {
   if (name === 'trade-history') refreshHistory();
   if (name === 'analytics') { refreshTraining(); refreshLoopStatus(); refreshHourlyTrainer(); }
   if (name === 'settings') loadSettings();
-  if (name === 'trading' && currentSymbol) loadMTF();
+  if (name === 'trading' && currentSymbol) { loadMTF(); refreshHeatmap(); if (allAnalyses[currentSymbol]) updateMicrostructurePanel(allAnalyses[currentSymbol]); }
   if (name === 'positions') refreshPositions();
   if (name === 'notifications') {
     _notifUnread = 0;
@@ -2916,7 +2966,11 @@ function selectSymbol(sym) {
   updateIndicatorPanel(sym);
   updateAIPanel(sym);
   fetchTradingChart(sym);
-  if (document.getElementById('sec-trading').classList.contains('active')) loadMTF();
+  if (document.getElementById('sec-trading').classList.contains('active')) {
+    loadMTF();
+    refreshHeatmap();
+    if (allAnalyses[sym]) updateMicrostructurePanel(allAnalyses[sym]);
+  }
 }
 
 async function fetchTradingChart(sym) {
@@ -3084,7 +3138,143 @@ function handleAnalysisUpdate(d) {
     addActivity(d.signal === 'BUY' ? '▲' : '▼', `${d.symbol} ${d.signal} (conf: ${(d.confidence*100).toFixed(0)}%)`, c);
   }
   if (document.getElementById('sec-dashboard').classList.contains('active')) renderPriceCards();
-  if (currentSymbol === d.symbol) { updateIndicatorPanel(d.symbol); updateAIPanel(d.symbol); }
+  if (currentSymbol === d.symbol) {
+    updateIndicatorPanel(d.symbol);
+    updateAIPanel(d.symbol);
+    updateMicrostructurePanel(d);
+    refreshHeatmap();
+  }
+}
+
+// ============================================================
+// Microstructure Panel
+// ============================================================
+function updateMicrostructurePanel(d) {
+  if (!d) return;
+  // Book imbalance bar (0=all sell, 1=all buy, 0.5=balanced)
+  const imb = d.book_imbalance != null ? d.book_imbalance : 0.5;
+  const pct = (imb * 100).toFixed(1);
+  document.getElementById('msImbalanceVal').textContent = imb >= 0.5
+    ? `Buy ${pct}%` : `Sell ${(100-pct).toFixed(1)}%`;
+  const bar = document.getElementById('msImbalanceBar');
+  bar.style.width = pct + '%';
+  bar.style.background = imb >= 0.6 ? 'linear-gradient(90deg,#3ad98a,#a8ff53)'
+    : imb <= 0.4 ? 'linear-gradient(90deg,#ff6b35,#ff4444)'
+    : 'linear-gradient(90deg,#666,#888)';
+
+  // Whale walls
+  const hasBid = d.whale_bid_size > 0;
+  const hasAsk = d.whale_ask_size > 0;
+  document.getElementById('msTwapAlert').classList.toggle('d-none', !d.twap_detected);
+  document.getElementById('msNoWhale').style.display = (hasBid || hasAsk) ? 'none' : '';
+  const bidEl = document.getElementById('msWhaleBid');
+  const askEl = document.getElementById('msWhaleAsk');
+  bidEl.classList.toggle('d-none', !hasBid);
+  askEl.classList.toggle('d-none', !hasAsk);
+  if (hasBid) {
+    document.getElementById('msWhaleBidPrice').textContent = formatPrice(d.whale_bid_price);
+    document.getElementById('msWhaleBidSize').textContent = d.whale_bid_size.toFixed(2);
+  }
+  if (hasAsk) {
+    document.getElementById('msWhaleAskPrice').textContent = formatPrice(d.whale_ask_price);
+    document.getElementById('msWhaleAskSize').textContent = d.whale_ask_size.toFixed(2);
+  }
+  if (d.twap_detected) {
+    document.getElementById('msTwapScore').textContent = d.twap_score != null ? d.twap_score.toFixed(1) : '—';
+  }
+}
+
+// ============================================================
+// Order Book Heatmap Canvas
+// ============================================================
+async function refreshHeatmap() {
+  const canvas = document.getElementById('obHeatmapCanvas');
+  if (!canvas || !currentSymbol) return;
+  const ctx = canvas.getContext('2d');
+  try {
+    const r = await fetch(`/api/orderbook/heatmap?symbol=${encodeURIComponent(currentSymbol)}`);
+    if (!r.ok) return;
+    const data = await r.json();
+    const snaps = data.snapshots;
+    if (!snaps || snaps.length < 2) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#333';
+      ctx.font = '11px monospace';
+      ctx.fillText('Accumulating data…', 10, canvas.height / 2);
+      return;
+    }
+    renderHeatmap(ctx, canvas, snaps);
+  } catch (e) { console.debug('heatmap fetch failed', e); }
+}
+
+function renderHeatmap(ctx, canvas, snaps) {
+  // Collect all price levels across all snapshots
+  const W = canvas.offsetWidth || 640;
+  const H = canvas.offsetHeight || 160;
+  canvas.width  = W;
+  canvas.height = H;
+  ctx.clearRect(0, 0, W, H);
+
+  // Find global price range
+  let minP = Infinity, maxP = -Infinity;
+  for (const s of snaps) {
+    for (const [p] of (s.bids || [])) { if (p < minP) minP=p; if (p > maxP) maxP=p; }
+    for (const [p] of (s.asks || [])) { if (p < minP) minP=p; if (p > maxP) maxP=p; }
+  }
+  if (minP === Infinity) return;
+
+  // Price bins
+  const N_PRICE = 40;
+  const priceStep = (maxP - minP) / N_PRICE || 1;
+
+  // Find max qty for normalization
+  let maxQty = 0;
+  for (const s of snaps) {
+    for (const [, q] of [...(s.bids||[]), ...(s.asks||[])]) if (q > maxQty) maxQty = q;
+  }
+  if (maxQty === 0) maxQty = 1;
+
+  const colW = W / snaps.length;
+  const rowH = H / N_PRICE;
+
+  for (let si = 0; si < snaps.length; si++) {
+    const s = snaps[si];
+    const x = si * colW;
+    // Bids (green)
+    for (const [p, q] of (s.bids || [])) {
+      const bin = Math.floor((p - minP) / priceStep);
+      if (bin < 0 || bin >= N_PRICE) continue;
+      const y = H - (bin + 1) * rowH;
+      const alpha = Math.min(q / maxQty, 1);
+      ctx.fillStyle = `rgba(58,217,138,${(0.15 + alpha * 0.85).toFixed(2)})`;
+      ctx.fillRect(Math.floor(x), Math.floor(y), Math.ceil(colW) + 1, Math.ceil(rowH) + 1);
+    }
+    // Asks (red)
+    for (const [p, q] of (s.asks || [])) {
+      const bin = Math.floor((p - minP) / priceStep);
+      if (bin < 0 || bin >= N_PRICE) continue;
+      const y = H - (bin + 1) * rowH;
+      const alpha = Math.min(q / maxQty, 1);
+      ctx.fillStyle = `rgba(255,107,53,${(0.15 + alpha * 0.85).toFixed(2)})`;
+      ctx.fillRect(Math.floor(x), Math.floor(y), Math.ceil(colW) + 1, Math.ceil(rowH) + 1);
+    }
+  }
+
+  // Mid-price line (latest snapshot)
+  const last = snaps[snaps.length - 1];
+  if (last && last.bids && last.bids.length && last.asks && last.asks.length) {
+    const mid = (last.bids[0][0] + last.asks[0][0]) / 2;
+    const bin = (mid - minP) / priceStep;
+    const y = H - (bin + 0.5) * rowH;
+    ctx.strokeStyle = 'rgba(168,255,83,0.7)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
 }
 
 function handleTradeExecuted(d) {

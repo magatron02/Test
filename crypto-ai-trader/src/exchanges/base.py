@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 
 @dataclass
@@ -46,6 +46,14 @@ class Order:
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+@dataclass
+class OrderBook:
+    symbol: str
+    bids: List[Tuple[float, float]]   # [(price, qty), ...] descending
+    asks: List[Tuple[float, float]]   # [(price, qty), ...] ascending
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class BaseExchange(ABC):
     name: str = "base"
     is_demo: bool = False
@@ -70,6 +78,10 @@ class BaseExchange(ABC):
     @abstractmethod
     async def create_order(self, symbol: str, side: str, amount: float, price: Optional[float] = None) -> Order:
         pass
+
+    async def get_order_book(self, symbol: str, limit: int = 20) -> Optional[OrderBook]:
+        """Return top-N bids/asks. Returns None if unsupported by the exchange."""
+        return None
 
     async def get_multiple_tickers(self, symbols: List[str]) -> Dict[str, Ticker]:
         result = {}

@@ -4,7 +4,7 @@ from typing import Dict, List, Optional
 
 import ccxt.async_support as ccxt
 
-from .base import Balance, BaseExchange, OHLCV, Order, Ticker
+from .base import Balance, BaseExchange, OHLCV, Order, OrderBook, Ticker
 from .retry import with_retry
 from ..core.config import settings
 
@@ -59,6 +59,13 @@ class BinanceExchange(BaseExchange):
             for cur, amt in total.items()
             if float(amt or 0) > 0
         }
+
+    @with_retry()
+    async def get_order_book(self, symbol: str, limit: int = 20) -> Optional[OrderBook]:
+        data = await self._client.fetch_order_book(symbol, limit=limit)
+        bids = [(float(p), float(q)) for p, q in data.get("bids", [])]
+        asks = [(float(p), float(q)) for p, q in data.get("asks", [])]
+        return OrderBook(symbol=symbol, bids=bids, asks=asks)
 
     @with_retry(max_attempts=2)
     async def create_order(self, symbol: str, side: str, amount: float, price: Optional[float] = None) -> Order:

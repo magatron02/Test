@@ -76,6 +76,15 @@ class MarketAnalysis:
     garch_regime_hint: str = "STABLE"    # RISING_VOL | FALLING_VOL | STABLE
     alphas: Dict = field(default_factory=dict)   # WorldQuant formulaic alpha values
 
+    # Microstructure features (from order book L2)
+    book_imbalance: float = 0.5          # bid_vol / (bid_vol+ask_vol), 0.5=balanced
+    whale_bid_price: float = 0.0         # price of largest bid wall (0 = none detected)
+    whale_bid_size: float = 0.0          # qty of largest bid wall
+    whale_ask_price: float = 0.0         # price of largest ask wall
+    whale_ask_size: float = 0.0          # qty of largest ask wall
+    twap_detected: bool = False          # True when periodic volume pattern found
+    twap_score: float = 0.0             # how many σ above noise (0–3)
+
 
 def _ema(series: np.ndarray, period: int) -> np.ndarray:
     k = 2 / (period + 1)
@@ -140,6 +149,73 @@ def _ohlcv_to_arrays(candles: List[OHLCV]):
     closes = np.array([c.close  for c in candles], dtype=float)
     vols   = np.array([c.volume for c in candles], dtype=float)
     return opens, highs, lows, closes, vols
+
+
+def analyze_order_book(analysis: "MarketAnalysis", bids: List, asks: List) -> None:
+    """Populate microstructure fields on an existing MarketAnalysis in-place.
+
+    bids/asks are lists of (price, qty) tuples sorted descending/ascending.
+    Only considers levels within ±3 % of the current mid-price.
+    """
+    price = analysis.price
+    if not price or not bids or not asks:
+        return
+
+    near = 0.03  # 3 % window around mid
+    bids_near = [(p, q) for p, q in bids if abs(p - price) / price <= near]
+    asks_near = [(p, q) for p, q in asks if abs(p - price) / price <= near]
+
+    # ── Book imbalance ────────────────────────────────────────────────
+    bid_vol = sum(q for _, q in bids_near[:10])
+    ask_vol = sum(q for _, q in asks_near[:10])
+    total = bid_vol + ask_vol
+    analysis.book_imbalance = bid_vol / total if total > 0 else 0.5
+
+    # ── Whale wall detection (qty > 3× average in near window) ───────
+    if bids_near:
+        bid_qtys = [q for _, q in bids_near]
+        avg_bid = float(np.mean(bid_qtys))
+        best_bid = max(bids_near, key=lambda x: x[1])
+        if avg_bid > 0 and best_bid[1] > avg_bid * 3:
+            analysis.whale_bid_price = best_bid[0]
+            analysis.whale_bid_size  = best_bid[1]
+
+    if asks_near:
+        ask_qtys = [q for _, q in asks_near]
+        avg_ask = float(np.mean(ask_qtys))
+        best_ask = max(asks_near, key=lambda x: x[1])
+        if avg_ask > 0 and best_ask[1] > avg_ask * 3:
+            analysis.whale_ask_price = best_ask[0]
+            analysis.whale_ask_size  = best_ask[1]
+
+
+def _twap_detect(vols: np.ndarray, n_bars: int = 64) -> dict:
+    """Detect periodic volume bursts (TWAP execution) via FFT on volume series."""
+    if len(vols) < n_bars:
+        return {"detected": False, "score": 0.0}
+
+    series = vols[-n_bars:].astype(float)
+    series -= series.mean()
+
+    fft_mag = np.abs(np.fft.rfft(series))
+    fft_mag[0] = 0  # remove DC
+
+    noise = fft_mag[1:]
+    if noise.std() == 0:
+        return {"detected": False, "score": 0.0}
+
+    threshold = noise.mean() + 3 * noise.std()
+    peaks = np.where(noise > threshold)[0]
+
+    if len(peaks) == 0:
+        return {"detected": False, "score": 0.0}
+
+    best = int(peaks[np.argmax(noise[peaks])])
+    score = float(noise[best] / threshold - 1.0)
+
+    period_bars = n_bars // (best + 1) if (best + 1) > 0 else 0
+    detected = score > 0.5 and period_bars >= 2
+    return {"detected": detected, "score": min(score, 3.0)}
 
 
 def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
@@ -338,6 +414,16 @@ def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
     except Exception as e:
         logger.debug("SMC detection skipped: %s", e)
 
+    # ── TWAP detection via FFT on volume series ───────────────────────────────
+    try:
+        twap = _twap_detect(vols)
+        result.twap_detected = twap["detected"]
+        result.twap_score    = twap["score"]
+        if result.twap_detected:
+            logger.debug("TWAP pattern detected for %s (score=%.2f)", symbol, result.twap_score)
+    except Exception as e:
+        logger.debug("TWAP detection skipped: %s", e)
+
     # ── Quant features: Kalman trend, GARCH vol forecast, WorldQuant alphas ──
     try:
         from .quant_features import kalman_trend, garch_volatility, worldquant_alphas
@@ -400,5 +486,12 @@ def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
     # Merge WorldQuant alphas (prefixed) into the feature vector
     for name, val in (result.alphas or {}).items():
         result.features[f"wq_{name}"] = val
+
+    # Microstructure features (populated later by analyze_order_book; zero until then)
+    result.features["book_imbalance"] = result.book_imbalance
+    result.features["whale_bid"]      = 1 if result.whale_bid_size > 0 else 0
+    result.features["whale_ask"]      = 1 if result.whale_ask_size > 0 else 0
+    result.features["twap_detected"]  = 1 if result.twap_detected else 0
+    result.features["twap_score"]     = result.twap_score
 
     return result
