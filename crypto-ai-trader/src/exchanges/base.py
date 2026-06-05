@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 
 @dataclass
@@ -79,3 +79,25 @@ class BaseExchange(ABC):
             except Exception:
                 pass
         return result
+
+    async def get_orderbook_top(self, symbol: str) -> Optional["OrderbookTop"]:
+        """Return best bid/ask. Default: last price ± 0.05% spread."""
+        try:
+            ticker = await self.get_ticker(symbol)
+            s = ticker.price * 0.0005
+            return OrderbookTop(symbol, ticker.price - s, ticker.price + s,
+                                round(s / ticker.price * 200, 6))
+        except Exception:
+            return None
+
+    async def get_funding_rate(self, symbol: str) -> Optional[dict]:
+        """Return perpetual funding rate dict. None if exchange doesn't support it."""
+        return None
+
+
+@dataclass
+class OrderbookTop:
+    symbol:     str
+    bid:        float
+    ask:        float
+    spread_pct: float   # (ask-bid)/bid × 100

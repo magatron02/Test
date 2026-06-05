@@ -14,6 +14,7 @@ from .position_sizer import PositionSizer
 from .rl_trainer import ModelBandit, RLTrainer
 from .signal_cache import SignalCache
 from .strategy_manager import StrategyManager, TradingSignal
+from .arbitrage import ArbitrageEngine
 from .trade_journal import TradeJournal
 from .trainer import AITrainer
 from ..core.config import settings
@@ -59,6 +60,14 @@ class AITrader:
         # F5.1 — walk-forward optimized params (loaded from best_params.json)
         self._param_opt   = ParamOptimizer(models_dir=settings.models_dir)
         self._apply_opt_params()
+        # Arbitrage engine: triangular + funding-rate scanner
+        arb_cfg = settings.get("arbitrage", default={}) or {}
+        self._arb = ArbitrageEngine(
+            exchange,
+            config   = arb_cfg,
+            dry_run  = bool(settings.get("trading", "dry_run", default=False)),
+        )
+
         # F2.3 — trade memory: learns win-rate/expectancy per setup signature
         jrn_cfg = settings.get("trade_journal", default={}) or {}
         self._journal = TradeJournal(
@@ -283,6 +292,7 @@ class AITrader:
             "param_opt":          self._param_opt.summary(),        # F5.1
             "trainer_drift":      ts.get("drift", {}),              # F3.4
             "trade_journal":      self._journal.summary(),          # F2.3
+            "arbitrage":          self._arb.last_result,            # Arb engine
             "ml_champion": {                                        # F5.3
                 "champion_auc":       ts.get("champion_auc"),
                 "challenger_auc":     ts.get("challenger_auc"),
@@ -1156,6 +1166,17 @@ class AITrader:
             elif res is not None:
                 analyses[sym] = res
         self._set_agent("analyzer", "idle", f"วิเคราะห์ครบ {len(analyses)}/{len(symbols)} เหรียญ")
+
+        # ── Arbitrage scan (between Phase A and B) ────────────────────────────
+        # Runs concurrently-safe: reads exchange prices, never touches _open_trades.
+        try:
+            portfolio_for_arb = await self._get_portfolio_summary()
+            await self._arb.run_cycle(
+                symbols      = symbols,
+                available_usdt = portfolio_for_arb.get("available_usdt", 0.0),
+            )
+        except Exception as _arb_exc:
+            logger.debug("Arbitrage scan error: %s", _arb_exc)
 
         # ── Phase B: decide + execute sequentially ───────────────────────────
         # Kept sequential because each step mutates shared state (portfolio cash,
