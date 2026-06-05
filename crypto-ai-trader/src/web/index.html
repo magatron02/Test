@@ -664,13 +664,13 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
     </div>
   </div>
 
-  <!-- Resilience Row (v1.4.0) — Tail Risk · Model Drift · Param Optimizer -->
+  <!-- Resilience Row (v1.4.0/v2.0.0) — Tail Risk · Model Drift · Param Opt · ML Champion -->
   <div class="row g-3 mb-3" id="resilienceRow">
     <!-- Tail Risk -->
-    <div class="col-md-4">
+    <div class="col-md-3">
       <div class="card h-100">
         <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-activity me-2"></i>Tail Risk <span class="text-muted" style="font-size:0.65rem;font-weight:400">VaR · CVaR · Monte Carlo</span></span>
+          <span><i class="bi bi-activity me-2"></i>Tail Risk <span class="text-muted" style="font-size:0.65rem;font-weight:400">VaR · CVaR · MC</span></span>
           <span id="varCircuitBadge" style="display:none;font-size:0.65rem;font-weight:700;color:#ff4d6d">⚡ VaR HALT</span>
         </div>
         <div class="card-body p-2" id="tailRiskPanel">
@@ -679,10 +679,10 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
       </div>
     </div>
     <!-- Model Drift -->
-    <div class="col-md-4">
+    <div class="col-md-3">
       <div class="card h-100">
         <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-arrow-repeat me-2"></i>Model Drift <span class="text-muted" style="font-size:0.65rem;font-weight:400">PSI per feature</span></span>
+          <span><i class="bi bi-arrow-repeat me-2"></i>Model Drift <span class="text-muted" style="font-size:0.65rem;font-weight:400">PSI</span></span>
           <span id="driftBadge" style="display:none;font-size:0.65rem;font-weight:700;color:#ffc107">⚠ DRIFT</span>
         </div>
         <div class="card-body p-2" id="driftPanel">
@@ -691,13 +691,25 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
       </div>
     </div>
     <!-- Param Optimizer -->
-    <div class="col-md-4">
+    <div class="col-md-3">
       <div class="card h-100">
         <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-sliders me-2"></i>Param Optimizer <span class="text-muted" style="font-size:0.65rem;font-weight:400">Walk-forward · Champion/Challenger</span></span>
-          <span id="paramChampBadge" style="display:none;font-size:0.65rem;font-weight:700;color:#39d98a">✓ PROMOTED</span>
+          <span><i class="bi bi-sliders me-2"></i>Param Opt <span class="text-muted" style="font-size:0.65rem;font-weight:400">Walk-forward</span></span>
+          <span id="paramChampBadge" style="display:none;font-size:0.65rem;font-weight:700;color:#39d98a">✓ NEW</span>
         </div>
         <div class="card-body p-2" id="paramOptPanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+    <!-- ML Champion/Challenger -->
+    <div class="col-md-3">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-trophy me-2"></i>ML Model <span class="text-muted" style="font-size:0.65rem;font-weight:400">Champion/Challenger</span></span>
+          <span id="mlChampBadge" style="display:none;font-size:0.65rem;font-weight:700;color:#39d98a">↑ PROMOTED</span>
+        </div>
+        <div class="card-body p-2" id="mlChampPanel">
           <div class="text-muted text-center small py-2">รอข้อมูล...</div>
         </div>
       </div>
@@ -4390,6 +4402,7 @@ function renderDashboardState(d) {
   if (d.risk && d.risk.tail_risk) renderTailRiskPanel(d.risk.tail_risk, d.risk.limits || {});
   if (d.trainer_drift)            renderDriftPanel(d.trainer_drift);
   if (d.param_opt)                renderParamOptPanel(d.param_opt);
+  if (d.ml_champion != null)      renderMlChampPanel(d.ml_champion);
   if (d.trade_journal)            renderTradeJournalPanel(d.trade_journal);
 }
 
@@ -4526,6 +4539,54 @@ function renderParamOptPanel(opt) {
     ${paramRows}
     <div class="mt-2" style="font-size:0.62rem;color:var(--text-muted);text-align:right">
       last opt: ${opt_at} · ${opt.n_combos || 0} combos
+    </div>`;
+}
+
+function renderMlChampPanel(mc) {
+  const panel = document.getElementById('mlChampPanel');
+  const badge = document.getElementById('mlChampBadge');
+  if (!panel) return;
+  if (!mc || mc.model_type === 'none' || mc.model_type == null) {
+    panel.innerHTML = '<div class="text-muted text-center small py-2">ยังไม่มีโมเดล</div>';
+    if (badge) badge.style.display = 'none';
+    return;
+  }
+  const champAuc = mc.champion_auc;
+  const challAuc = mc.challenger_auc;
+  const promoted = mc.challenger_promoted === true;
+  const rejected  = mc.challenger_promoted === false;
+  if (badge) {
+    badge.style.display = promoted ? '' : 'none';
+  }
+  const aucColor = (v) => v == null ? 'var(--text-muted)' : v >= 0.60 ? '#39d98a' : v >= 0.52 ? '#ffc107' : '#ff4d6d';
+  const fmtAuc = (v) => v != null ? v.toFixed(4) : '—';
+  const acc = mc.accuracy != null ? (mc.accuracy * 100).toFixed(1) + '%' : '—';
+  const lastT = mc.last_trained
+    ? new Date(mc.last_trained + (mc.last_trained.includes('Z') ? '' : 'Z'))
+        .toLocaleString('th', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
+    : '—';
+  const typeLabel = mc.model_type === 'lightgbm' ? 'LightGBM' : mc.model_type === 'random_forest' ? 'RandomForest' : mc.model_type || '—';
+
+  const challRow = challAuc != null ? `
+    <div class="d-flex justify-content-between py-1" style="border-bottom:1px solid var(--border);font-size:0.72rem">
+      <span style="color:var(--text-muted)">Challenger AUC</span>
+      <strong style="font-family:var(--font-mono);color:${aucColor(challAuc)}">${fmtAuc(challAuc)}
+        ${promoted ? '<span style="color:#39d98a;font-size:0.65rem">↑ promoted</span>' : rejected ? '<span style="color:#ff4d6d;font-size:0.65rem">✕ rejected</span>' : ''}
+      </strong>
+    </div>` : '';
+
+  panel.innerHTML = `
+    <div class="d-flex justify-content-between py-1" style="border-bottom:1px solid var(--border);font-size:0.72rem">
+      <span style="color:var(--text-muted)">Champion AUC</span>
+      <strong style="font-family:var(--font-mono);color:${aucColor(champAuc)}">${fmtAuc(champAuc)}</strong>
+    </div>
+    ${challRow}
+    <div class="d-flex justify-content-between py-1" style="border-bottom:1px solid var(--border);font-size:0.72rem">
+      <span style="color:var(--text-muted)">CV Accuracy</span>
+      <strong style="font-family:var(--font-mono)">${acc}</strong>
+    </div>
+    <div class="mt-2" style="font-size:0.62rem;color:var(--text-muted);text-align:right">
+      ${typeLabel} · ${lastT}
     </div>`;
 }
 

@@ -221,6 +221,14 @@ class AITrader:
             "param_opt":          self._param_opt.summary(),        # F5.1
             "trainer_drift":      ts.get("drift", {}),              # F3.4
             "trade_journal":      self._journal.summary(),          # F2.3
+            "ml_champion": {                                        # F5.3
+                "champion_auc":       ts.get("champion_auc"),
+                "challenger_auc":     ts.get("challenger_auc"),
+                "challenger_promoted": ts.get("challenger_promoted"),
+                "accuracy":           ts.get("accuracy"),
+                "model_type":         ts.get("model_type"),
+                "last_trained":       ts.get("last_trained"),
+            },
         }
 
     async def _broadcast(self, event: str, data: dict):

@@ -75,91 +75,119 @@ class GBMSignalModel:
     # Training
     # ------------------------------------------------------------------ #
     def fit(self, X: np.ndarray, y: np.ndarray, feature_names: list[str]) -> dict:
+        """Train on full dataset and save immediately (legacy / fallback path)."""
+        res = self.fit_challenger(X, y, feature_names)
+        if res.get("auc_oos") is not None:
+            self.save()
+        return res
+
+    def fit_challenger(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        feature_names: list[str],
+        val_fraction: float = 0.20,
+    ) -> dict:
+        """Train on the first (1-val_fraction) of data, evaluate OOS AUC on the
+        last val_fraction, then refit on the full dataset so the model in memory
+        is always trained on everything.  Does NOT save — the caller decides
+        whether to promote this challenger to champion.
+
+        Returns a dict with ``auc_oos``, ``accuracy`` (CV on train slice),
+        ``n_train``, ``n_val``, ``n_total``.
+        """
         try:
             import lightgbm as lgb
+            from sklearn.metrics import roc_auc_score
             from sklearn.model_selection import TimeSeriesSplit, cross_val_score
 
             X = np.asarray(X, dtype=float)
             y = np.asarray(y).astype(int)
-            n_samples = int(X.shape[0])
+            n = int(X.shape[0])
+
+            n_val   = max(int(n * val_fraction), 5)
+            n_train = n - n_val
+            if n_train < 10:
+                return {"auc_oos": None, "error": "insufficient data for champion/challenger split"}
+
+            X_tr, X_val = X[:n_train], X[n_train:]
+            y_tr, y_val = y[:n_train], y[n_train:]
 
             self.feature_names = list(feature_names)
 
-            self.model = lgb.LGBMClassifier(
-                n_estimators=200,
-                learning_rate=0.05,
-                num_leaves=31,
-                max_depth=6,
-                subsample=0.8,
-                colsample_bytree=0.8,
-                random_state=42,
-                n_jobs=-1,
-                verbose=-1,
+            challenger = lgb.LGBMClassifier(
+                n_estimators=200, learning_rate=0.05, num_leaves=31,
+                max_depth=6, subsample=0.8, colsample_bytree=0.8,
+                random_state=42, n_jobs=-1, verbose=-1,
             )
+            challenger.fit(X_tr, y_tr)
 
-            # Time-series cross-validation accuracy.
-            n_splits = max(2, min(5, n_samples // 10 + 1))
+            # OOS AUC on the held-out time slice
+            if len(np.unique(y_val)) < 2:
+                auc_oos = 0.5   # can't discriminate with single class
+            else:
+                proba_val = challenger.predict_proba(X_val)[:, 1]
+                auc_oos = float(roc_auc_score(y_val, proba_val))
+
+            # CV accuracy on the training slice
+            accuracy = None
+            n_splits = max(2, min(5, n_train // 10 + 1))
             try:
                 tscv = TimeSeriesSplit(n_splits=n_splits)
-                scores = cross_val_score(
-                    self.model, X, y, cv=tscv, scoring="accuracy"
-                )
+                scores = cross_val_score(challenger, X_tr, y_tr, cv=tscv, scoring="accuracy")
                 accuracy = float(np.mean(scores))
             except Exception as exc:
-                logger.warning("Cross-validation failed, falling back: %s", exc)
-                accuracy = None
-                n_splits = 0
+                logger.debug("CV during fit_challenger failed: %s", exc)
 
-            # Fit final model on the full data set.
-            self.model.fit(X, y)
-
-            # Build SHAP explainer AFTER fit.
+            # Refit on the FULL dataset so if promoted the champion saw everything
+            challenger.fit(X, y)
+            self.model = challenger
             self._build_explainer()
 
-            # Cache global SHAP importance on (a sample of) the training set.
+            # Cache global SHAP importance on a sample of the full set
             self._shap_global = None
             if self._explainer is not None:
                 try:
-                    if n_samples > self._SHAP_SAMPLE_LIMIT:
-                        rng = np.random.default_rng(42)
-                        idx = rng.choice(
-                            n_samples, self._SHAP_SAMPLE_LIMIT, replace=False
-                        )
-                        X_sample = X[idx]
-                    else:
-                        X_sample = X
-                    sv = self._positive_class_shap(
-                        self._explainer.shap_values(X_sample)
-                    )
+                    n_s = min(n, self._SHAP_SAMPLE_LIMIT)
+                    rng = np.random.default_rng(42)
+                    idx = rng.choice(n, n_s, replace=False)
+                    sv = self._positive_class_shap(self._explainer.shap_values(X[idx]))
                     self._shap_global = np.mean(np.abs(sv), axis=0)
                 except Exception as exc:
-                    logger.warning("Failed to cache global SHAP values: %s", exc)
-                    self._shap_global = None
-
-            # Persist model + feature_names.
-            try:
-                self.model_dir.mkdir(parents=True, exist_ok=True)
-                with open(self._model_path, "wb") as fh:
-                    pickle.dump(
-                        {
-                            "model": self.model,
-                            "feature_names": self.feature_names,
-                            "shap_global": self._shap_global,
-                        },
-                        fh,
-                    )
-            except Exception as exc:
-                logger.warning("Failed to persist GBM model: %s", exc)
+                    logger.debug("SHAP caching failed: %s", exc)
 
             return {
-                "accuracy": accuracy,
-                "n_samples": n_samples,
+                "auc_oos":  round(auc_oos, 4),
+                "accuracy": round(accuracy, 3) if accuracy is not None else None,
+                "n_train":  n_train,
+                "n_val":    n_val,
+                "n_total":  n,
+                "cv_folds": n_splits,
                 "feature_names": self.feature_names,
-                "cv_folds": int(n_splits),
             }
         except Exception as exc:
-            logger.warning("GBMSignalModel.fit failed: %s", exc)
-            return {"accuracy": None, "error": str(exc)}
+            logger.warning("GBMSignalModel.fit_challenger failed: %s", exc)
+            return {"auc_oos": None, "error": str(exc)}
+
+    def save(self) -> bool:
+        """Explicitly persist the currently-loaded model to disk (champion promotion)."""
+        if self.model is None:
+            return False
+        try:
+            self.model_dir.mkdir(parents=True, exist_ok=True)
+            with open(self._model_path, "wb") as fh:
+                pickle.dump(
+                    {
+                        "model": self.model,
+                        "feature_names": self.feature_names,
+                        "shap_global": self._shap_global,
+                    },
+                    fh,
+                )
+            return True
+        except Exception as exc:
+            logger.warning("GBMSignalModel.save failed: %s", exc)
+            return False
 
     # ------------------------------------------------------------------ #
     # Inference
