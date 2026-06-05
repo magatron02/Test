@@ -1,36 +1,49 @@
 @echo off
 cd /d "%~dp0"
-title Aiterra v1.0.0 - Update
+title Aiterra v1.2.0 - Update
 color 0B
 
 cls
 echo.
 echo  ============================================================
-echo   Aiterra v1.0.0  --  Update (keeps your settings and data)
+echo   Aiterra v1.2.0  --  Update
 echo  ============================================================
 echo.
-echo   This updates the program code and dependencies.
-echo   Your saved data is NOT touched:
-echo     - config\settings.yml   (your API keys / tokens)
-echo     - data\trades.db        (trade history)
-echo     - models\signal_model.pkl (trained AI model)
+echo   Upgrades the program and brings your data into this version.
+echo   Nothing you entered before is deleted:
+echo     - config\settings.yml      (your API keys / tokens)
+echo     - data\trades.db           (trade history)
+echo     - models\signal_model.pkl  (trained AI model)
+echo.
+echo   It imports them automatically from a previous Aiterra folder
+echo   if you extracted this version next to the old one, and adds
+echo   any new settings this version introduced (your values win).
 echo.
 
 REM --- Confirm we are in a real install -----------------------
 if not exist requirements.txt (
     echo  ERROR: requirements.txt not found in this folder.
-    echo  Make sure you extracted the new files into your existing
-    echo  Aiterra folder (choose "Replace the files" when asked).
+    echo  Extract ALL the new files into this folder first.
     echo.
     pause & exit /b 1
 )
 
-REM --- venv check ---------------------------------------------
+REM --- Python check -------------------------------------------
+python --version >nul 2>&1
+if errorlevel 1 (
+    echo  ERROR: Python not found. Install Python 3.10+ from python.org
+    echo  (tick "Add Python to PATH"), then run UPDATE.bat again.
+    pause & exit /b 1
+)
+
+REM --- venv: reuse if present, else create --------------------
 if not exist venv\Scripts\activate.bat (
-    echo  No virtual environment found. Running full install instead...
-    echo.
-    call INSTALL.bat
-    exit /b 0
+    echo  No virtual environment yet - creating one...
+    python -m venv venv
+    if errorlevel 1 (
+        echo  ERROR: Failed to create virtual environment.
+        pause & exit /b 1
+    )
 )
 
 call venv\Scripts\activate.bat
@@ -39,21 +52,9 @@ if errorlevel 1 (
     pause & exit /b 1
 )
 
-REM --- Preserve config: only create if missing ----------------
-if not exist config\settings.yml (
-    if exist config\settings.example.yml (
-        copy config\settings.example.yml config\settings.yml >nul
-        echo  Note: no existing settings.yml found - created a fresh one.
-    )
-) else (
-    echo  [OK] Existing config\settings.yml preserved.
-)
-if not exist data   mkdir data
-if not exist models mkdir models
-
-REM --- Upgrade dependencies -----------------------------------
+REM --- Upgrade dependencies (needed before migrate uses pyyaml) -
 echo.
-echo  Updating dependencies (may take a few minutes)...
+echo  [1/2] Updating dependencies (may take a few minutes)...
 echo.
 python -m pip install --upgrade pip --quiet
 pip install -r requirements.txt --upgrade
@@ -65,9 +66,17 @@ if errorlevel 1 (
     pause & exit /b 1
 )
 
+REM --- Import / merge user data -------------------------------
+echo.
+echo  [2/2] Importing your data and merging new settings...
+echo.
+if not exist data   mkdir data
+if not exist models mkdir models
+python migrate.py
+
 echo.
 echo  ============================================================
-echo   Update complete!  Your API keys and history are intact.
+echo   Update complete!  Your API keys, history and model are intact.
 echo.
 echo   Double-click START.bat to launch the updated app.
 echo  ============================================================

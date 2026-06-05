@@ -6,7 +6,7 @@ color 0B
 cls
 echo.
 echo  ============================================================
-echo   Aiterra v1.0.0  --  Build Standalone .exe (PyInstaller)
+echo   Aiterra v1.2.0  --  Build Standalone .exe (PyInstaller)
 echo   Creates a single folder you can share without Python.
 echo   Build time: ~3-5 minutes
 echo  ============================================================

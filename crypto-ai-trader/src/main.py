@@ -5,6 +5,9 @@ import threading
 import webbrowser
 from pathlib import Path
 
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 import sys as _sys
 import uvicorn
 from fastapi import FastAPI, WebSocket
@@ -18,6 +21,7 @@ from .exchanges import create_exchange
 from .agent.ai_trader import AITrader
 from .agent.training_loop import TrainingLoop
 from .agent.hourly_trainer import HourlyTrainer
+from .agent.alert_monitor import AlertMonitor
 from .api.routes import router, set_trader, set_training_loop, set_hourly_trainer
 from .api.websocket import broadcast, websocket_endpoint
 
@@ -29,12 +33,34 @@ logger = logging.getLogger(__name__)
 
 WEB_DIR = (Path(_sys._MEIPASS) / "src" / "web") if getattr(_sys, 'frozen', False) else (Path(__file__).parent / "web")
 
-app = FastAPI(title=settings.app_name, version="1.0.0")
+app = FastAPI(title=settings.app_name, version="1.2.0")
+APP_VERSION = "1.2.0"
+APP_NAME    = "Aiterra"
+AI_NAME     = "Lunai"
+AI_VERSION  = "1.2.0"
+
+# Attach slowapi rate-limiter state so @limiter.limit decorators work.
+try:
+    from slowapi import _rate_limit_exceeded_handler
+    from slowapi.errors import RateLimitExceeded
+    from .api.routes import _limiter as _route_limiter
+    if _route_limiter:
+        app.state.limiter = _route_limiter
+        app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+except ImportError:
+    pass  # slowapi optional — graceful degradation if not installed
+except Exception:
+    logger.warning("slowapi rate-limiter setup failed; running without rate limits", exc_info=True)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
+    # Restrict to localhost only — this is a single-user local app.
+    # If you expose over a LAN, also add your LAN address here.
+    allow_origins=[
+        f"http://localhost:{settings.app_port}",
+        f"http://127.0.0.1:{settings.app_port}",
+    ],
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -58,6 +84,8 @@ _trader: AITrader = None
 _trader_task = None
 _training_loop_inst: TrainingLoop = None
 _hourly_trainer_inst: HourlyTrainer = None
+_alert_monitor_inst: AlertMonitor = None
+_alert_task = None
 
 
 async def _snapshot_loop():
@@ -94,15 +122,17 @@ async def _snapshot_loop():
                     db.commit()
                 except Exception:
                     db.rollback()
+                    logger.warning("Portfolio snapshot DB write failed", exc_info=True)
                 finally:
                     db.close()
         except Exception as e:
-            logger.debug(f"Snapshot error: {e}")
+            logger.warning("Snapshot loop error: %s", e)
         await asyncio.sleep(300)  # every 5 minutes
 
 @app.on_event("startup")
 async def startup():
     global _trader, _trader_task, _training_loop_inst, _hourly_trainer_inst
+    global _alert_monitor_inst, _alert_task
 
     init_db()
     logger.info(f"Database initialized")
@@ -118,7 +148,9 @@ async def startup():
     _trader.set_broadcast(broadcast)
 
     _training_loop_inst = TrainingLoop(_trader, broadcast_fn=broadcast)
-    _hourly_trainer_inst = HourlyTrainer(_trader._trainer, broadcast_fn=broadcast)
+    _hourly_trainer_inst = HourlyTrainer(
+        _trader._trainer, broadcast_fn=broadcast, trader=_trader
+    )
 
     set_trader(_trader)
     set_training_loop(_training_loop_inst)
@@ -126,6 +158,8 @@ async def startup():
 
     _trader_task = asyncio.create_task(_trader.start())
     asyncio.create_task(_snapshot_loop())
+    _alert_monitor_inst = AlertMonitor(exchange, broadcast_fn=broadcast)
+    _alert_task = asyncio.create_task(_alert_monitor_inst.start())
     _hourly_trainer_inst.start()
     logger.info(f"AI Trader started in {settings.trading_mode} mode (exchange={ex_name}) with model={settings.ai_model}")
 
@@ -140,22 +174,41 @@ async def startup():
 @app.on_event("shutdown")
 async def shutdown():
     if _trader:
-        _trader.stop()
+        _trader.stop()   # signals the event — unlocks the inter-cycle sleep
     if _trader_task:
-        _trader_task.cancel()
+        # Give the current cycle up to 30 s to finish cleanly, then force-cancel.
+        try:
+            await asyncio.wait_for(asyncio.shield(_trader_task), timeout=30)
+        except (asyncio.TimeoutError, asyncio.CancelledError, Exception):
+            _trader_task.cancel()
+    # Close exchange HTTP sessions to avoid ResourceWarning on exit
+    try:
+        if _trader and hasattr(_trader._exchange, "close"):
+            await _trader._exchange.close()
+    except Exception:
+        pass
+    if _hourly_trainer_inst:
+        _hourly_trainer_inst.stop()
+    if _alert_monitor_inst:
+        _alert_monitor_inst.stop()
+    if _alert_task:
+        _alert_task.cancel()
 
 
 def main():
     print(f"""
 ╔══════════════════════════════════════════╗
-║          Aiterra v1.0.0 - Starting...    ║
+║    Aiterra v1.2.0  |  Lunai v1.2.0          ║
 ║  Mode: {settings.trading_mode.upper():<10} Model: {settings.ai_model:<12}║
 ║  Port: {settings.app_port:<10} URL: http://localhost:{settings.app_port} ║
 ╚══════════════════════════════════════════╝
 """)
+    # Bind to localhost only by default — prevents unintended LAN exposure.
+    # Set app.host = "0.0.0.0" in settings.yml to expose over a network.
+    host = settings.get("app", "host", default="127.0.0.1")
     uvicorn.run(
         app,
-        host="0.0.0.0",
+        host=host,
         port=settings.app_port,
         reload=False,
         log_level=settings.get("app", "log_level", default="info").lower(),

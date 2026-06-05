@@ -3,21 +3,36 @@ import csv
 import io
 import logging
 import math
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from ..core.config import settings
-from ..core.database import Portfolio, Trade, TrainingRecord, get_db, SessionLocal
+from ..core.database import Portfolio, PriceAlert, Trade, TrainingRecord, get_db, SessionLocal
 from .websocket import get_notifications, clear_notifications
 from ..notifications import line_notify, telegram_notify
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
+
+# ── Rate limiting (slowapi) ───────────────────────────────────────────────────
+try:
+    from slowapi import Limiter
+    from slowapi.util import get_remote_address
+    _limiter = Limiter(key_func=get_remote_address, default_limits=[])
+except ImportError:
+    _limiter = None
+
+
+def _rate_limit(limit_string: str):
+    """Dependency that applies a rate limit when slowapi is available."""
+    if _limiter is None:
+        return Depends(lambda: None)
+    return Depends(_limiter.limit(limit_string))
 
 # Reference to trader injected at startup
 _trader = None
@@ -121,6 +136,7 @@ async def get_portfolio():
 
 @router.get("/trades")
 async def get_trades(limit: int = 50, db: Session = Depends(get_db)):
+    limit = max(1, min(limit, 1000))   # cap unbounded reads
     trades = db.query(Trade).order_by(Trade.opened_at.desc()).limit(limit).all()
     return [
         {
@@ -135,6 +151,7 @@ async def get_trades(limit: int = 50, db: Session = Depends(get_db)):
             "ai_model": t.ai_model,
             "confidence": t.confidence,
             "reasoning": t.reasoning,
+            "journal": t.journal,
             "close_price": t.close_price,
             "pnl": t.pnl,
             "pnl_pct": t.pnl_pct,
@@ -186,11 +203,65 @@ async def get_training_stats():
 
 
 @router.post("/training/trigger")
-async def trigger_training():
+@(_limiter.limit("6/minute") if _limiter else lambda f: f)
+async def trigger_training(request: Request):
     if not _trader:
         raise HTTPException(503, "Trader not running")
     success = _trader._trainer.train()
     return {"success": success, "stats": _trader.trainer_stats}
+
+
+@router.get("/ml/feature-importance")
+async def ml_feature_importance():
+    """Global SHAP feature importance from the LightGBM signal model (ML4T Ch.12)."""
+    if not _trader:
+        raise HTTPException(503, "Trader not running")
+    try:
+        importance = _trader._trainer.feature_importance()
+        stats = _trader.trainer_stats
+        return {
+            "model_type": stats.get("model_type", "none"),
+            "accuracy":   stats.get("accuracy"),
+            "features":   importance[:20],
+        }
+    except Exception as e:
+        return {"model_type": "none", "features": [], "error": str(e)}
+
+
+@router.get("/portfolio/hrp")
+async def portfolio_hrp():
+    """Hierarchical Risk Parity weights across tracked symbols (ML4T Ch.13)."""
+    if not _trader:
+        raise HTTPException(503, "Trader not running")
+    try:
+        _trader._update_hrp_weights()
+        weights = _trader._hrp_weights or {}
+        n = len(weights)
+        equal = 1.0 / n if n else 0.0
+        rows = [
+            {
+                "symbol":     s,
+                "weight":     round(w, 4),
+                "vs_equal":   round((w / equal) if equal else 1.0, 2),
+                "multiplier": round(_trader._hrp_multiplier(s), 2),
+            }
+            for s, w in sorted(weights.items(), key=lambda kv: -kv[1])
+        ]
+        return {"equal_weight": round(equal, 4), "weights": rows}
+    except Exception as e:
+        return {"weights": [], "error": str(e)}
+
+
+@router.get("/pairs/cointegration")
+async def pairs_cointegration():
+    """Cointegrated pairs for statistical-arbitrage signals (ML4T Ch.9)."""
+    if not _trader:
+        raise HTTPException(503, "Trader not running")
+    try:
+        pairs = _trader.cointegration_pairs()
+        return {"pairs": pairs, "count": len(pairs)}
+    except Exception as e:
+        return {"pairs": [], "count": 0, "error": str(e)}
 
 
 @router.get("/settings")
@@ -200,34 +271,145 @@ async def get_settings():
     for ex in cfg.get("exchanges", {}).values():
         if isinstance(ex, dict):
             if "api_key" in ex and ex["api_key"]:
-                ex["api_key"] = ex["api_key"][:4] + "****"
+                ex["api_key"] = "****"          # full mask — even first chars leak entropy
             if "api_secret" in ex and ex["api_secret"]:
                 ex["api_secret"] = "****"
-    if "ai" in cfg and "claude" in cfg["ai"]:
-        key = cfg["ai"]["claude"].get("api_key", "")
-        cfg["ai"]["claude"]["api_key"] = key[:8] + "****" if key else ""
+            if "api_secret" in ex and ex["api_secret"]:
+                ex["api_secret"] = "****"
+    if "ai" in cfg:
+        for provider in ("claude", "openai", "gemini"):
+            if provider in cfg["ai"] and isinstance(cfg["ai"][provider], dict):
+                key = cfg["ai"][provider].get("api_key", "")
+                cfg["ai"][provider]["api_key"] = key[:8] + "****" if key else ""
     return cfg
+
+
+# (section, key) → (type_coerce_fn, min_val, max_val)
+# None min/max means no range check.
+_SETTINGS_SCHEMA: Dict[tuple, tuple] = {
+    ("trading", "take_profit_pct"):    (float, 0.001, 0.50),
+    ("trading", "stop_loss_pct"):      (float, 0.001, 0.50),
+    ("trading", "min_confidence"):     (float, 0.10,  1.0),
+    ("trading", "analysis_interval"):  (int,   30,    86400),
+    ("trading", "risk_per_trade_pct"): (float, 0.001, 0.20),
+    ("trading", "max_daily_loss_pct"): (float, 0.001, 1.0),
+    ("trading", "max_open_trades"):    (int,   1,     50),
+    ("trading", "max_position_pct"):   (float, 0.01,  1.0),
+    ("trading", "dry_run"):            (bool,  None,  None),
+    ("trading", "live_max_budget_usdt"): (float, 0.0, 1e7),
+    ("risk",    "max_drawdown_pct"):   (float, 0.01,  1.0),
+    ("risk",    "max_daily_loss_pct"): (float, 0.001, 1.0),
+    ("risk",    "max_portfolio_heat"): (float, 0.01,  1.0),
+    ("risk",    "max_position_pct"):   (float, 0.01,  1.0),
+    ("backtest","fee_pct"):            (float, 0.0,   0.05),
+    ("backtest","slippage_pct"):       (float, 0.0,   0.05),
+    ("position_sizer", "kelly_fraction"):   (float, 0.01, 1.0),
+    ("position_sizer", "min_trade_usdt"):   (float, 1.0, 1e6),
+    ("position_sizer", "max_trade_usdt"):   (float, 1.0, 1e6),
+    ("position_sizer", "fallback_risk_pct"):(float, 0.001, 0.20),
+    ("position_sizer", "target_atr_pct"):   (float, 0.1,  20.0),
+}
+
+
+def _coerce_and_validate(section: str, key: str, value: Any) -> Any:
+    """Type-coerce and range-check a setting value. Raises HTTPException on failure."""
+    schema = _SETTINGS_SCHEMA.get((section, key))
+    if schema is None:
+        return value   # no schema for this key — pass through unchanged
+    coerce_fn, lo, hi = schema
+    try:
+        if coerce_fn is bool:
+            if isinstance(value, bool):
+                coerced = value
+            elif isinstance(value, str):
+                coerced = value.lower() in ("true", "1", "yes")
+            else:
+                coerced = bool(value)
+        else:
+            coerced = coerce_fn(value)
+    except (TypeError, ValueError):
+        raise HTTPException(400, f"'{section}.{key}' must be a {coerce_fn.__name__}")
+    if lo is not None and coerced < lo:
+        raise HTTPException(400, f"'{section}.{key}' must be >= {lo}")
+    if hi is not None and coerced > hi:
+        raise HTTPException(400, f"'{section}.{key}' must be <= {hi}")
+    return coerced
+
+
+_SETTINGS_ALLOWLIST: Dict[str, set] = {
+    "trading": {
+        "take_profit_pct", "stop_loss_pct", "min_confidence",
+        "analysis_interval", "risk_per_trade_pct", "max_daily_loss_pct",
+        "max_open_trades", "max_position_pct", "dry_run",
+        "schedule", "live_max_budget_usdt",
+    },
+    "strategy": {
+        "primary", "roi_table", "trailing_stop",
+    },
+    "risk": {
+        "max_drawdown_pct", "max_daily_loss_pct",
+        "max_portfolio_heat", "max_position_pct",
+    },
+    "ai": {
+        "default_model",
+    },
+    "notifications": {
+        "line", "telegram", "notify_on",
+    },
+    "exchanges": {
+        # allow writing api_key/secret only — not enabled/testnet flags
+        "binance", "binance_th", "bitkub", "okx",
+    },
+    "backtest": {"fee_pct", "slippage_pct"},
+    "position_sizer": {
+        "kelly_fraction", "min_trade_usdt", "max_trade_usdt",
+        "fallback_risk_pct", "target_atr_pct",
+    },
+}
 
 
 @router.post("/settings")
 async def update_settings(data: Dict[str, Any]):
     for section, values in data.items():
+        allowed_keys = _SETTINGS_ALLOWLIST.get(section)
+        if allowed_keys is None:
+            raise HTTPException(400, f"Section '{section}' is not writable via API")
         if isinstance(values, dict):
             for key, val in values.items():
+                if key not in allowed_keys:
+                    raise HTTPException(400, f"Key '{section}.{key}' is not writable via API")
+                val = _coerce_and_validate(section, key, val)
                 settings.set(val, section, key)
+        else:
+            # scalar top-level key
+            settings.set(values, section)
     settings.save()
     settings.reload()
     return {"success": True}
 
 
 @router.post("/mode")
-async def set_mode(data: Dict[str, str]):
+async def set_mode(data: Dict[str, Any]):
     mode = data.get("mode", "demo")
     if mode not in ("demo", "live"):
         raise HTTPException(400, "Mode must be 'demo' or 'live'")
+    if mode == "live":
+        # Real funds at risk — require explicit confirmation and accept a budget cap.
+        if not data.get("confirm"):
+            raise HTTPException(400, "Live mode requires confirm=true")
+        if "budget_usdt" in data:
+            try:
+                budget = float(data.get("budget_usdt") or 0)
+            except (TypeError, ValueError):
+                raise HTTPException(400, "budget_usdt must be a number")
+            if budget < 0 or budget > 10_000_000:
+                raise HTTPException(400, "budget_usdt must be 0 – 10,000,000")
+            settings.set(budget, "trading", "live_max_budget_usdt")
     settings.set(mode, "trading", "mode")
     settings.save()
-    return {"mode": mode}
+    settings.reload()
+    return {"mode": mode,
+            "live_max_budget_usdt": settings.get("trading", "live_max_budget_usdt", default=0)}
 
 
 @router.post("/strategy")
@@ -243,7 +425,7 @@ async def set_strategy(data: Dict[str, str]):
 @router.post("/ai-model")
 async def set_ai_model(data: Dict[str, str]):
     model = data.get("model", "hybrid")
-    valid = ("claude", "rule_based", "ml", "hybrid")
+    valid = ("claude", "rule_based", "ml", "hybrid", "multi_model")
     if model not in valid:
         raise HTTPException(400, f"Model must be one of {valid}")
     settings.set(model, "ai", "default_model")
@@ -358,7 +540,7 @@ async def export_trades(db: Session = Depends(get_db)):
             t.closed_at.isoformat() if t.closed_at else "",
         ])
     buf.seek(0)
-    filename = f"trades_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
+    filename = f"trades_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.csv"
     return StreamingResponse(
         io.BytesIO(buf.getvalue().encode()),
         media_type="text/csv",
@@ -493,20 +675,77 @@ async def get_mtf_analysis(symbol: str = "BTC/USDT"):
 
 
 @router.post("/backtest")
-async def run_backtest(data: Dict[str, Any]):
-    """POST /api/backtest — Run backtest on real Binance klines (simulated fallback)."""
+@(_limiter.limit("10/minute") if _limiter else lambda f: f)
+async def run_backtest(request: Request, data: Dict[str, Any]):
+    """POST /api/backtest — Backtest with Market Regime + Chart Patterns + Kelly Sizing.
+
+    Body:
+      symbol:          BTC/USDT (default)
+      days:            7-365    (default 30)
+      tp_pct:          take-profit fraction (default 0.04)
+      sl_pct:          stop-loss  fraction  (default 0.02)
+      initial_capital: starting capital USDT (default 10000)
+
+    Response includes:
+      - Primary metrics from autotrade AI stack
+      - comparison.basic / comparison.hybrid / comparison.autotrade
+      - regime_stats: performance breakdown per detected regime
+      - pattern_stats: best/worst chart patterns by PnL
+      - equity_curve + last 50 annotated trades
+    """
     from ..agent.backtest import run_backtest_real as _run
-    symbol  = data.get("symbol", "BTC/USDT")
+    symbol  = str(data.get("symbol", "BTC/USDT"))
     days    = int(data.get("days", 30))
     tp_pct  = float(data.get("tp_pct", 0.04))
     sl_pct  = float(data.get("sl_pct", 0.02))
+    capital = float(data.get("initial_capital", 10_000.0))
     if days < 7 or days > 365:
         raise HTTPException(400, "days must be 7-365")
+    if not (0.001 <= tp_pct <= 0.50):
+        raise HTTPException(400, "tp_pct must be between 0.1% and 50%")
+    if not (0.001 <= sl_pct <= 0.50):
+        raise HTTPException(400, "sl_pct must be between 0.1% and 50%")
+    if capital < 100 or capital > 10_000_000:
+        raise HTTPException(400, "initial_capital must be 100 – 10,000,000")
     try:
-        result = await _run(symbol, days=days, tp_pct=tp_pct, sl_pct=sl_pct)
+        result = await _run(symbol, days=days, tp_pct=tp_pct, sl_pct=sl_pct,
+                            initial_capital=capital)
         return result
     except Exception as e:
         raise HTTPException(500, str(e))
+
+
+@router.get("/backtest/walkforward")
+@(_limiter.limit("4/minute") if _limiter else lambda f: f)
+async def backtest_walkforward(
+    request: Request,
+    symbol: str = "BTC/USDT",
+    days: int = 90,
+    folds: int = 3,
+    tp_pct: float = 0.04,
+    sl_pct: float = 0.02,
+    initial_capital: float = 10000.0,
+):
+    """Walk-forward validation: Jesse-style rolling IS/OOS parameter optimisation."""
+    from ..agent.backtest import run_walkforward
+    if days < 14 or days > 365:
+        raise HTTPException(400, "days must be 14-365")
+    if folds < 2 or folds > 10:
+        raise HTTPException(400, "folds must be 2-10")
+    if not (0.001 <= tp_pct <= 0.50):
+        raise HTTPException(400, "tp_pct must be between 0.1% and 50%")
+    if not (0.001 <= sl_pct <= 0.50):
+        raise HTTPException(400, "sl_pct must be between 0.1% and 50%")
+    if initial_capital < 100 or initial_capital > 10_000_000:
+        raise HTTPException(400, "initial_capital must be 100 – 10,000,000")
+    try:
+        result = await run_walkforward(
+            symbol=symbol, days=days, folds=folds,
+            tp_pct=tp_pct, sl_pct=sl_pct, initial_capital=initial_capital,
+        )
+        return result
+    except Exception as e:
+        return {"error": str(e), "symbol": symbol}
 
 
 # ─── Training Loop Routes ──────────────────────────────────────
@@ -577,19 +816,122 @@ async def get_open_positions():
     return rows
 
 
+# ─── Price Alerts ─────────────────────────────────────────────────
+
+def _alert_to_dict(a: PriceAlert) -> dict:
+    return {
+        "id": a.id,
+        "symbol": a.symbol,
+        "condition": a.condition,
+        "target_price": a.target_price,
+        "note": a.note,
+        "active": a.active,
+        "repeat": a.repeat,
+        "triggered_at": a.triggered_at.isoformat() if a.triggered_at else None,
+        "created_at": a.created_at.isoformat() if a.created_at else None,
+    }
+
+
+@router.get("/alerts")
+async def list_alerts(db: Session = Depends(get_db)):
+    """GET /api/alerts — all price alerts, active first then newest."""
+    alerts = db.query(PriceAlert).order_by(
+        PriceAlert.active.desc(), PriceAlert.created_at.desc()
+    ).all()
+    return [_alert_to_dict(a) for a in alerts]
+
+
+@router.post("/alerts")
+async def create_alert(data: Dict[str, Any], db: Session = Depends(get_db)):
+    """POST /api/alerts — create a price alert.
+    Body: {"symbol":"BTC/THB", "condition":"above"|"below", "target_price":1234, "note":"", "repeat":false}
+    """
+    symbol = str(data.get("symbol") or "")
+    condition = str(data.get("condition") or "").lower()
+    if symbol not in settings.symbols:
+        raise HTTPException(400, f"symbol must be one of: {settings.symbols}")
+    if condition not in ("above", "below"):
+        raise HTTPException(400, "condition must be 'above' or 'below'")
+    try:
+        target = float(data.get("target_price"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "target_price must be a number")
+    if target <= 0 or target > 1e12:
+        raise HTTPException(400, "target_price out of range")
+    note = (str(data.get("note") or ""))[:200]
+    alert = PriceAlert(
+        symbol=symbol,
+        condition=condition,
+        target_price=target,
+        note=note or None,
+        active=True,
+        repeat=bool(data.get("repeat", False)),
+    )
+    db.add(alert)
+    db.commit()
+    db.refresh(alert)
+    return _alert_to_dict(alert)
+
+
+@router.post("/alerts/{alert_id}/toggle")
+async def toggle_alert(alert_id: int, db: Session = Depends(get_db)):
+    """POST /api/alerts/{id}/toggle — enable/disable an alert (re-arms a fired one)."""
+    alert = db.query(PriceAlert).filter(PriceAlert.id == alert_id).first()
+    if not alert:
+        raise HTTPException(404, "Alert not found")
+    alert.active = not alert.active
+    if alert.active:
+        alert.triggered_at = None  # re-arm
+    db.commit()
+    db.refresh(alert)
+    return _alert_to_dict(alert)
+
+
+@router.delete("/alerts/{alert_id}")
+async def delete_alert(alert_id: int, db: Session = Depends(get_db)):
+    """DELETE /api/alerts/{id} — remove an alert."""
+    alert = db.query(PriceAlert).filter(PriceAlert.id == alert_id).first()
+    if not alert:
+        raise HTTPException(404, "Alert not found")
+    db.delete(alert)
+    db.commit()
+    return {"deleted": alert_id}
+
+
+# ─── Trade Journal ────────────────────────────────────────────────
+
+@router.post("/trades/{trade_id}/note")
+async def set_trade_note(trade_id: int, data: Dict[str, Any], db: Session = Depends(get_db)):
+    """POST /api/trades/{id}/note — attach/update a personal journal note on a trade.
+    Body: {"note": "เหตุผลที่เข้า/ออก ..."}
+    """
+    trade = db.query(Trade).filter(Trade.id == trade_id).first()
+    if not trade:
+        raise HTTPException(404, "Trade not found")
+    note = str(data.get("note") or "")[:2000]
+    trade.journal = note or None
+    db.commit()
+    return {"ok": True, "id": trade_id, "journal": trade.journal}
+
+
 @router.post("/trade/manual")
-async def manual_trade(data: Dict[str, Any]):
+@(_limiter.limit("12/minute") if _limiter else lambda f: f)
+async def manual_trade(request: Request, data: Dict[str, Any]):
     """POST /api/trade/manual — manually open or close a position (demo-safe override).
     Body: {"action":"BUY"|"SELL"|"CLOSE", "symbol":"BTC/USDT", "amount_usdt": 200}
     Bypasses the AI signal so users can test the full trade pipeline.
     """
     if not _trader:
         raise HTTPException(503, "Trader not running")
-    action  = (data.get("action") or "").upper()
-    symbol  = data.get("symbol") or "BTC/USDT"
+    action   = (data.get("action") or "").upper()
+    symbol   = str(data.get("symbol") or "BTC/USDT")
     amt_usdt = float(data.get("amount_usdt") or 0)
     if action not in ("BUY", "SELL", "CLOSE"):
         raise HTTPException(400, "action must be BUY, SELL, or CLOSE")
+    if symbol not in settings.symbols:
+        raise HTTPException(400, f"symbol must be one of: {settings.symbols}")
+    if amt_usdt < 0 or amt_usdt > 1_000_000:
+        raise HTTPException(400, "amount_usdt must be 0 – 1,000,000")
 
     analysis = await _trader.analyze_symbol(symbol)
     if not analysis:
@@ -614,6 +956,7 @@ async def manual_trade(data: Dict[str, Any]):
 
     # BUY / SELL
     from ..agent.strategy_manager import TradingSignal
+    from ..agent.market_regime import RegimeResult
     portfolio = await _trader._get_portfolio_summary()
     avail = portfolio.get("available_usdt", 0)
     if amt_usdt <= 0:
@@ -627,7 +970,9 @@ async def manual_trade(data: Dict[str, Any]):
                            strategy="manual",
                            stop_loss_pct=0.02,
                            take_profit_pct=0.04)
-    executed = await _trader._execute_trade(symbol, signal, analysis, force=True)
+    # Use cached regime or default
+    regime = _trader.regimes.get(symbol) or RegimeResult("RANGING", 0.5, 20.0, 2.0, 0.0, "manual")
+    executed = await _trader._execute_trade(symbol, signal, analysis, regime, force=True)
     if executed:
         return {"ok": True, "action": action, "symbol": symbol,
                 "price": round(analysis.price, 6), "amount": round(amount, 6),
@@ -764,12 +1109,17 @@ class ChatHandler:
         if not analysis:
             return {"type": "error", "reply": f"วิเคราะห์ {symbol} ไม่ได้"}
         portfolio = await self._trader._get_portfolio_summary()
-        signal = await self._trader._get_final_signal(analysis, portfolio)
+        from ..agent.market_regime import RegimeResult
+        regime = self._trader.regimes.get(symbol) or RegimeResult("RANGING", 0.5, 20.0, 2.0, 0.0, "")
+        signal = await self._trader._get_final_signal(analysis, portfolio, regime)
+        pat_text = ""
+        if getattr(analysis, "patterns", None):
+            pat_text = "\nPattern: " + ", ".join(p.name_th for p in analysis.patterns[:2])
         reply = (
-            f"วิเคราะห์ {symbol}\n"
+            f"วิเคราะห์ {symbol} [{regime.regime}]\n"
             f"ราคา: ${analysis.price:.4f} ({analysis.change_24h:+.2f}%)\n"
             f"RSI: {analysis.rsi:.1f} | EMA: {analysis.ema_trend} | MACD: {analysis.macd_trend}\n"
-            f"Bollinger: {analysis.bb_signal} | Volatility: {analysis.volatility}\n"
+            f"Bollinger: {analysis.bb_signal} | Volatility: {analysis.volatility}{pat_text}\n"
             f"สัญญาณ: {signal.action} (conf {signal.confidence:.0%})\n"
             f"เหตุผล: {signal.reasoning[:220]}"
         )
@@ -784,9 +1134,11 @@ class ChatHandler:
         if not analysis:
             return {"type": "error", "reply": f"ดึงข้อมูล {symbol} ไม่ได้"}
         portfolio = await self._trader._get_portfolio_summary()
-        signal = await self._trader._get_final_signal(analysis, portfolio)
+        from ..agent.market_regime import RegimeResult
+        regime = self._trader.regimes.get(symbol) or RegimeResult("RANGING", 0.5, 20.0, 2.0, 0.0, "")
+        signal = await self._trader._get_final_signal(analysis, portfolio, regime)
         if signal.action == action:
-            executed = await self._trader._execute_trade(symbol, signal, analysis)
+            executed = await self._trader._execute_trade(symbol, signal, analysis, regime)
             if executed:
                 return {"type": "trade", "reply": f"✓ ส่งคำสั่ง {action} {symbol} @ ${analysis.price:.4f} (conf {signal.confidence:.0%})\n{signal.reasoning[:180]}"}
             return {"type": "info", "reply": f"AI เห็นด้วยกับ {action} {symbol} แต่ไม่ execute (ติด risk limit / เงินไม่พอ / มี position อยู่แล้ว)"}
@@ -805,7 +1157,7 @@ class ChatHandler:
                 trade_ctx = ", ".join(f"{t.symbol} {t.side} {t.pnl_pct:+.2f}%" for t in recent if t.pnl_pct is not None) or "ยังไม่มี"
             finally:
                 db.close()
-            sys_prompt = f"คุณคือ AI trading assistant ของ Aiterra ตอบสั้น กระชับ เป็นภาษาไทย recent trades: {trade_ctx}"
+            sys_prompt = f"คุณคือ Lunai v1.0.0 — AI trading assistant ภายใน Aiterra ตอบสั้น กระชับ เป็นภาษาไทย recent trades: {trade_ctx}"
             resp = await client.messages.create(
                 model=settings.claude_model, max_tokens=512,
                 system=sys_prompt,
@@ -872,7 +1224,7 @@ async def test_exchanges():
 @router.post("/notifications/test")
 async def test_notifications(data: Dict[str, Any] = None):
     """Send a test message to configured LINE / Telegram channels."""
-    msg = "🧪 Aiterra — การแจ้งเตือนทดสอบ / Test notification ✅"
+    msg = "🧪 Lunai v1.0.0 (Aiterra) — การแจ้งเตือนทดสอบ / Test notification ✅"
     results = {}
 
     # LINE Messaging API
@@ -995,6 +1347,79 @@ async def hot_swap_mode(data: Dict[str, str]):
     return {"mode": mode, "exchange": exchange_name, "swapped": True}
 
 
+@router.post("/exchange/probe")
+async def probe_exchange(data: Dict[str, Any]):
+    """POST /api/exchange/probe — test public + authenticated connection for a named exchange.
+
+    Does NOT require the exchange to be enabled.  Useful during setup to verify
+    API keys before going live.
+
+    Body: {"exchange": "binance_th", "api_key": "...", "api_secret": "..."}
+    Returns: public_ok, auth_ok, balances (THB/USDT/BTC), latency_ms, error.
+    """
+    from ..exchanges.factory import LIVE_EXCHANGES, _load
+    import time as _time
+
+    name = str(data.get("exchange") or "binance_th").lower()
+    if name not in LIVE_EXCHANGES:
+        raise HTTPException(400, f"Unknown exchange: {name}. Must be one of {list(LIVE_EXCHANGES)}")
+
+    api_key    = str(data.get("api_key")    or "").strip()
+    api_secret = str(data.get("api_secret") or "").strip()
+
+    # Temporarily write keys to settings so the client picks them up,
+    # then restore originals regardless of outcome.
+    orig_key    = settings.get("exchanges", name, "api_key",    default="")
+    orig_secret = settings.get("exchanges", name, "api_secret", default="")
+    result: dict = {"exchange": name, "public_ok": False, "auth_ok": False,
+                    "balance": {}, "latency_ms": None, "error": None}
+    client = None
+    try:
+        if api_key:
+            settings.set(api_key,    "exchanges", name, "api_key")
+        if api_secret:
+            settings.set(api_secret, "exchanges", name, "api_secret")
+
+        client = _load(name)
+        probe_sym = "BTC/THB" if name in ("bitkub", "binance_th") else "BTC/USDT"
+
+        # 1. Public API — price fetch (no auth)
+        t0 = _time.monotonic()
+        ticker = await client.get_ticker(probe_sym)
+        result["latency_ms"] = round((_time.monotonic() - t0) * 1000)
+        result["public_ok"]  = ticker.price > 0
+        result["price"]      = round(ticker.price, 2)
+
+        # 2. Authenticated API — balance fetch (requires valid keys)
+        if api_key and api_secret:
+            try:
+                balances = await client.get_balance()
+                bal = {}
+                for asset in ("THB", "USDT", "BTC", "ETH", "BNB", "XRP", "SOL"):
+                    b = balances.get(asset)
+                    if b:
+                        bal[asset] = {"free": round(b.free, 6), "total": round(b.total, 6)}
+                result["auth_ok"]  = True
+                result["balance"]  = bal
+            except Exception as e:
+                result["auth_ok"] = False
+                result["error"]   = f"Auth failed: {str(e)[:200]}"
+        else:
+            result["auth_ok"] = None  # keys not provided — not tested
+    except Exception as e:
+        result["error"] = str(e)[:200]
+    finally:
+        # Always restore original keys
+        settings.set(orig_key,    "exchanges", name, "api_key")
+        settings.set(orig_secret, "exchanges", name, "api_secret")
+        if client is not None and hasattr(client, "close"):
+            try:
+                await client.close()
+            except Exception:
+                pass
+    return result
+
+
 @router.get("/exchange/active")
 async def get_active_exchange():
     """GET /api/exchange/active — which live exchange is selected and which would
@@ -1030,4 +1455,309 @@ async def set_active_exchange(data: Dict[str, str]):
     settings.set(name, "exchanges", "active")
     settings.save()
     return {"active": name}
+
+
+# ─── Autotrade Intelligence Endpoints ─────────────────────────
+
+@router.get("/regimes")
+async def get_market_regimes():
+    """GET /api/regimes — current market regime for each tracked symbol."""
+    if not _trader:
+        return {}
+    return {
+        sym: {
+            "regime":     r.regime,
+            "confidence": round(r.confidence, 2),
+            "adx":        round(r.adx, 1),
+            "atr_pct":    round(r.atr_pct, 2),
+            "trend_slope": round(r.trend_slope, 4),
+            "detail":     r.detail,
+        }
+        for sym, r in _trader.regimes.items()
+    }
+
+
+@router.get("/narratives")
+async def get_narratives():
+    """GET /api/narratives — plain-language market summary for each tracked symbol."""
+    if not _trader:
+        return {}
+    return dict(_trader.narratives)
+
+
+@router.get("/correlations")
+async def get_correlations():
+    """GET /api/correlations — pairwise return-correlation matrix across symbols."""
+    if not _trader:
+        return {"symbols": [], "matrix": []}
+    return _trader.correlation_matrix()
+
+
+@router.get("/risk")
+async def get_risk_state():
+    """GET /api/risk — portfolio risk engine state (drawdown, heat, circuit breaker)."""
+    if not _trader:
+        return {}
+    return _trader.risk_summary
+
+
+@router.get("/rl/stats")
+async def get_rl_stats():
+    """GET /api/rl/stats — Reinforcement Learning bandit state per regime."""
+    if not _trader:
+        return {}
+    stats = _trader._rl.stats
+    arm_data = {}
+    for regime in ["BULL_TREND", "BEAR_TREND", "RANGING", "VOLATILE", "CRASH"]:
+        arm_data[regime] = _trader._rl.get_arm_stats(regime)
+        arm_data[regime]["best_strategy"] = _trader._rl.select_strategy(regime)
+    return {**stats, "arms": arm_data}
+
+
+@router.get("/patterns")
+async def get_chart_patterns(symbol: str = "BTC/USDT"):
+    """GET /api/patterns?symbol=BTC/USDT — detected chart patterns for symbol."""
+    if not _trader:
+        raise HTTPException(503, "Trader not running")
+    analysis = _trader.analyses.get(symbol)
+    if not analysis:
+        analysis = await _trader.analyze_symbol(symbol)
+    if not analysis:
+        raise HTTPException(503, f"No data for {symbol}")
+    patterns = getattr(analysis, "patterns", [])
+    return {
+        "symbol":  symbol,
+        "count":   len(patterns),
+        "summary": getattr(analysis, "pattern_summary", ""),
+        "patterns": [
+            {
+                "name":           p.name,
+                "name_th":        p.name_th,
+                "type":           p.pattern_type,
+                "signal":         p.signal,
+                "confidence":     round(p.confidence, 2),
+                "description":    p.description,
+                "description_th": p.description_th,
+            }
+            for p in patterns
+        ],
+    }
+
+
+@router.get("/sizer/stats")
+async def get_sizer_stats():
+    """GET /api/sizer/stats — Kelly Criterion win-rate stats per symbol."""
+    if not _trader:
+        return {}
+    symbols = settings.symbols
+    return {sym: _trader._sizer.stats_for(sym) for sym in symbols}
+
+
+@router.get("/analytics")
+async def get_analytics(symbol: Optional[str] = None, days: int = 30):
+    """GET /api/analytics — Sharpe, Sortino, Calmar, VaR, streaks from DB trade history."""
+    from ..agent.risk_analytics import compute_metrics
+
+    with SessionLocal() as db:
+        q = db.query(Trade).filter(Trade.status == "closed", Trade.pnl_pct.isnot(None))
+        if symbol:
+            q = q.filter(Trade.symbol == symbol)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        q = q.filter(Trade.closed_at >= cutoff)
+        trades_db = q.order_by(Trade.opened_at).all()
+
+    if not trades_db:
+        from ..agent.risk_analytics import _empty
+        return {**_empty(), "symbol": symbol, "days": days, "source": "db", "note": "no closed trades"}
+
+    trade_dicts = [{"pnl_pct": t.pnl_pct, "win": (t.pnl_pct or 0) > 0} for t in trades_db]
+
+    # Approximate equity curve from trade outcomes
+    initial = 10_000.0
+    equity  = [initial]
+    for t in trades_db:
+        last    = equity[-1]
+        equity.append(last * (1 + (t.pnl_pct or 0) / 100))
+
+    metrics = compute_metrics(trade_dicts, equity, initial)
+    return {**metrics, "symbol": symbol, "days": days, "source": "db"}
+
+
+@router.get("/sentiment")
+async def get_sentiment(symbol: str = "BTC/USDT"):
+    """GET /api/sentiment — all market intelligence data for a symbol.
+
+    Returns Fear & Greed, funding, OI, derivatives flow, order book
+    microstructure (F1.2), on-chain metrics (F1.1), and news sentiment (F1.3).
+    symbol: crypto pair, e.g. BTC/USDT
+    """
+    from ..data.sentiment import (
+        get_fear_greed, get_funding_rate, get_open_interest,
+        get_long_short_ratio, get_taker_ratio, derivatives_bias, _record_oi,
+    )
+    from ..data.orderbook import get_order_book
+    from ..data.onchain import get_onchain
+    from ..data.social import get_news_sentiment
+
+    binance_symbol = symbol.replace("/", "")
+    exchange = _trader._exchange if _trader else None
+
+    mark_price = None
+    if _trader:
+        a = _trader.analyses.get(symbol)
+        if a:
+            mark_price = a.price
+
+    # All sources fire concurrently
+    fng_task     = get_fear_greed()
+    oi_task      = get_open_interest(binance_symbol, mark_price=mark_price)
+    ls_task      = get_long_short_ratio(binance_symbol)
+    taker_task   = get_taker_ratio(binance_symbol)
+    ob_task      = get_order_book(binance_symbol)      # F1.2
+    onchain_task = get_onchain(symbol)                 # F1.1
+    social_task  = get_news_sentiment(symbol)          # F1.3
+
+    if exchange:
+        funding_task = get_funding_rate(exchange, symbol)
+        fng, oi, ls, taker, funding, ob, oc, soc = await asyncio.gather(
+            fng_task, oi_task, ls_task, taker_task, funding_task,
+            ob_task, onchain_task, social_task, return_exceptions=True)
+    else:
+        fng, oi, ls, taker, ob, oc, soc = await asyncio.gather(
+            fng_task, oi_task, ls_task, taker_task,
+            ob_task, onchain_task, social_task, return_exceptions=True)
+        funding = {"symbol": symbol, "funding_rate": None, "error": "exchange unavailable"}
+
+    fng     = fng     if not isinstance(fng,     Exception) else {"value": None, "label": None, "error": str(fng)}
+    oi      = oi      if not isinstance(oi,      Exception) else {"open_interest_usdt": None, "error": str(oi)}
+    ls      = ls      if not isinstance(ls,      Exception) else {"long_short_ratio": None, "error": str(ls)}
+    taker   = taker   if not isinstance(taker,   Exception) else {"taker_buy_sell_ratio": None, "error": str(taker)}
+    funding = funding if not isinstance(funding, Exception) else {"funding_rate": None, "error": str(funding)}
+    # ob/oc/soc are dataclasses; on exception substitute a None-safe fallback
+    if isinstance(ob,  Exception): ob  = None
+    if isinstance(oc,  Exception): oc  = None
+    if isinstance(soc, Exception): soc = None
+
+    def _f(snap, attr):
+        try:
+            return getattr(snap, attr) if snap else None
+        except Exception:
+            return None
+
+    # Derive trading bias from Fear & Greed
+    fng_value = fng.get("value")
+    if fng_value is None:   bias = "NEUTRAL"
+    elif fng_value <= 25:   bias = "CONTRARIAN_BUY"
+    elif fng_value <= 45:   bias = "CAUTIOUS_BUY"
+    elif fng_value <= 55:   bias = "NEUTRAL"
+    elif fng_value <= 75:   bias = "CAUTIOUS_SELL"
+    else:                   bias = "CONTRARIAN_SELL"
+
+    oi_change = _record_oi(binance_symbol, oi.get("open_interest_contracts"))
+    deriv_label, deriv_score = derivatives_bias(
+        ls.get("long_short_ratio"),
+        taker.get("taker_buy_sell_ratio"),
+        oi_change,
+        funding.get("funding_rate"),
+    )
+
+    return {
+        "symbol": symbol,
+        "fear_greed": {
+            "value":        fng.get("value"),
+            "label":        fng.get("label"),
+            "trading_bias": bias,
+            "error":        fng.get("error"),
+        },
+        "funding_rate": {
+            "rate":         funding.get("funding_rate"),
+            "rate_pct":     funding.get("funding_rate_pct"),
+            "next_funding": funding.get("next_funding_time"),
+            "error":        funding.get("error"),
+        },
+        "open_interest": {
+            "usdt":       oi.get("open_interest_usdt"),
+            "contracts":  oi.get("open_interest_contracts"),
+            "change_pct": oi_change,
+            "error":      oi.get("error"),
+        },
+        "derivatives": {
+            "long_short_ratio":     ls.get("long_short_ratio"),
+            "taker_buy_sell_ratio": taker.get("taker_buy_sell_ratio"),
+            "oi_change_pct":        oi_change,
+            "bias":                 deriv_label,
+            "score":                deriv_score,
+            "error":                ls.get("error") or taker.get("error"),
+        },
+        # F1.2 Order Book Microstructure
+        "order_book": {
+            "bid_ask_imbalance": _f(ob, "bid_ask_imbalance"),
+            "bid_wall_pct":      _f(ob, "bid_wall_pct"),
+            "ask_wall_pct":      _f(ob, "ask_wall_pct"),
+            "spread_bps":        _f(ob, "spread_bps"),
+            "signal":            _f(ob, "signal") or "NEUTRAL",
+            "error":             _f(ob, "error"),
+        },
+        # F1.1 On-chain Metrics
+        "onchain": {
+            "active_addr_change_pct": _f(oc, "active_addr_change_pct"),
+            "tx_count_change_pct":    _f(oc, "tx_count_change_pct"),
+            "hash_rate_change_pct":   _f(oc, "hash_rate_change_pct"),
+            "label":                  _f(oc, "label") or "NEUTRAL",
+            "score":                  _f(oc, "score"),
+            "error":                  _f(oc, "error"),
+        },
+        # F1.3 Social / News Sentiment
+        "social": {
+            "label":         _f(soc, "label") or "NEUTRAL",
+            "score":         _f(soc, "score"),
+            "article_count": _f(soc, "article_count"),
+            "bullish_count": _f(soc, "bullish_count"),
+            "bearish_count": _f(soc, "bearish_count"),
+            "error":         _f(soc, "error"),
+        },
+    }
+
+
+@router.get("/trading/kill-switch")
+async def kill_switch_status():
+    """GET /api/trading/kill-switch — return current kill switch and dry-run state."""
+    return {
+        "killed":  _trader.killed   if _trader else False,
+        "dry_run": _trader.dry_run  if _trader else False,
+        "running": _trader._running if _trader else False,
+    }
+
+
+@router.post("/trading/kill-switch")
+async def set_kill_switch(action: str = "activate"):
+    """POST /api/trading/kill-switch?action=activate|deactivate — toggle kill switch.
+
+    action=activate   → halt all new trades immediately.
+    action=deactivate → resume trading.
+    """
+    if not _trader:
+        raise HTTPException(503, "Trader not initialised")
+    if action == "activate":
+        _trader.kill()
+        return {"killed": True, "message": "Kill switch activated — trading halted"}
+    elif action == "deactivate":
+        _trader.resume()
+        return {"killed": False, "message": "Kill switch deactivated — trading resumed"}
+    raise HTTPException(400, "action must be 'activate' or 'deactivate'")
+
+
+@router.post("/trading/dry-run")
+async def set_dry_run(enabled: bool = True):
+    """POST /api/trading/dry-run?enabled=true|false — toggle paper-trading mode at runtime.
+
+    When enabled, orders are logged but never sent to the exchange.
+    """
+    if not _trader:
+        raise HTTPException(503, "Trader not initialised")
+    _trader._dry_run = enabled
+    return {
+        "dry_run": _trader._dry_run,
+        "message": f"Dry-run {'enabled' if enabled else 'disabled'}",
+    }
 

@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 import ccxt.async_support as ccxt
 
 from .base import Balance, BaseExchange, OHLCV, Order, Ticker
+from .retry import with_retry
 from ..core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,7 @@ class BinanceExchange(BaseExchange):
     async def close(self):
         await self._client.close()
 
+    @with_retry()
     async def get_ticker(self, symbol: str) -> Ticker:
         data = await self._client.fetch_ticker(symbol)
         return Ticker(
@@ -38,6 +40,7 @@ class BinanceExchange(BaseExchange):
             low_24h=float(data.get("low") or 0),
         )
 
+    @with_retry()
     async def get_ohlcv(self, symbol: str, timeframe: str = "5m", limit: int = 100) -> List[OHLCV]:
         data = await self._client.fetch_ohlcv(symbol, timeframe, limit=limit)
         return [
@@ -45,6 +48,7 @@ class BinanceExchange(BaseExchange):
             for row in data
         ]
 
+    @with_retry()
     async def get_balance(self) -> Dict[str, Balance]:
         data = await self._client.fetch_balance()
         free  = data.get("free", {})  or {}
@@ -56,6 +60,7 @@ class BinanceExchange(BaseExchange):
             if float(amt or 0) > 0
         }
 
+    @with_retry(max_attempts=2)
     async def create_order(self, symbol: str, side: str, amount: float, price: Optional[float] = None) -> Order:
         # Round to the exchange's lot-size precision so live orders aren't rejected.
         try:

@@ -3,7 +3,7 @@ import logging
 import math
 import random
 import time as _time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 import aiohttp
@@ -61,7 +61,7 @@ def _mock_ohlcv(symbol: str, limit: int = 100) -> List[OHLCV]:
     base = _SEED_PRICES.get(symbol, 100.0)
     candles = []
     p = base * random.uniform(0.92, 1.08)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     for i in range(limit):
         ts = now - timedelta(minutes=(limit - i) * 15)
         o = p

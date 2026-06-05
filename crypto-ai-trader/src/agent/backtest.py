@@ -1,12 +1,25 @@
-"""Backtesting engine.
+"""
+Enhanced Backtest Engine — Market Regime + Chart Patterns + Kelly Sizing + Risk Engine.
 
-Runs on REAL Binance hourly klines when reachable (no API key needed),
-and transparently falls back to regime-simulated data when offline."""
+Three backtest modes:
+  basic      — original EMA-crossover baseline (v1 benchmark)
+  hybrid     — StrategyManager.hybrid_signal with regime-aware confidence thresholds
+  autotrade  — full AI stack: regime + chart patterns + Kelly position sizing + circuit breaker
+
+Results include:
+  - Overall metrics (return, Sharpe, win rate, max drawdown)
+  - Per-regime breakdown (performance in each of the 5 regimes)
+  - Per-pattern breakdown (best and worst chart patterns)
+  - Side-by-side comparison (basic vs autotrade)
+  - Full equity curve
+  - Last 50 annotated trades
+"""
 import logging
 import math
 import random
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -14,15 +27,24 @@ logger = logging.getLogger(__name__)
 
 BINANCE_KLINES = "https://api.binance.com/api/v3/klines"
 
+# Regime → preferred single strategy (the policy the RL bandit converges to).
+# Ichimoku & SMC work well in trending markets; mean-reversion for ranging.
+_REGIME_STRATEGY = {
+    "BULL_TREND": "ichimoku",      # Ichimoku excels in trending markets
+    "BEAR_TREND": "smc",           # SMC detects bearish structure + liquidity sweeps
+    "RANGING":    "mean_reversion",
+    "VOLATILE":   "mean_reversion",
+    "CRASH":      "smc",           # SMC BOS/ChoCH useful for crash structure reads
+}
 
-REGIMES = {
+# ── Regime simulation parameters (used when Binance is unreachable) ───────────
+_SIM_REGIMES = {
     "BULL":     {"drift": +0.0040, "vol": 0.0055, "dur": (30, 80)},
     "BEAR":     {"drift": -0.0040, "vol": 0.0055, "dur": (30, 80)},
     "RANGE":    {"drift":  0.0000, "vol": 0.0030, "dur": (20, 60)},
     "VOLATILE": {"drift":  0.0002, "vol": 0.0160, "dur": (8,  20)},
 }
-
-TRANSITIONS = {
+_SIM_TRANSITIONS = {
     "BULL":     [("RANGE", 0.50), ("BEAR", 0.30), ("VOLATILE", 0.20)],
     "BEAR":     [("RANGE", 0.50), ("BULL", 0.30), ("VOLATILE", 0.20)],
     "RANGE":    [("BULL", 0.35), ("BEAR", 0.35), ("VOLATILE", 0.30)],
@@ -30,29 +52,29 @@ TRANSITIONS = {
 }
 
 
-def _simulate_ohlcv(days: int, base_price: float, tf_minutes: int = 60) -> List[dict]:
-    n_candles = days * 24 * 60 // tf_minutes
-    candles = []
-    p = base_price
-    regime = "RANGE"
-    remaining = random.randint(20, 50)
-    start = datetime.utcnow() - timedelta(days=days)
+# ── Data fetching ─────────────────────────────────────────────────────────────
 
-    for i in range(n_candles):
+def _simulate_ohlcv(days: int, base_price: float, tf_minutes: int = 60) -> List[dict]:
+    n = days * 24 * 60 // tf_minutes
+    candles, p = [], base_price
+    regime, remaining = "RANGE", random.randint(20, 50)
+    start = datetime.now(timezone.utc) - timedelta(days=days)
+    for i in range(n):
         if remaining <= 0:
-            names, weights = zip(*TRANSITIONS[regime])
+            names, weights = zip(*_SIM_TRANSITIONS[regime])
             regime = random.choices(names, weights=weights)[0]
-            remaining = random.randint(*REGIMES[regime]["dur"])
-        cfg = REGIMES[regime]
+            remaining = random.randint(*_SIM_REGIMES[regime]["dur"])
+        cfg = _SIM_REGIMES[regime]
         c = p * math.exp(random.gauss(cfg["drift"], cfg["vol"]))
         spread = cfg["vol"] * random.uniform(0.3, 0.7)
-        h = max(p, c) * (1 + spread * 0.5)
-        l = min(p, c) * (1 - spread * 0.5)
         candles.append({
-            "ts": start + timedelta(minutes=i * tf_minutes),
-            "open": p, "high": h, "low": l, "close": c,
+            "ts":     start + timedelta(minutes=i * tf_minutes),
+            "open":   p,
+            "high":   max(p, c) * (1 + spread * 0.5),
+            "low":    min(p, c) * (1 - spread * 0.5),
+            "close":  c,
             "volume": random.uniform(200, 3000),
-            "regime": regime,
+            "sim_regime": regime,
         })
         p = c
         remaining -= 1
@@ -60,14 +82,11 @@ def _simulate_ohlcv(days: int, base_price: float, tf_minutes: int = 60) -> List[
 
 
 async def _fetch_real_ohlcv(symbol: str, days: int, tf_minutes: int = 60) -> List[dict]:
-    """Fetch real hourly klines from Binance public API, paginating backwards.
-    Returns candles oldest→newest. Raises on network/HTTP error so the caller
-    can fall back to simulation."""
     import aiohttp
-
-    needed      = days * 24 * 60 // tf_minutes
+    needed = days * 24 * 60 // tf_minutes
     binance_sym = symbol.replace("/", "")
-    interval    = "1h"
+    interval_map = {60: "1h", 15: "15m", 240: "4h", 1440: "1d"}
+    interval = interval_map.get(tf_minutes, "1h")
     out: List[dict] = []
     end_time: Optional[int] = None
 
@@ -89,17 +108,74 @@ async def _fetch_real_ohlcv(symbol: str, days: int, tf_minutes: int = 60) -> Lis
                 "low":    float(row[3]),
                 "close":  float(row[4]),
                 "volume": float(row[5]),
-                "regime": "LIVE",
+                "sim_regime": "LIVE",
             } for row in raw]
-            out = chunk + out                 # prepend older candles
-            end_time = raw[0][0] - 1          # ms just before earliest fetched
-            if len(raw) < limit:              # exchange has no more history
+            out = chunk + out
+            end_time = raw[0][0] - 1
+            if len(raw) < limit:
                 break
 
     if not out:
         raise ValueError("Binance returned no candles")
     return out
 
+
+# ── Convert dict candles → OHLCV objects ─────────────────────────────────────
+
+def _to_ohlcv(candles: List[dict]):
+    from ..exchanges.base import OHLCV
+    return [
+        OHLCV(
+            timestamp=c["ts"],
+            open=c["open"], high=c["high"], low=c["low"],
+            close=c["close"], volume=c["volume"],
+        )
+        for c in candles
+    ]
+
+
+# ── Rolling Kelly tracker ─────────────────────────────────────────────────────
+
+class _KellyTracker:
+    """Rolling Kelly sizer with Bayesian warm-start (matches PositionSizer logic)."""
+
+    PRIOR_N = 5
+    PRIOR_P = 0.55
+    PRIOR_B = 1.5
+
+    def __init__(self, fraction: float = 0.25):
+        self.fraction  = fraction
+        self.wins      = 0
+        self.losses    = 0
+        self.gain_sum  = 0.0
+        self.loss_sum  = 0.0
+
+    def update(self, pnl_pct: float):
+        if pnl_pct > 0:
+            self.wins     += 1
+            self.gain_sum += pnl_pct
+        else:
+            self.losses   += 1
+            self.loss_sum += abs(pnl_pct)
+
+    @property
+    def fraction_for_trade(self) -> float:
+        P, B = self.PRIOR_P, self.PRIOR_B
+        bw = self.wins   + self.PRIOR_N * P
+        bl = self.losses + self.PRIOR_N * (1 - P)
+        bt = bw + bl
+        p  = bw / bt
+        q  = 1.0 - p
+        aw = ((self.gain_sum + self.PRIOR_N * P * B) / bw) if bw > 0 else B
+        al = ((self.loss_sum + self.PRIOR_N * (1 - P)) / bl) if bl > 0 else 1.0
+        b  = aw / al if al > 0 else B
+        kelly = (p * b - q) / b
+        # Minimum 2% floor so system keeps trading and collecting data
+        # (live system's RiskEngine provides the true safety circuit breaker)
+        return max(0.02, min(kelly * self.fraction, 0.15))
+
+
+# ── Basic signal (v1 baseline — EMA crossover) ────────────────────────────────
 
 def _ema(series: np.ndarray, period: int) -> np.ndarray:
     k = 2 / (period + 1)
@@ -110,137 +186,676 @@ def _ema(series: np.ndarray, period: int) -> np.ndarray:
     return out
 
 
-def _rsi(closes: np.ndarray, period: int = 14) -> float:
-    if len(closes) < period + 1:
-        return 50.0
-    d = np.diff(closes[-(period + 1):])
-    avg_gain = np.where(d > 0, d, 0.0).mean()
-    avg_loss = np.where(d < 0, -d, 0.0).mean()
-    return 100.0 if avg_loss == 0 else 100 - 100 / (1 + avg_gain / avg_loss)
-
-
-def _signal(window: List[dict]) -> tuple:
-    """Trend-following signal: EMA alignment + momentum confirmation."""
+def _basic_signal(window: List[dict]) -> Tuple[str, float]:
     if len(window) < 30:
         return "HOLD", 0.0
     closes = np.array([c["close"] for c in window])
     ema9  = _ema(closes, 9)
     ema21 = _ema(closes, 21)
     ema50 = _ema(closes, min(50, len(closes) - 1))
-
-    # Trend: EMAs aligned
-    bull = ema9[-1] > ema21[-1] > ema50[-1]
-    bear = ema9[-1] < ema21[-1] < ema50[-1]
-
-    # Momentum: recent EMA9 direction
-    ema9_rising  = ema9[-1] > ema9[-3]
-    ema9_falling = ema9[-1] < ema9[-3]
-
-    # Price vs EMA21 (entry timing — don't chase too far above/below)
+    bull  = ema9[-1] > ema21[-1] > ema50[-1]
+    bear  = ema9[-1] < ema21[-1] < ema50[-1]
     price = closes[-1]
-    dist = abs(price - ema21[-1]) / ema21[-1] if ema21[-1] > 0 else 0
-
-    if bull and ema9_rising and dist < 0.06:
+    dist  = abs(price - ema21[-1]) / ema21[-1] if ema21[-1] > 0 else 0
+    if bull and ema9[-1] > ema9[-3] and dist < 0.06:
         return "BUY",  min(0.5 + (ema9[-1] - ema21[-1]) / ema21[-1] * 5, 0.85)
-    if bear and ema9_falling and dist < 0.06:
+    if bear and ema9[-1] < ema9[-3] and dist < 0.06:
         return "SELL", min(0.5 + (ema21[-1] - ema9[-1]) / ema21[-1] * 5, 0.85)
     return "HOLD", 0.0
 
 
-def run_backtest(symbol: str, days: int = 30,
-                 tp_pct: float = 0.04, sl_pct: float = 0.02,
-                 initial_capital: float = 10000.0) -> dict:
-    """Synchronous simulated backtest (offline fallback)."""
-    from ..exchanges.demo_client import _SEED_PRICES
-    base_price = _SEED_PRICES.get(symbol, 100.0)
-    candles = _simulate_ohlcv(days, base_price)
-    result = _run_on_candles(symbol, candles, days, tp_pct, sl_pct, initial_capital)
-    result["data_source"] = "simulated"
-    return result
+# ── Hybrid / Autotrade signal ─────────────────────────────────────────────────
+
+def _ai_signal(
+    symbol: str,
+    ohlcv_window,
+    use_patterns: bool = True,
+    use_regime: bool = True,
+) -> Tuple[str, float, str, str, str]:
+    """
+    Returns (action, confidence, strategy, regime_name, patterns_summary).
+    Wraps the production StrategyManager + MarketRegime + ChartPatterns.
+    """
+    from .market_analyzer import analyze
+    from .market_regime import detect_regime
+    from .strategy_manager import StrategyManager, TradingSignal
+
+    if len(ohlcv_window) < 30:
+        return "HOLD", 0.0, "none", "RANGING", ""
+
+    price = ohlcv_window[-1].close
+    change_24h = (price - ohlcv_window[-24].close) / ohlcv_window[-24].close * 100 \
+        if len(ohlcv_window) >= 24 else 0.0
+
+    analysis = analyze(symbol, ohlcv_window, price, change_24h)
+    regime   = detect_regime(ohlcv_window, analysis) if use_regime else None
+    regime_name = regime.regime if regime else "RANGING"
+
+    sm = StrategyManager()
+    # Pick the strategy that fits the regime (the policy the RL bandit converges
+    # to). Blending all strategies lets trend & mean-reversion cancel to HOLD.
+    if use_regime and regime:
+        strat = _REGIME_STRATEGY.get(regime.regime, "trend")
+        signal = sm.signal_for_strategy(strat, analysis)
+        # Fallback: if primary strategy has no conviction, try trend-following
+        if signal.action == "HOLD" and signal.confidence < 0.20 and strat not in ("trend", "mean_reversion"):
+            signal = sm.signal_for_strategy("trend", analysis)
+    else:
+        signal = sm.get_signal(analysis)
+
+    # Regime-aware confidence threshold
+    min_conf = 0.55
+    if use_regime and regime:
+        if regime.regime == "CRASH":
+            min_conf = 0.85
+        elif regime.regime == "VOLATILE":
+            min_conf = 0.70
+        elif regime.regime == "BEAR_TREND":
+            min_conf = 0.60
+
+    if signal.action != "HOLD" and signal.confidence < min_conf:
+        return "HOLD", signal.confidence, signal.strategy, regime_name, \
+               getattr(analysis, "pattern_summary", "")
+
+    # In bear trend / crash, suppress new BUYs
+    if use_regime and regime and regime.regime in ("CRASH", "BEAR_TREND") \
+            and signal.action == "BUY":
+        return "HOLD", signal.confidence, signal.strategy, regime_name, \
+               getattr(analysis, "pattern_summary", "")
+
+    return (signal.action, signal.confidence, signal.strategy, regime_name,
+            getattr(analysis, "pattern_summary", ""))
 
 
-async def run_backtest_real(symbol: str, days: int = 30,
-                            tp_pct: float = 0.04, sl_pct: float = 0.02,
-                            initial_capital: float = 10000.0) -> dict:
-    """Backtest on REAL Binance klines; fall back to simulation if offline."""
-    try:
-        candles = await _fetch_real_ohlcv(symbol, days)
-        result = _run_on_candles(symbol, candles, days, tp_pct, sl_pct, initial_capital)
-        result["data_source"] = "binance"
-        return result
-    except Exception as e:
-        logger.warning(f"Real backtest data unavailable for {symbol} ({e}); using simulation")
-        return run_backtest(symbol, days, tp_pct, sl_pct, initial_capital)
+# ── Core simulation loop ──────────────────────────────────────────────────────
 
+def _run_loop(
+    symbol: str,
+    candles: List[dict],
+    tp_pct: float,
+    sl_pct: float,
+    initial_capital: float,
+    mode: str = "basic",
+    window_size: int = 80,
+    roi_table: Optional[dict] = None,
+    trailing_stop_pct: Optional[float] = None,
+    trailing_activate_pct: float = 0.01,
+    fee_pct: float = 0.001,
+    slippage_pct: float = 0.0005,
+) -> Tuple[dict, list, list, list]:
+    """
+    Core simulation loop shared by all modes.
+    Returns (metrics_dict, curve_list, trades_list, equity_raw).
 
-def _run_on_candles(symbol: str, candles: List[dict], days: int,
-                    tp_pct: float, sl_pct: float,
-                    initial_capital: float) -> dict:
-    capital = initial_capital
-    equity  = [capital]
-    trades  = []
-    open_trade = None
+    fee_pct      — round-trip commission per leg (0.001 = 0.1% per side).
+    slippage_pct — market-impact slippage added on entry and subtracted on exit.
+    """
+    capital     = initial_capital
+    equity      = [capital]
+    trades: List[dict] = []
+    open_trade  = None
+    kelly       = _KellyTracker()
+    total_fees  = 0.0
 
-    for i in range(30, len(candles)):
+    # Regime + pattern stats
+    regime_stats: Dict[str, dict] = defaultdict(
+        lambda: {"trades": 0, "wins": 0, "pnl_sum": 0.0}
+    )
+    pattern_stats: Dict[str, dict] = defaultdict(
+        lambda: {"trades": 0, "wins": 0, "pnl_sum": 0.0}
+    )
+
+    # Circuit breaker (autotrade mode only)
+    high_water = initial_capital
+    circuit_open = False
+
+    ohlcv_cache = _to_ohlcv(candles)
+
+    # Pre-process ROI table: list of (min_age_minutes, profit_threshold) sorted descending
+    roi_sorted: list = []
+    if roi_table:
+        roi_sorted = sorted(
+            [(int(k), float(v)) for k, v in roi_table.items()],
+            reverse=True,
+        )
+
+    for i in range(window_size, len(candles)):
         c = candles[i]
         price = c["close"]
 
+        # --- Update circuit breaker ---
+        if capital > high_water:
+            high_water = capital
+        drawdown = (high_water - capital) / high_water if high_water > 0 else 0
+        if mode == "autotrade":
+            circuit_open = drawdown >= 0.10
+
+        # --- Check open trade exit ---
         if open_trade:
             side  = open_trade["side"]
             entry = open_trade["entry"]
-            tp = entry * (1 + tp_pct) if side == "BUY" else entry * (1 - tp_pct)
-            sl = entry * (1 - sl_pct) if side == "BUY" else entry * (1 + sl_pct)
-            hit_tp = c["high"] >= tp if side == "BUY" else c["low"] <= tp
-            hit_sl = c["low"]  <= sl if side == "BUY" else c["high"] >= sl
-            if hit_tp or hit_sl:
-                pnl_pct = tp_pct if hit_tp else -sl_pct
-                capital += open_trade["cost"] * pnl_pct
+            fixed_tp = entry * (1 + tp_pct) if side == "BUY" else entry * (1 - tp_pct)
+            fixed_sl = entry * (1 - sl_pct) if side == "BUY" else entry * (1 + sl_pct)
+
+            # Trailing stop: update high-water mark and trailing level
+            if trailing_stop_pct and side == "BUY":
+                hw = max(open_trade.get("high_water", entry), c["high"])
+                open_trade["high_water"] = hw
+                cur_profit = (hw - entry) / entry
+                if cur_profit >= trailing_activate_pct:
+                    new_trail = hw * (1 - trailing_stop_pct)
+                    old_trail = open_trade.get("trailing_sl")
+                    if old_trail is None or new_trail > old_trail:
+                        open_trade["trailing_sl"] = new_trail
+
+            # --- Exit priority: SL > trailing SL > ROI table > fixed TP ---
+            exit_price = None
+            exit_reason = ""
+            win = False
+
+            # 1. Fixed stop loss (intracandle)
+            if side == "BUY" and c["low"] <= fixed_sl:
+                exit_price = fixed_sl
+                exit_reason = "stop_loss"
+            elif side == "SELL" and c["high"] >= fixed_sl:
+                exit_price = fixed_sl
+                exit_reason = "stop_loss"
+
+            # 2. Trailing stop (intracandle)
+            trail_sl = open_trade.get("trailing_sl")
+            if not exit_reason and trail_sl:
+                if side == "BUY" and c["low"] <= trail_sl:
+                    exit_price = trail_sl
+                    exit_reason = "trailing_stop"
+                    win = True   # trailing stop exits above entry (activated after profit threshold)
+
+            # 3. ROI table (at candle close price)
+            if not exit_reason and roi_sorted:
+                trade_age_s = (c["ts"] - open_trade["at"]).total_seconds()
+                trade_age_m = trade_age_s / 60.0
+                roi_thresh = None
+                for min_age, roi_pct in roi_sorted:
+                    if trade_age_m >= min_age:
+                        roi_thresh = roi_pct
+                        break
+                if roi_thresh is not None:
+                    cur_pnl = (price - entry) / entry if side == "BUY" else (entry - price) / entry
+                    if cur_pnl >= roi_thresh:
+                        exit_price = price
+                        exit_reason = "roi_table"
+                        win = True
+
+            # 4. Fixed take profit (intracandle)
+            if not exit_reason:
+                if side == "BUY" and c["high"] >= fixed_tp:
+                    exit_price = fixed_tp
+                    exit_reason = "take_profit"
+                    win = True
+                elif side == "SELL" and c["low"] <= fixed_tp:
+                    exit_price = fixed_tp
+                    exit_reason = "take_profit"
+                    win = True
+
+            if exit_reason:
+                # Slippage on exit: lose a bit more on the fill
+                if side == "BUY":
+                    eff_exit = exit_price * (1 - slippage_pct)
+                else:
+                    eff_exit = exit_price * (1 + slippage_pct)
+                eff_entry = open_trade.get("eff_entry", entry)
+                raw_pnl_pct = (eff_exit - eff_entry) / eff_entry if side == "BUY" else (eff_entry - eff_exit) / eff_entry
+                exit_fee = open_trade["cost"] * fee_pct
+                capital += open_trade["cost"] * raw_pnl_pct - exit_fee
+                total_fees += exit_fee
+                win = raw_pnl_pct > 0   # recompute with real fill prices
+                kelly.update(raw_pnl_pct * 100)
+
+                r = open_trade.get("regime", "RANGING")
+                regime_stats[r]["trades"] += 1
+                regime_stats[r]["pnl_sum"] += raw_pnl_pct * 100
+                if win:
+                    regime_stats[r]["wins"] += 1
+
+                for pat in open_trade.get("patterns", []):
+                    pattern_stats[pat]["trades"] += 1
+                    pattern_stats[pat]["pnl_sum"] += raw_pnl_pct * 100
+                    if win:
+                        pattern_stats[pat]["wins"] += 1
+
                 trades.append({
-                    "open_at":  open_trade["at"].isoformat(),
-                    "close_at": c["ts"].isoformat(),
-                    "side": side,
-                    "pnl_pct": round(pnl_pct * 100, 2),
-                    "win": hit_tp,
-                    "regime": c["regime"],
+                    "open_at":    open_trade["at"].isoformat(),
+                    "close_at":   c["ts"].isoformat(),
+                    "side":       side,
+                    "entry":      round(entry, 4),
+                    "exit":       round(exit_price, 4),
+                    "pnl_pct":    round(raw_pnl_pct * 100, 2),
+                    "win":        win,
+                    "regime":     open_trade.get("regime", "RANGING"),
+                    "patterns":   open_trade.get("patterns", []),
+                    "strategy":   open_trade.get("strategy", ""),
+                    "exit_reason": exit_reason,
+                    "hour":       open_trade["at"].hour,
+                    "size_pct":   round(open_trade["cost"] / max(capital, 1) * 100, 1),
+                    "fee_usdt":   round(exit_fee + open_trade.get("entry_fee", 0.0), 4),
                 })
                 open_trade = None
 
         equity.append(round(capital, 2))
 
-        if not open_trade:
-            action, _ = _signal(candles[max(0, i - 60):i])
-            if action != "HOLD":
-                open_trade = {"side": action, "entry": price,
-                               "cost": capital * 0.10, "at": c["ts"]}
+        if open_trade or circuit_open:
+            continue
 
-    if not trades:
-        return {"symbol": symbol, "days": days, "total_trades": 0,
-                "win_rate": 0, "total_return_pct": 0, "sharpe": 0,
-                "max_drawdown_pct": 0, "equity_curve": [], "trades": []}
+        # --- Get signal ---
+        if mode == "basic":
+            action, conf = _basic_signal(candles[max(0, i - window_size):i])
+            regime_name = candles[i].get("sim_regime", "RANGING")
+            patterns_s  = ""
+            strategy    = "ema_crossover"
+        else:
+            ohlcv_win = ohlcv_cache[max(0, i - window_size):i]
+            action, conf, strategy, regime_name, patterns_s = _ai_signal(
+                symbol, ohlcv_win,
+                use_patterns=(mode == "autotrade"),
+                use_regime=(mode in ("hybrid", "autotrade")),
+            )
 
-    eq = np.array(equity, dtype=float)
+        if action not in ("BUY", "SELL"):
+            continue
+
+        # --- Position sizing ---
+        if mode == "autotrade":
+            # Kelly + ATR-based sizing
+            frac = kelly.fraction_for_trade
+            # Simple ATR proxy from last 14 candles
+            if i >= 14:
+                recent = candles[i - 14:i]
+                trs = [max(r["high"] - r["low"],
+                           abs(r["high"] - candles[j]["close"]),
+                           abs(r["low"]  - candles[j]["close"]))
+                       for j, r in enumerate(recent[1:], i - 13)]
+                atr_pct = np.mean(trs) / price * 100 if price > 0 else 2.0
+                target_atr = 2.0
+                atr_adj = min(target_atr / atr_pct, 1.5) if atr_pct > 0 else 1.0
+                atr_adj = max(atr_adj, 0.25)
+                frac *= atr_adj
+            frac = min(frac, 0.10)
+            cost = max(capital * frac, 0.0)
+        else:
+            cost = capital * 0.10   # fixed 10% baseline
+
+        if cost < 1.0:
+            continue
+
+        # Apply slippage to entry fill and deduct entry commission
+        eff_entry = price * (1 + slippage_pct) if action == "BUY" else price * (1 - slippage_pct)
+        entry_fee = cost * fee_pct
+        capital  -= entry_fee
+        total_fees += entry_fee
+
+        open_trade = {
+            "side":       action,
+            "entry":      price,       # raw (used for TP/SL price levels)
+            "eff_entry":  eff_entry,   # slippage-adjusted (used for PnL)
+            "cost":       cost,
+            "entry_fee":  entry_fee,
+            "at":         c["ts"],
+            "regime":     regime_name,
+            "patterns":   [s for s in patterns_s.split() if s] if patterns_s else [],
+            "strategy":   strategy,
+        }
+
+    # --- Close any open position at end ---
+    if open_trade:
+        price     = candles[-1]["close"]
+        entry     = open_trade["entry"]
+        side      = open_trade["side"]
+        eff_entry = open_trade.get("eff_entry", entry)
+        eff_exit  = price * (1 - slippage_pct) if side == "BUY" else price * (1 + slippage_pct)
+        raw_pnl_pct = (eff_exit - eff_entry) / eff_entry if side == "BUY" else (eff_entry - eff_exit) / eff_entry
+        exit_fee  = open_trade["cost"] * fee_pct
+        capital  += open_trade["cost"] * raw_pnl_pct - exit_fee
+        total_fees += exit_fee
+        trades.append({
+            "open_at":    open_trade["at"].isoformat(),
+            "close_at":   candles[-1]["ts"].isoformat(),
+            "side":       side,
+            "entry":      round(entry, 4),
+            "exit":       round(price, 4),
+            "pnl_pct":    round(raw_pnl_pct * 100, 2),
+            "win":        raw_pnl_pct > 0,
+            "regime":     open_trade.get("regime", "RANGING"),
+            "patterns":   open_trade.get("patterns", []),
+            "strategy":   open_trade.get("strategy", ""),
+            "exit_reason": "end_of_period",
+            "hour":       open_trade["at"].hour,
+            "size_pct":   round(open_trade["cost"] / max(capital, 1) * 100, 1),
+            "fee_usdt":   round(exit_fee + open_trade.get("entry_fee", 0.0), 4),
+        })
+        equity.append(round(capital, 2))
+
+    # --- Metrics ---
+    eq   = np.array(equity, dtype=float)
     rets = np.diff(eq) / np.where(eq[:-1] != 0, eq[:-1], 1)
-    # Equity has one point per hourly candle → annualize hourly Sharpe by sqrt(24*365)
-    sharpe = float((rets.mean() / rets.std()) * math.sqrt(24 * 365)) if rets.std() > 0 else 0.0
+    # 1-hour candles → annualise with sqrt(8760); use 24*365 to be safe
+    sharpe = float((rets.mean() / rets.std()) * math.sqrt(24 * 365)) \
+        if len(rets) > 1 and rets.std() > 0 else 0.0
+    run_max = np.maximum.accumulate(eq)
+    max_dd  = float(((eq - run_max) / np.where(run_max != 0, run_max, 1)).min() * 100)
+    wins    = sum(1 for t in trades if t["win"])
+    tot_ret = (capital - initial_capital) / initial_capital * 100
 
-    run_max  = np.maximum.accumulate(eq)
-    max_dd   = float(((eq - run_max) / np.where(run_max != 0, run_max, 1)).min() * 100)
-    wins     = sum(1 for t in trades if t["win"])
-    tot_ret  = (capital - initial_capital) / initial_capital * 100
+    # Equity curve (max 300 points)
+    step  = max(1, len(equity) // 300)
+    curve = [{"i": idx, "v": equity[idx]} for idx in range(0, len(equity), step)]
 
-    step = max(1, len(equity) // 200)
-    curve = [{"i": i, "v": equity[i]} for i in range(0, len(equity), step)]
+    # Regime breakdown
+    regime_out = {}
+    for rname, rs in regime_stats.items():
+        n = rs["trades"]
+        regime_out[rname] = {
+            "trades":   n,
+            "win_rate": round(rs["wins"] / n * 100, 1) if n > 0 else 0,
+            "avg_pnl":  round(rs["pnl_sum"] / n, 2)   if n > 0 else 0,
+        }
+
+    # Pattern breakdown (top 5 by trade count)
+    sorted_patterns = sorted(pattern_stats.items(), key=lambda x: -x[1]["trades"])[:5]
+    pattern_out = {}
+    for pname, ps in sorted_patterns:
+        n = ps["trades"]
+        pattern_out[pname] = {
+            "trades":   n,
+            "win_rate": round(ps["wins"] / n * 100, 1) if n > 0 else 0,
+            "avg_pnl":  round(ps["pnl_sum"] / n, 2)   if n > 0 else 0,
+        }
+
+    metrics = {
+        "total_trades":     len(trades),
+        "win_rate":         round(wins / len(trades) * 100, 1) if trades else 0,
+        "total_return_pct": round(tot_ret, 2),
+        "sharpe":           round(sharpe, 2),
+        "max_drawdown_pct": round(max_dd, 2),
+        "initial_capital":  initial_capital,
+        "final_capital":    round(capital, 2),
+        "total_fees_pct":   round(total_fees / initial_capital * 100, 3),
+        "regime_stats":     regime_out,
+        "pattern_stats":    pattern_out,
+    }
+    return metrics, curve, trades, list(equity)
+
+
+def _exit_reason_stats(trades: list) -> dict:
+    """Summarise exit reasons: take_profit, stop_loss, roi_table, trailing_stop, end_of_period."""
+    from collections import Counter
+    c = Counter(t.get("exit_reason", "unknown") for t in trades)
+    return dict(c)
+
+
+# ── Public API ────────────────────────────────────────────────────────────────
+
+def run_backtest(
+    symbol: str,
+    days: int = 30,
+    tp_pct: float = 0.04,
+    sl_pct: float = 0.02,
+    initial_capital: float = 10_000.0,
+) -> dict:
+    """Synchronous simulated backtest (offline fallback). Compares basic vs autotrade."""
+    from ..exchanges.demo_client import _SEED_PRICES
+    base_price = _SEED_PRICES.get(symbol, 100.0)
+    candles = _simulate_ohlcv(days, base_price)
+    return _build_result(symbol, candles, days, tp_pct, sl_pct, initial_capital,
+                         data_source="simulated")
+
+
+async def run_backtest_real(
+    symbol: str,
+    days: int = 30,
+    tp_pct: float = 0.04,
+    sl_pct: float = 0.02,
+    initial_capital: float = 10_000.0,
+) -> dict:
+    """Backtest on real Binance klines; falls back to simulation if offline."""
+    try:
+        candles = await _fetch_real_ohlcv(symbol, days)
+        return _build_result(symbol, candles, days, tp_pct, sl_pct, initial_capital,
+                             data_source="binance")
+    except Exception as e:
+        logger.warning("Real backtest unavailable for %s (%s); using simulation", symbol, e)
+        return run_backtest(symbol, days, tp_pct, sl_pct, initial_capital)
+
+
+def _build_result(
+    symbol: str,
+    candles: List[dict],
+    days: int,
+    tp_pct: float,
+    sl_pct: float,
+    initial_capital: float,
+    data_source: str,
+) -> dict:
+    """Run all 3 modes and merge into one result."""
+    from .risk_analytics import compute_metrics
+
+    # Load dynamic exit settings
+    from ..core.config import settings as _cfg
+    roi_tbl    = _cfg.get("strategy",  "roi_table")       or {}
+    trail_cfg  = _cfg.get("strategy",  "trailing_stop")   or {}
+    bt_cfg     = _cfg.get("backtest")                      or {}
+    trail_pct  = float(trail_cfg.get("pct", 0.02)) if trail_cfg.get("enabled") else None
+    trail_act  = float(trail_cfg.get("activate_pct", 0.01))
+    fee_pct    = float(bt_cfg.get("fee_pct",      0.001))
+    slip_pct   = float(bt_cfg.get("slippage_pct", 0.0005))
+
+    loop_kw = dict(roi_table=roi_tbl, trailing_stop_pct=trail_pct,
+                   trailing_activate_pct=trail_act, fee_pct=fee_pct, slippage_pct=slip_pct)
+
+    basic_m,  basic_curve,  basic_trades,  basic_eq  = _run_loop(symbol, candles, tp_pct, sl_pct, initial_capital, "basic",     **loop_kw)
+    hybrid_m, hybrid_curve, hybrid_trades, hybrid_eq = _run_loop(symbol, candles, tp_pct, sl_pct, initial_capital, "hybrid",    **loop_kw)
+    ai_m,     ai_curve,     ai_trades,     ai_eq     = _run_loop(symbol, candles, tp_pct, sl_pct, initial_capital, "autotrade", **loop_kw)
+
+    basic_analytics  = compute_metrics(basic_trades,  basic_eq,  initial_capital)
+    hybrid_analytics = compute_metrics(hybrid_trades, hybrid_eq, initial_capital)
+    ai_analytics     = compute_metrics(ai_trades,     ai_eq,     initial_capital)
+
+    def _mode_block(m, curve, analytics):
+        return {
+            "total_trades":     m["total_trades"],
+            "win_rate":         m["win_rate"],
+            "total_return_pct": m["total_return_pct"],
+            "sharpe":           analytics["sharpe"],
+            "sortino":          analytics["sortino"],
+            "calmar":           analytics["calmar"],
+            "var_95_pct":       analytics["var_95_pct"],
+            "max_drawdown_pct": m["max_drawdown_pct"],
+            "profit_factor":    analytics["profit_factor"],
+            "max_win_streak":   analytics["max_win_streak"],
+            "max_loss_streak":  analytics["max_loss_streak"],
+            "avg_win_pct":      analytics["avg_win_pct"],
+            "avg_loss_pct":     analytics["avg_loss_pct"],
+            "expectancy_pct":   analytics["expectancy_pct"],
+            "total_fees_pct":   m.get("total_fees_pct", 0.0),
+            "final_capital":    m["final_capital"],
+            "equity_curve":     curve,
+        }
+
+    # ── Hourly signal quality (which UTC hours produce best AI signals)
+    from collections import defaultdict as _dd
+    hourly: dict = _dd(lambda: {"trades": 0, "wins": 0, "pnl_sum": 0.0})
+    for t in ai_trades:
+        h = t.get("hour")
+        if h is not None:
+            hourly[h]["trades"] += 1
+            hourly[h]["pnl_sum"] += t["pnl_pct"]
+            if t.get("win"):
+                hourly[h]["wins"] += 1
+    hourly_stats = {
+        str(h): {
+            "trades":   d["trades"],
+            "win_rate": round(d["wins"] / d["trades"] * 100, 1) if d["trades"] else 0,
+            "avg_pnl":  round(d["pnl_sum"] / d["trades"], 2) if d["trades"] else 0,
+        }
+        for h, d in sorted(hourly.items())
+    }
+
+    # Primary result = autotrade (full AI stack)
+    result = {
+        "symbol":       symbol,
+        "days":         days,
+        "data_source":  data_source,
+        "tp_pct":       tp_pct,
+        "sl_pct":       sl_pct,
+
+        # Top-level metrics = autotrade
+        **{k: ai_m[k] for k in (
+            "total_trades", "win_rate", "total_return_pct",
+            "sharpe", "max_drawdown_pct", "initial_capital", "final_capital",
+            "total_fees_pct",
+        )},
+        "fee_pct":      fee_pct,
+        "slippage_pct": slip_pct,
+        "analytics":     ai_analytics,
+
+        "equity_curve":  ai_curve,
+        "trades":        ai_trades[-50:],
+        "regime_stats":  ai_m["regime_stats"],
+        "pattern_stats": ai_m["pattern_stats"],
+        "hourly_stats":  hourly_stats,
+        "exit_reason_stats": _exit_reason_stats(ai_trades),
+
+        # Side-by-side comparison (full analytics per mode)
+        "comparison": {
+            "basic":      _mode_block(basic_m,  basic_curve,  basic_analytics),
+            "hybrid":     _mode_block(hybrid_m, hybrid_curve, hybrid_analytics),
+            "autotrade":  _mode_block(ai_m,     ai_curve,     ai_analytics),
+        },
+    }
+    return result
+
+
+async def run_walkforward(
+    symbol: str,
+    days: int = 90,
+    folds: int = 3,
+    tp_pct: float = 0.04,
+    sl_pct: float = 0.02,
+    initial_capital: float = 10_000.0,
+) -> dict:
+    """Walk-forward validation: rolling in-sample parameter optimisation + out-of-sample test.
+
+    For each fold we:
+      1. Optimise TP / SL via a small grid on the in-sample window.
+      2. Test the chosen params on the unseen out-of-sample window.
+      3. Report IS vs OOS performance degradation — high degradation = overfit.
+
+    This is the Jesse-framework approach: zero look-ahead bias by never touching
+    OOS data during parameter selection.
+    """
+    try:
+        candles = await _fetch_real_ohlcv(symbol, days)
+        data_source = "binance"
+    except Exception as e:
+        logger.warning("Walk-forward: using simulation (%s)", e)
+        try:
+            from ..exchanges.demo_client import _SEED_PRICES
+            base_price = _SEED_PRICES.get(symbol, 100.0)
+        except Exception:
+            base_price = 100.0
+        candles = _simulate_ohlcv(days, base_price)
+        data_source = "simulated"
+
+    from .risk_analytics import compute_metrics
+    from ..core.config import settings as _cfg2
+    _bt2 = _cfg2.get("backtest") or {}
+    _fee    = float(_bt2.get("fee_pct",      0.001))
+    _slip   = float(_bt2.get("slippage_pct", 0.0005))
+    _wf_kw  = dict(fee_pct=_fee, slippage_pct=_slip)
+
+    n = len(candles)
+    # Each fold uses an expanding IS window; OOS = next fold_size candles
+    fold_size = n // (folds + 1)
+    if fold_size < 100:
+        return {"error": "Insufficient data for walk-forward (need more days)", "symbol": symbol}
+
+    results = []
+    grid_tp = [tp_pct * f for f in (0.75, 1.0, 1.25, 1.5)]
+    grid_sl = [sl_pct * f for f in (0.75, 1.0, 1.25)]
+
+    for fold_idx in range(folds):
+        is_end   = (fold_idx + 1) * fold_size
+        oos_end  = min(is_end + fold_size, n)
+        if oos_end <= is_end or is_end < 50:
+            break
+
+        is_candles  = candles[:is_end]
+        oos_candles = candles[is_end:oos_end]
+
+        # ── In-sample: grid-search TP/SL by Sharpe ────────────────────────
+        best_tp, best_sl, best_sharpe = tp_pct, sl_pct, -999.0
+        for t in grid_tp:
+            for s in grid_sl:
+                if t <= s:          # require positive R:R
+                    continue
+                m, _, _, _ = _run_loop(symbol, is_candles, t, s, initial_capital, "autotrade", **_wf_kw)
+                if m["sharpe"] > best_sharpe:
+                    best_sharpe = m["sharpe"]
+                    best_tp, best_sl = t, s
+
+        # ── IS performance with optimised params ──────────────────────────
+        is_m, _, is_trades, is_eq = _run_loop(symbol, is_candles, best_tp, best_sl, initial_capital, "autotrade", **_wf_kw)
+
+        # ── OOS performance with SAME params (no peeking) ─────────────────
+        oos_m, _, oos_trades, oos_eq = _run_loop(symbol, oos_candles, best_tp, best_sl, initial_capital, "autotrade", **_wf_kw)
+        oos_ana = compute_metrics(oos_trades, oos_eq, initial_capital)
+
+        # Degradation ratio: OOS_return / IS_return (1.0 = perfect; 0 = all alpha lost OOS)
+        is_ret  = is_m["total_return_pct"]
+        oos_ret = oos_m["total_return_pct"]
+        degradation = round(oos_ret / is_ret, 2) if abs(is_ret) > 0.01 else None
+
+        results.append({
+            "fold":             fold_idx + 1,
+            "is_bars":          len(is_candles),
+            "oos_bars":         len(oos_candles),
+            "optimized_tp_pct": round(best_tp * 100, 2),
+            "optimized_sl_pct": round(best_sl * 100, 2),
+            "is_sharpe":        round(best_sharpe, 2),
+            "is_return_pct":    round(is_ret, 2),
+            "oos_return_pct":   round(oos_ret, 2),
+            "oos_sharpe":       round(oos_ana["sharpe"], 2),
+            "oos_win_rate":     round(oos_m["win_rate"], 1),
+            "oos_trades":       oos_m["total_trades"],
+            "oos_max_dd_pct":   round(oos_m["max_drawdown_pct"], 2),
+            "degradation":      degradation,
+        })
+
+    if not results:
+        return {"error": "No folds completed", "symbol": symbol, "data_source": data_source}
+
+    # ── Summary ────────────────────────────────────────────────────────────
+    profitable_folds = sum(1 for r in results if r["oos_return_pct"] > 0)
+    avg_oos_ret   = round(sum(r["oos_return_pct"] for r in results) / len(results), 2)
+    avg_oos_sharp = round(sum(r["oos_sharpe"] for r in results) / len(results), 2)
+
+    overfit_risk = "LOW"
+    degrading = [r for r in results if r["degradation"] is not None and r["degradation"] < 0.5]
+    if len(degrading) > len(results) / 2:
+        overfit_risk = "HIGH"
+    elif len(degrading) > 0:
+        overfit_risk = "MEDIUM"
 
     return {
-        "symbol":            symbol,
-        "days":              days,
-        "total_trades":      len(trades),
-        "win_rate":          round(wins / len(trades) * 100, 1),
-        "total_return_pct":  round(tot_ret, 2),
-        "sharpe":            round(sharpe, 2),
-        "max_drawdown_pct":  round(max_dd, 2),
-        "initial_capital":   initial_capital,
-        "final_capital":     round(capital, 2),
-        "equity_curve":      curve,
-        "trades":            trades[-20:],
+        "symbol":          symbol,
+        "days":            days,
+        "folds_completed": len(results),
+        "data_source":     data_source,
+        "summary": {
+            "avg_oos_return_pct":   avg_oos_ret,
+            "avg_oos_sharpe":       avg_oos_sharp,
+            "profitable_folds":     profitable_folds,
+            "total_folds":          len(results),
+            "overfit_risk":         overfit_risk,
+            "consistency_pct":      round(profitable_folds / len(results) * 100, 1),
+        },
+        "folds": results,
     }

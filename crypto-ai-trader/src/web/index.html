@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Aiterra v1.0.0</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/apexcharts@3.49.0/dist/apexcharts.min.js"></script>
+<title>Aiterra v1.2.0</title>
+<link href="/static/css/bootstrap.min.css" rel="stylesheet">
+<link href="/static/css/bootstrap-icons.min.css" rel="stylesheet">
+<script src="/static/js/apexcharts.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/countup.js@2.8.3/dist/countUp.umd.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Finlandica:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Finlandica:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Noto+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
 :root {
   --bg-dark:   #000000;
@@ -28,15 +28,15 @@
   --accent-purple: #A8FF53;
   --font-mono:     'Space Mono', 'Courier New', monospace;
   --font-headline: 'Finlandica', sans-serif;
-  --font-thai:     'Noto Sans Thai', sans-serif;
+  --font-body:     'Noto Sans', sans-serif;
 }
 * { box-sizing: border-box; }
 
-/* Base: Noto Sans Thai for body copy (Thai+Latin fallback) */
+/* Base: Noto Sans for body copy (Latin + Unicode fallback) */
 body {
   background: var(--bg-dark);
   color: var(--text-main);
-  font-family: var(--font-thai), sans-serif;
+  font-family: var(--font-body), sans-serif;
   margin: 0;
   font-size: 14px;
   line-height: 1.55;
@@ -88,8 +88,27 @@ body {
 .signal-buy-text  { color: var(--accent-buy); font-weight: 700; }
 .signal-sell-text { color: var(--accent-red); font-weight: 700; }
 
+/* ── Regime badges ── */
+.regime-badge { font-size: 0.58rem; padding: 1px 6px; border-radius: 2px; font-weight: 700; letter-spacing: 0.6px; font-family: var(--font-mono); display: inline-block; }
+.regime-bull   { background: rgba(57,217,138,0.15);  color: #39d98a; border: 1px solid rgba(57,217,138,0.3); }
+.regime-bear   { background: rgba(255,107,53,0.15);  color: #ff6b35; border: 1px solid rgba(255,107,53,0.3); }
+.regime-range  { background: rgba(168,255,83,0.10);  color: #A8FF53; border: 1px solid rgba(168,255,83,0.25); }
+.regime-vol    { background: rgba(255,193,7,0.12);   color: #ffc107; border: 1px solid rgba(255,193,7,0.25); }
+.regime-crash  { background: rgba(220,53,69,0.18);   color: #ff4d6d; border: 1px solid rgba(220,53,69,0.4); animation: pulse 1s infinite; }
+
+/* ── Risk / circuit bar ── */
+.heat-bar { height: 5px; border-radius: 2px; background: var(--border); overflow: hidden; }
+.heat-fill { height: 100%; transition: width 0.5s; }
+.circuit-open { color: #ff4d6d; font-weight: 700; animation: pulse 1.2s infinite; }
+
+/* ── Pattern pill ── */
+.pat-pill { font-size: 0.6rem; padding: 2px 7px; border-radius: 100px; font-family: var(--font-mono); font-weight: 600; display: inline-block; margin: 1px 2px; }
+.pat-buy  { background: rgba(57,217,138,0.12); color: #39d98a; border: 1px solid rgba(57,217,138,0.2); }
+.pat-sell { background: rgba(255,107,53,0.12);  color: #ff6b35; border: 1px solid rgba(255,107,53,0.2); }
+.pat-neu  { background: rgba(100,100,100,0.12); color: #888;    border: 1px solid rgba(100,100,100,0.2); }
+
 /* ── Table ── */
-.table { color: var(--text-main); font-family: var(--font-thai); }
+.table { color: var(--text-main); font-family: var(--font-body); }
 .table td, .table th { border-color: var(--border); font-size: 0.82rem; vertical-align: middle; padding: 8px 12px; }
 .table thead th {
   color: var(--text-muted); font-weight: 600; background: var(--bg-card2);
@@ -107,13 +126,13 @@ body {
 .price-down { color: var(--accent-red); font-weight: 600; }
 
 /* ── Indicators ── */
-.indicator-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(34,34,34,0.8); font-size: 0.8rem; font-family: var(--font-thai); }
+.indicator-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(34,34,34,0.8); font-size: 0.8rem; font-family: var(--font-body); }
 .indicator-row:last-child { border-bottom: none; }
 .indicator-bar { width: 60px; height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 6px; }
 .indicator-fill { height: 100%; transition: width 0.5s; }
 
 /* ── Activity feed ── */
-.activity-item { padding: 8px 14px; border-bottom: 1px solid var(--border); font-size: 0.82rem; font-family: var(--font-thai); line-height: 1.5; }
+.activity-item { padding: 8px 14px; border-bottom: 1px solid var(--border); font-size: 0.82rem; font-family: var(--font-body); line-height: 1.5; }
 .activity-item:last-child { border-bottom: none; }
 
 /* ── Mode badge ── */
@@ -125,7 +144,7 @@ body {
 .form-control, .form-select {
   background: var(--bg-card2); border: 1px solid var(--border2);
   color: var(--text-main); border-radius: 4px;
-  font-family: var(--font-thai); font-size: 0.85rem;
+  font-family: var(--font-body); font-size: 0.85rem;
 }
 .form-control:focus, .form-select:focus {
   background: var(--bg-card2); border-color: var(--accent);
@@ -291,13 +310,12 @@ a:hover { color: #C6FF80; }
 /* ── Typography helpers ── */
 h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
 .font-headline { font-family: var(--font-headline); }
-.font-thai     { font-family: var(--font-thai); }
 .font-mono     { font-family: var(--font-mono); }
 
-/* Thai text blocks: looser line-height for readability */
-.text-thai, .thai-text, ol.small, ul.small, .small.text-muted,
-#sec-thai-market, #sec-settings, .activity-item, .card-body p,
-.alert, .form-check-label { font-family: var(--font-thai); line-height: 1.65; }
+/* Body text blocks: looser line-height for readability */
+ol.small, ul.small, .small.text-muted,
+#sec-settings, .activity-item, .card-body p,
+.alert, .form-check-label { font-family: var(--font-body); line-height: 1.65; }
 
 /* Numbers and prices always Space Mono */
 .fw-bold.mt-1, .price-card .fw-bold,
@@ -343,7 +361,7 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
 .chat-msg.chat-user { flex-direction:row-reverse; }
 .chat-bubble {
   max-width:82%; padding:9px 13px; border-radius:12px;
-  font-size:0.82rem; font-family:var(--font-thai); line-height:1.65;
+  font-size:0.82rem; font-family:var(--font-body); line-height:1.65;
   word-break:break-word;
 }
 .chat-ai .chat-bubble {
@@ -357,7 +375,7 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
 .chat-quick {
   background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.08);
   color:var(--text-muted); border-radius:100px; padding:3px 11px;
-  font-size:0.72rem; cursor:pointer; font-family:var(--font-thai);
+  font-size:0.72rem; cursor:pointer; font-family:var(--font-body);
   transition:all 0.15s; white-space:nowrap;
 }
 .chat-quick:hover { background:rgba(168,255,83,0.12); border-color:rgba(168,255,83,0.35); color:var(--accent); }
@@ -365,7 +383,7 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
 #chatInput {
   flex:1; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1);
   border-radius:10px; padding:8px 12px; color:var(--text-main);
-  font-family:var(--font-thai); font-size:0.85rem; outline:none;
+  font-family:var(--font-body); font-size:0.85rem; outline:none;
   transition:border-color 0.15s;
 }
 #chatInput:focus { border-color:rgba(168,255,83,0.5); }
@@ -454,6 +472,39 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
   .brand-name { font-size: 1rem; }
   .stat-value { font-size: 1.15rem; }
 }
+
+/* ── Market Narrative ── */
+.narrative-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 9px 12px; border-radius: 0 8px 8px 0;
+  border-left: 3px solid var(--border2);
+  background: rgba(255,255,255,0.02);
+  margin-bottom: 6px; transition: background 0.15s;
+}
+.narrative-item:last-child { margin-bottom: 0; }
+.narrative-item.nar-buy  { border-left-color: var(--accent-buy);  background: rgba(57,217,138,0.04); }
+.narrative-item.nar-sell { border-left-color: var(--accent-red);  background: rgba(255,107,53,0.04); }
+.narrative-item.nar-hold { border-left-color: var(--border2);     background: rgba(255,255,255,0.02); }
+.narrative-sym { min-width: 42px; text-align: center; }
+.narrative-sym .sym-name { font-family: var(--font-headline); font-weight: 700; font-size: 0.88rem; }
+.narrative-text { font-size: 0.79rem; color: var(--text-muted); line-height: 1.55; flex: 1; }
+
+/* ── Cache Stats Box ── */
+.cache-stat-box {
+  margin-top: 10px; padding: 8px 10px;
+  background: rgba(168,255,83,0.05);
+  border: 1px solid rgba(168,255,83,0.15);
+  border-radius: 8px;
+}
+.cache-hit-bar { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; margin-top: 4px; }
+.cache-hit-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.5s; }
+
+/* ── Confidence bar in price cards ── */
+.conf-bar { height: 3px; border-radius: 2px; background: var(--border); overflow: hidden; margin-top: 5px; }
+.conf-fill { height: 100%; border-radius: 2px; transition: width 0.5s; }
+
+/* ── Correlation cell upgrade ── */
+.corr-cell { padding: 6px 8px; border-radius: 4px; text-align: center; font-family: var(--font-mono); font-size: 0.65rem; font-weight: 600; cursor: default; }
 </style>
 </head>
 <body>
@@ -468,7 +519,7 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
   </button>
   <a class="brand-wrap" href="#">
     <div class="brand-icon">AT</div>
-    <span class="brand-name">Aiterra <small>v1.0.0</small></span>
+    <span class="brand-name">Aiterra <small>v1.2.0</small></span>
   </a>
 
   <div class="topnav-pills">
@@ -478,8 +529,8 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
     <a class="pill-link nav-link" onclick="showSection('analytics',this)">Analytics</a>
     <a class="pill-link nav-link" onclick="showSection('trade-history',this)">History</a>
     <a class="pill-link nav-link" onclick="showSection('positions',this)">Positions</a>
+    <a class="pill-link nav-link" onclick="showSection('alerts',this)" id="navAlerts">Alerts</a>
     <a class="pill-link nav-link" onclick="showSection('notifications',this)" id="navNotifications">Notifications</a>
-    <a class="pill-link nav-link" onclick="showSection('thai-market',this)">ตลาดไทย</a>
     <a class="pill-link nav-link" onclick="showSection('settings',this)">Settings</a>
   </div>
 
@@ -493,6 +544,7 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
       <option value="rule_based">Rule-based</option>
       <option value="ml">ML</option>
       <option value="claude">Claude API</option>
+      <option value="multi_model">Multi-Model Consensus</option>
     </select>
     <select class="form-select form-select-sm" style="width:auto;font-size:0.72rem" id="strategySelect">
       <option value="hybrid">Hybrid</option>
@@ -517,7 +569,7 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
         <span id="totalValue">$0.00</span>
         <span id="totalPnlPct" class="ms-3" style="font-size:1.1rem;color:var(--accent);vertical-align:middle;font-family:var(--font-mono);letter-spacing:0">+0.00%</span>
       </div>
-      <div class="text-muted mt-1" style="font-size:0.85rem;font-family:var(--font-thai)">Available: <strong id="cashValue" style="color:var(--text-main)">$0.00</strong>&nbsp;&nbsp;|&nbsp;&nbsp;<span id="positionCount">0 positions</span></div>
+      <div class="text-muted mt-1" style="font-size:0.85rem;font-family:var(--font-body)">Available: <strong id="cashValue" style="color:var(--text-main)">$0.00</strong>&nbsp;&nbsp;|&nbsp;&nbsp;<span id="positionCount">0 positions</span></div>
       <div class="d-flex gap-2 mt-3">
         <button class="btn btn-sm px-3" style="background:var(--accent);color:#000;font-weight:700;border:none;border-radius:100px" onclick="showSection('trading',document.querySelector('.pill-link:nth-child(2)'))">
           Buy / Sell ↑
@@ -538,6 +590,145 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
 
   <!-- Price ticker row -->
   <div class="row g-2 mb-4" id="priceCardsRow"></div>
+
+  <!-- Kill Switch + Dry-Run Controls -->
+  <div class="row g-3 mb-3">
+    <div class="col-12">
+      <div class="card" style="border-color:rgba(220,53,69,0.3)">
+        <div class="card-header d-flex justify-content-between align-items-center" style="background:rgba(220,53,69,0.08)">
+          <span><i class="bi bi-power me-2 text-danger"></i>Trading Controls <span class="text-muted" style="font-size:0.7rem;font-weight:400">— Kill Switch &amp; Dry-Run</span></span>
+          <div class="d-flex gap-2 align-items-center">
+            <span id="killStatusBadge" class="badge bg-success" style="font-size:0.65rem">TRADING ACTIVE</span>
+            <span id="dryRunBadge" class="badge bg-secondary d-none" style="font-size:0.65rem">DRY-RUN</span>
+          </div>
+        </div>
+        <div class="card-body py-2 px-3">
+          <div class="d-flex flex-wrap gap-3 align-items-center">
+            <button id="killSwitchBtn" class="btn btn-danger btn-sm px-4" onclick="activateKillSwitch()">
+              <i class="bi bi-stop-circle me-1"></i>Activate Kill Switch
+            </button>
+            <button id="resumeTradeBtn" class="btn btn-success btn-sm px-4 d-none" onclick="deactivateKillSwitch()">
+              <i class="bi bi-play-circle me-1"></i>Resume Trading
+            </button>
+            <div class="vr"></div>
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" id="dryRunToggle" onchange="toggleDryRun(this.checked)">
+              <label class="form-check-label small" for="dryRunToggle">Paper Trade (Dry-Run)</label>
+            </div>
+            <span class="text-muted" style="font-size:0.7rem" id="killSwitchNote">Kill switch immediately stops all new orders. Existing positions remain open.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Market Intelligence Row: Regime + Risk + Patterns -->
+  <div class="row g-3 mb-3" id="marketIntelRow">
+    <!-- Market Regime -->
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-radar me-2"></i>Market Regime</span>
+          <span class="text-muted" style="font-size:0.62rem;font-family:var(--font-mono)" id="regimeUpdated">—</span>
+        </div>
+        <div class="card-body p-2" id="regimePanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+    <!-- Risk Engine -->
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-shield-exclamation me-2"></i>Risk Engine</span>
+          <span id="circuitBadge" style="display:none" class="circuit-open" style="font-size:0.7rem">⚡ CIRCUIT</span>
+        </div>
+        <div class="card-body" id="riskPanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+    <!-- Chart Patterns -->
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-diagram-2 me-2"></i>Chart Patterns</span>
+          <select class="form-select form-select-sm" style="width:auto;font-size:0.7rem" id="patternSymbolSelect" onchange="fetchPatterns(this.value)"></select>
+        </div>
+        <div class="card-body p-2" id="patternPanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Correlation Matrix Row -->
+  <div class="row g-3 mb-3" id="correlationRow">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-grid-3x3-gap me-2"></i>Correlation Matrix <span class="text-muted" style="font-size:0.7rem;font-weight:400">— ความสัมพันธ์ของราคา (กันถือเหรียญที่วิ่งทางเดียวกันซ้ำ)</span></span>
+          <span class="text-muted" style="font-size:0.65rem" id="corrUpdated">—</span>
+        </div>
+        <div class="card-body p-2" id="correlationPanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Market Narrative Row -->
+  <div class="row g-3 mb-3" id="narrativeRow">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-chat-left-text me-2"></i>Market Narrative
+            <span class="text-muted" style="font-size:0.68rem;font-weight:400;letter-spacing:0;text-transform:none"> — สรุปสภาพตลาดภาษาไทย (rule-based · ไม่ใช้ API)</span>
+          </span>
+          <span class="text-muted" style="font-size:0.65rem;font-family:var(--font-mono)" id="narrativeUpdated">—</span>
+        </div>
+        <div class="card-body p-2" id="narrativePanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Risk Analytics Row -->
+  <div class="row g-3 mb-3" id="analyticsRow">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-bar-chart-steps me-2"></i>Risk Analytics <span class="text-muted" style="font-size:0.7rem;font-weight:400">— live trades</span></span>
+          <div class="d-flex gap-2 align-items-center">
+            <span class="text-muted" style="font-size:0.65rem" id="analyticsUpdated">—</span>
+            <button class="btn btn-outline-secondary btn-sm" style="padding:1px 8px;font-size:0.7rem" onclick="fetchAnalytics()">↻</button>
+          </div>
+        </div>
+        <div class="card-body p-2" id="analyticsPanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sentiment & On-chain Row -->
+  <div class="row g-3 mb-3" id="sentimentRow">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-emoji-smile me-2"></i>Market Sentiment &amp; On-chain <span class="text-muted" style="font-size:0.7rem;font-weight:400">— Fear &amp; Greed · Funding Rate · Open Interest</span></span>
+          <div class="d-flex gap-2 align-items-center">
+            <span class="text-muted" style="font-size:0.65rem" id="sentimentUpdated">—</span>
+            <button class="btn btn-outline-secondary btn-sm" style="padding:1px 8px;font-size:0.7rem" onclick="fetchSentiment()">↻</button>
+          </div>
+        </div>
+        <div class="card-body p-2" id="sentimentPanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Signal Funnel + PNL Today + Agent Status -->
   <div class="row g-3 mb-3">
@@ -571,6 +762,14 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
             </div>
           </div>
           <div class="text-muted mt-2 text-center" style="font-size:0.7rem;font-family:var(--font-mono)" id="funLastSignal">รอสัญญาณ...</div>
+          <div class="cache-stat-box d-none" id="funCacheBox">
+            <div class="d-flex justify-content-between align-items-center">
+              <span style="font-size:0.6rem;font-family:var(--font-mono);color:var(--accent);letter-spacing:0.8px;text-transform:uppercase">⚡ Signal Cache</span>
+              <span style="font-size:0.7rem;font-family:var(--font-mono);color:var(--text-main)" id="funCacheHitRate">—</span>
+            </div>
+            <div class="cache-hit-bar"><div class="cache-hit-fill" id="funCacheBar" style="width:0%"></div></div>
+            <div class="text-muted mt-1 text-center" style="font-size:0.65rem;font-family:var(--font-mono)" id="funCacheSaved"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -704,7 +903,10 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
     </div>
     <div class="col-md-4">
       <div class="card mb-3">
-        <div class="card-header"><i class="bi bi-cpu me-2"></i>AI Analysis</div>
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-cpu me-2"></i>AI Analysis</span>
+          <span class="text-muted" style="font-size:0.65rem;font-family:var(--font-mono)" id="aiAnalysisTimestamp">—</span>
+        </div>
         <div class="card-body" id="aiAnalysisPanel">
           <div class="text-muted text-center small py-2">รอการวิเคราะห์...</div>
         </div>
@@ -1014,6 +1216,47 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
       </div>
     </div>
   </div>
+
+  <!-- ═══ Quant Lab (ML for Trading) ═══ -->
+  <div class="card mb-3" style="border-color:rgba(91,200,255,0.25)">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-cpu me-2"></i>Quant Lab <span class="badge ms-1" style="background:rgba(91,200,255,0.15);color:#5bc8ff;font-size:0.6rem">ML4T</span></span>
+      <button class="btn btn-outline-secondary btn-sm" onclick="loadQuantLab()" id="quantLabBtn">
+        <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+      </button>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <!-- SHAP Feature Importance -->
+        <div class="col-md-5">
+          <div style="font-size:0.8rem;color:#5bc8ff;font-weight:600;margin-bottom:8px">
+            <i class="bi bi-bar-chart-steps me-1"></i>SHAP Feature Importance
+            <span class="text-muted" style="font-size:0.65rem;font-weight:400" id="shapModelType"></span>
+          </div>
+          <div id="shapBars" style="min-height:60px"></div>
+        </div>
+        <!-- HRP Allocation -->
+        <div class="col-md-4">
+          <div style="font-size:0.8rem;color:#A8FF53;font-weight:600;margin-bottom:8px">
+            <i class="bi bi-diagram-3 me-1"></i>HRP Allocation
+            <span class="text-muted" style="font-size:0.65rem;font-weight:400">correlation-aware</span>
+          </div>
+          <table class="table table-dark table-sm mb-0" style="font-size:0.74rem">
+            <thead><tr><th>Symbol</th><th>Weight</th><th title="vs equal weight">×Eq</th><th title="size multiplier">Mult</th></tr></thead>
+            <tbody id="hrpBody"><tr><td colspan="4" class="text-muted text-center">—</td></tr></tbody>
+          </table>
+        </div>
+        <!-- Cointegration Pairs -->
+        <div class="col-md-3">
+          <div style="font-size:0.8rem;color:#ffc107;font-weight:600;margin-bottom:8px">
+            <i class="bi bi-link-45deg me-1"></i>Cointegrated Pairs
+            <span class="text-muted" style="font-size:0.65rem;font-weight:400">stat-arb</span>
+          </div>
+          <div id="cointList" style="font-size:0.74rem"><span class="text-muted">—</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </section>
 <!-- AI TRAINING inner content end -->
   </div><!-- end anl-training -->
@@ -1032,8 +1275,8 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
     </div>
     <div class="card-body p-0" style="overflow-x:auto">
       <table class="table table-dark mb-0">
-        <thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th>Price</th><th>Amount</th><th>Strategy</th><th>Model</th><th>Conf</th><th>Status</th><th>PnL</th></tr></thead>
-        <tbody id="historyBody"><tr><td colspan="10" class="text-center text-muted p-3">ยังไม่มีประวัติ</td></tr></tbody>
+        <thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th>Price</th><th>Amount</th><th>Strategy</th><th>Model</th><th>Conf</th><th>Status</th><th>PnL</th><th style="width:44px"></th></tr></thead>
+        <tbody id="historyBody"><tr><td colspan="11" class="text-center text-muted p-3">ยังไม่มีประวัติ</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -1108,6 +1351,119 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
 </section>
 
 <!-- NOTIFICATIONS -->
+<!-- PRICE ALERTS -->
+<section id="sec-alerts" class="section">
+  <div class="row g-3">
+    <div class="col-md-5">
+      <div class="card">
+        <div class="card-header"><i class="bi bi-bell me-2"></i>ตั้งแจ้งเตือนราคา</div>
+        <div class="card-body">
+          <div class="mb-2">
+            <label class="form-label small mb-1">Symbol</label>
+            <select class="form-select form-select-sm" id="alertSymbol"></select>
+          </div>
+          <div class="row g-2 mb-2">
+            <div class="col-6">
+              <label class="form-label small mb-1">เงื่อนไข</label>
+              <select class="form-select form-select-sm" id="alertCondition">
+                <option value="above">📈 ราคาขึ้นถึง</option>
+                <option value="below">📉 ราคาลงถึง</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label small mb-1">ราคาเป้าหมาย</label>
+              <input type="number" class="form-control form-control-sm" id="alertPrice" placeholder="0.00" min="0" step="any">
+            </div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small mb-1">โน้ต (ไม่บังคับ)</label>
+            <input type="text" class="form-control form-control-sm" id="alertNote" placeholder="เช่น: แนวรับสำคัญ" maxlength="200">
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="alertRepeat">
+            <label class="form-check-label small" for="alertRepeat">แจ้งซ้ำทุกครั้ง (ไม่ปิดหลังแจ้งครั้งแรก)</label>
+          </div>
+          <button class="btn btn-primary btn-sm w-100" onclick="createAlert()">
+            <i class="bi bi-plus-circle me-1"></i>เพิ่มการแจ้งเตือน
+          </button>
+          <div id="alertCreateResult" class="small mt-2" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-7">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-list-check me-2"></i>การแจ้งเตือนทั้งหมด</span>
+          <button class="btn btn-outline-secondary btn-sm" onclick="loadAlerts()"><i class="bi bi-arrow-clockwise"></i></button>
+        </div>
+        <div class="card-body p-0">
+          <div id="alertsEmpty" class="text-center text-muted py-4" style="font-size:0.85rem">
+            <i class="bi bi-bell-slash" style="font-size:1.8rem;display:block;margin-bottom:8px"></i>ยังไม่มีการแจ้งเตือน
+          </div>
+          <div id="alertsList" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRADE JOURNAL MODAL -->
+<div class="modal fade" id="journalModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:var(--bg-card);border:1px solid var(--border)">
+      <div class="modal-header" style="border-color:var(--border)">
+        <h6 class="modal-title"><i class="bi bi-journal-text me-2"></i>Trade Journal</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="journalTradeInfo" class="small text-muted mb-2"></div>
+        <label class="form-label small mb-1">บันทึก / เหตุผล / สิ่งที่เรียนรู้</label>
+        <textarea class="form-control" id="journalText" rows="5" maxlength="2000"
+          placeholder="เช่น: เข้าเพราะ RSI oversold + breakout / ออกเพราะ momentum อ่อนลง / ครั้งหน้าควร..."></textarea>
+        <div class="d-flex justify-content-between align-items-center mt-1">
+          <small class="text-muted" id="journalCharCount">0 / 2000</small>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-color:var(--border)">
+        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
+        <button class="btn btn-primary btn-sm" onclick="saveJournal()"><i class="bi bi-save me-1"></i>บันทึก</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LIVE MODE CONFIRMATION MODAL -->
+<div class="modal fade" id="liveModeModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:var(--bg-card);border:1px solid var(--border)">
+      <div class="modal-header" style="border-color:var(--border);background:rgba(220,53,69,0.15)">
+        <h6 class="modal-title text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>เปิด Live Mode — ใช้เงินจริง</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-warning py-2 small mb-3">
+          ⚠️ ต้องตั้งค่า Exchange API key ใน Settings → Exchange API Keys ก่อน<br>
+          ระบบจะเทรดด้วยเงินจริงทันทีหลังเปิด Live Mode
+        </div>
+        <label class="form-label small mb-1">
+          วงเงินสูงสุดที่ให้ AI ใช้ได้ <span class="text-muted">(0 = ไม่จำกัด)</span>
+        </label>
+        <div class="input-group input-group-sm mb-1">
+          <input type="number" class="form-control" id="liveBudgetInput" value="0" min="0" step="100" placeholder="0">
+          <span class="input-group-text" id="liveBudgetCurLabel">USDT</span>
+        </div>
+        <small class="text-muted">ตั้งวงเงินเพื่อจำกัดความเสี่ยง เช่น 5000 = AI ใช้ได้ไม่เกิน 5,000</small>
+      </div>
+      <div class="modal-footer" style="border-color:var(--border)">
+        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmLiveMode()">
+          <i class="bi bi-exclamation-triangle me-1"></i>ยืนยัน เปิด Live Mode
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <section id="sec-notifications" class="section">
   <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
@@ -1125,96 +1481,6 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
     </div>
     <div id="notifList" style="display:none"></div>
   </div>
-</section>
-
-<!-- THAI MARKET -->
-<section id="sec-thai-market" class="section">
-
-  <!-- Tabs -->
-  <div class="d-flex gap-2 mb-3">
-    <button class="tab-btn active" id="tabStocks" onclick="thaiTab('stocks',this)">
-      <i class="bi bi-bar-chart me-1"></i>หุ้นไทย (SET)
-    </button>
-    <button class="tab-btn" id="tabFunds" onclick="thaiTab('funds',this)">
-      <i class="bi bi-piggy-bank me-1"></i>กองทุนรวม
-    </button>
-    <div class="ms-auto d-flex align-items-center gap-2">
-      <span class="badge" style="background:rgba(168,255,83,0.18);color:#A8FF53;border:1px solid rgba(168,255,83,0.25)" id="thaiDataSource">simulation</span>
-      <button class="btn btn-outline-secondary btn-sm" onclick="refreshThaiData()">
-        <i class="bi bi-arrow-clockwise"></i>
-      </button>
-    </div>
-  </div>
-
-  <!-- หุ้นไทย panel -->
-  <div id="panel-stocks">
-    <div class="row g-3 mb-3">
-      <div class="col-md-8">
-        <div class="card">
-          <div class="card-header d-flex justify-content-between">
-            <span><i class="bi bi-graph-up me-2"></i>SET Stock Chart (Daily)</span>
-            <select class="form-select form-select-sm" style="width:auto" id="setChartSymbol" onchange="loadSetChart(this.value)"></select>
-          </div>
-          <div class="card-body p-2">
-            <div class="chart-container"><canvas id="setChart"></canvas></div>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-4">
-        <div class="card h-100">
-          <div class="card-header"><i class="bi bi-cpu me-2"></i>Technical Analysis</div>
-          <div class="card-body" id="setAnalysisPanel">
-            <div class="text-muted small text-center py-3">เลือกหุ้น</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="row g-2" id="setStockCards">
-      <div class="col-12 text-muted text-center py-4">
-        <div class="spinner-border spinner-border-sm text-secondary me-2"></div>กำลังโหลดข้อมูล...
-      </div>
-    </div>
-  </div>
-
-  <!-- กองทุน panel -->
-  <div id="panel-funds" style="display:none">
-    <div class="row g-3 mb-3">
-      <div class="col-md-8">
-        <div class="card">
-          <div class="card-header d-flex justify-content-between">
-            <span><i class="bi bi-graph-up me-2"></i>NAV History</span>
-            <select class="form-select form-select-sm" style="width:auto" id="fundChartSelect" onchange="loadFundChart(this.value)"></select>
-          </div>
-          <div class="card-body p-2">
-            <div class="chart-container"><canvas id="fundChart"></canvas></div>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-4">
-        <div class="card h-100">
-          <div class="card-header"><i class="bi bi-info-circle me-2"></i>Fund Info</div>
-          <div class="card-body" id="fundInfoPanel">
-            <div class="text-muted small text-center py-3">เลือกกองทุน</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="row g-2" id="fundCards">
-      <div class="col-12 text-muted text-center py-4">
-        <div class="spinner-border spinner-border-sm text-secondary me-2"></div>กำลังโหลด...
-      </div>
-    </div>
-
-    <!-- SEC API key notice -->
-    <div class="alert mt-3" style="background:rgba(168,255,83,0.06);border:1px solid rgba(168,255,83,0.18);border-radius:8px">
-      <i class="bi bi-info-circle me-2" style="color:#A8FF53"></i>
-      <strong style="color:#A8FF53">ข้อมูล NAV จริง:</strong>
-      ต้องลงทะเบียนรับ API key ฟรีที่
-      <a href="https://api-portal.sec.or.th" target="_blank" style="color:#A8FF53">api-portal.sec.or.th</a>
-      แล้วใส่ใน Settings → Thai Market → SEC API Key
-    </div>
-  </div>
-
 </section>
 
 <!-- BACKTEST inner content (inside analytics anl-backtest-section div) -->
@@ -1263,14 +1529,20 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
           <button class="btn btn-primary w-100" id="btRunBtn" onclick="runBacktest()">
             <i class="bi bi-play-fill me-1"></i>Run Backtest
           </button>
+          <hr class="my-2" style="border-color:var(--border)">
+          <button class="btn btn-outline-secondary w-100 btn-sm" id="wfRunBtn" onclick="runWalkForward()">
+            <i class="bi bi-arrow-repeat me-1"></i>Walk-Forward Validation
+          </button>
+          <div class="text-center mt-1" style="color:#555;font-size:0.62rem">Jesse-style IS/OOS fold analysis</div>
         </div>
       </div>
     </div>
     <div class="col-md-8">
+      <!-- AI Autotrade metrics -->
       <div class="row g-3 mb-3" id="btMetrics" style="display:none">
         <div class="col-6 col-md-3">
           <div class="stat-card" style="background:rgba(57,217,138,0.06);border:1px solid rgba(57,217,138,0.18)">
-            <div class="stat-label">Total Return</div>
+            <div class="stat-label">AI Return</div>
             <div class="stat-value" id="btReturn">—</div>
           </div>
         </div>
@@ -1293,31 +1565,107 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
           </div>
         </div>
       </div>
+
+      <!-- 3-way Comparison table -->
+      <div class="card mb-3" id="btCompareCard" style="display:none">
+        <div class="card-header"><i class="bi bi-bar-chart-line me-2"></i>Strategy Comparison</div>
+        <div class="card-body p-0" style="overflow-x:auto">
+          <table class="table table-dark table-sm mb-0">
+            <thead><tr><th>Strategy</th><th>Return</th><th>Win Rate</th><th>Sharpe</th><th>Drawdown</th><th>Final</th></tr></thead>
+            <tbody id="btCompareBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Equity Curve (multi-series) -->
       <div class="card mb-3" id="btChartCard" style="display:none">
         <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-graph-up me-2"></i>Equity Curve</span>
+          <span><i class="bi bi-graph-up me-2"></i>Equity Curves (Basic vs Hybrid vs AI)</span>
           <span id="btSource" class="badge" style="font-size:0.62rem;font-family:var(--font-mono)"></span>
         </div>
         <div class="card-body p-2">
-          <div class="chart-container"><canvas id="btEquityChart"></canvas></div>
+          <div id="btEquityChart" style="min-height:220px"></div>
         </div>
       </div>
+
+      <!-- Regime + Pattern breakdown (side by side) -->
+      <div class="row g-3 mb-3" id="btBreakdownRow" style="display:none">
+        <div class="col-md-6">
+          <div class="card h-100">
+            <div class="card-header"><i class="bi bi-radar me-2"></i>Regime Breakdown</div>
+            <div class="card-body p-0">
+              <table class="table table-dark table-sm mb-0">
+                <thead><tr><th>Regime</th><th>Trades</th><th>Win %</th><th>Avg PnL</th></tr></thead>
+                <tbody id="btRegimeBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card h-100">
+            <div class="card-header"><i class="bi bi-diagram-2 me-2"></i>Pattern Performance</div>
+            <div class="card-body p-0">
+              <table class="table table-dark table-sm mb-0">
+                <thead><tr><th>Pattern</th><th>Trades</th><th>Win %</th><th>Avg PnL</th></tr></thead>
+                <tbody id="btPatternBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hourly Signal Quality Heatmap -->
+      <div class="card mb-3" id="btHourlyCard" style="display:none">
+        <div class="card-header"><i class="bi bi-clock-history me-2"></i>Signal Quality by Hour (UTC) — Intelligent Trading Bot concept</div>
+        <div class="card-body p-2">
+          <div id="btHourlyChart" style="min-height:130px"></div>
+        </div>
+      </div>
+
+      <!-- Exit Reason Breakdown -->
+      <div class="card mb-3" id="btExitCard" style="display:none">
+        <div class="card-header"><i class="bi bi-sign-stop me-2"></i>Exit Reason Breakdown</div>
+        <div class="card-body" id="btExitBars" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;min-height:48px"></div>
+      </div>
+
+      <!-- Walk-Forward Results -->
+      <div class="card mb-3" id="wfCard" style="display:none">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-arrow-repeat me-2"></i>Walk-Forward Validation <span class="text-muted" style="font-size:0.7rem;font-weight:400">(Jesse-style IS/OOS)</span></span>
+          <span id="wfOverfitBadge" class="badge" style="font-size:0.65rem"></span>
+        </div>
+        <div class="card-body">
+          <div class="row g-2 mb-2" id="wfSummaryRow"></div>
+          <div style="overflow-x:auto">
+            <table class="table table-dark table-sm mb-0" style="font-size:0.76rem">
+              <thead><tr>
+                <th>Fold</th><th title="Optimised TP">TP%</th><th title="Optimised SL">SL%</th>
+                <th title="In-Sample Sharpe">IS Sharpe</th><th title="In-Sample Return">IS Return</th>
+                <th title="Out-of-Sample Return">OOS Return</th><th title="OOS Sharpe">OOS Sharpe</th>
+                <th title="OOS Win Rate">OOS WR</th><th title="OOS/IS return ratio">Degrad.</th>
+              </tr></thead>
+              <tbody id="wfFoldsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <div class="card" id="btNoData">
         <div class="card-body text-center py-5 text-muted">
           <i class="bi bi-skip-backward-circle" style="font-size:2rem;display:block;margin-bottom:8px"></i>
-          กดปุ่ม Run Backtest เพื่อทดสอบกลยุทธ์บนข้อมูลจำลอง
+          กดปุ่ม Run Backtest เพื่อทดสอบ AI Autotrade vs Baseline บนข้อมูลจริง Binance
         </div>
       </div>
     </div>
   </div>
   <div class="card" id="btTradesCard" style="display:none">
     <div class="card-header d-flex justify-content-between align-items-center">
-      <span><i class="bi bi-table me-2"></i>Backtest Trades (last 20)</span>
+      <span><i class="bi bi-table me-2"></i>AI Autotrade Trades (last 50)</span>
       <span class="text-muted small" id="btTradeCount"></span>
     </div>
     <div class="card-body p-0" style="overflow-x:auto">
       <table class="table table-dark table-sm mb-0">
-        <thead><tr><th>Open</th><th>Close</th><th>Side</th><th>PnL %</th><th>Result</th><th>Regime</th></tr></thead>
+        <thead><tr><th>Open</th><th>Close</th><th>Side</th><th>PnL%</th><th>Win</th><th>Exit</th><th>Regime</th><th>Pattern</th><th>Size%</th></tr></thead>
         <tbody id="btTradesBody"></tbody>
       </table>
     </div>
@@ -1353,6 +1701,33 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
           <div id="modeSwapResult" class="small mt-2" style="display:none"></div>
           <small class="text-muted d-block mt-1">สลับ Demo↔Live ได้ทันทีโดยไม่ต้อง restart</small>
           <small class="text-muted">Demo Mode: virtual money · Live Mode: ต้องเปิด exchange + ใส่ API key ก่อน</small>
+        </div>
+      </div>
+
+      <!-- Small Budget Preset -->
+      <div class="card mb-3" style="border-color:rgba(255,193,7,0.4)">
+        <div class="card-header" style="background:rgba(255,193,7,0.08)">
+          <i class="bi bi-piggy-bank me-2" style="color:#ffc107"></i>ตั้งค่าสำหรับงบน้อย
+        </div>
+        <div class="card-body">
+          <div class="row g-2 align-items-end mb-2">
+            <div class="col-8">
+              <label class="form-label small mb-1">งบเริ่มต้น (<span id="presetCurLabel">THB</span>)</label>
+              <div class="input-group input-group-sm">
+                <input type="number" class="form-control" id="presetBudget" value="500" min="100" step="100">
+                <span class="input-group-text" id="presetCurSuffix">THB</span>
+              </div>
+            </div>
+            <div class="col-4">
+              <button class="btn btn-warning btn-sm w-100" onclick="applySmallBudgetPreset()" style="color:#000;font-weight:700">
+                <i class="bi bi-magic me-1"></i>ใช้งาน
+              </button>
+            </div>
+          </div>
+          <div id="presetResult" style="display:none;font-size:0.75rem"></div>
+          <small class="text-muted d-block" style="font-size:0.7rem">
+            ปรับ Kelly fraction, ขนาด position, stop-loss และ max trades ให้เหมาะกับงบที่ใส่โดยอัตโนมัติ
+          </small>
         </div>
       </div>
 
@@ -1414,6 +1789,35 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
       </div>
 
       <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-clock me-2"></i>Trading Schedule</div>
+        <div class="card-body">
+          <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" id="schedEnabled" role="switch">
+            <label class="form-check-label small" for="schedEnabled">เปิดใช้ตารางเวลา (หยุดเปิดออเดอร์ใหม่ตามช่วงเวลา)</label>
+          </div>
+          <div class="row g-2 mb-2">
+            <div class="col-6">
+              <label class="form-label small mb-1">ห้ามเทรดตั้งแต่</label>
+              <input type="time" class="form-control form-control-sm" id="schedStart" value="00:00">
+            </div>
+            <div class="col-6">
+              <label class="form-label small mb-1">ถึงเวลา</label>
+              <input type="time" class="form-control form-control-sm" id="schedEnd" value="06:00">
+            </div>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="schedNoWeekend">
+            <label class="form-check-label small" for="schedNoWeekend">หยุดเทรดวันเสาร์–อาทิตย์</label>
+          </div>
+          <small class="text-muted d-block mb-2">การปิดออเดอร์เดิม (Stop Loss / Take Profit) ยังทำงานตามปกติในช่วงเวลาพัก</small>
+          <button class="btn btn-primary btn-sm" onclick="saveSchedule()">
+            <i class="bi bi-save me-1"></i>Save Schedule
+          </button>
+          <span id="schedSaveResult" class="small ms-2" style="display:none"></span>
+        </div>
+      </div>
+
+      <div class="card mb-3">
         <div class="card-header"><i class="bi bi-cpu me-2"></i>AI Model</div>
         <div class="card-body">
           <label class="form-label small mb-1">Claude API Key</label>
@@ -1424,6 +1828,14 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
             <option value="claude-opus-4-8">claude-opus-4-8 (ฉลาดสุด)</option>
             <option value="claude-haiku-4-5-20251001">claude-haiku-4-5 (เร็วสุด)</option>
           </select>
+          <hr style="border-color:var(--border);margin:0.75rem 0">
+          <div class="small text-muted mb-2" style="font-size:0.7rem">
+            <i class="bi bi-people me-1"></i>Multi-Model Consensus — ใส่ key เพิ่มเพื่อให้ AI หลายตัวโหวตร่วมกัน (เลือกโหมด "Multi-Model Consensus")
+          </div>
+          <label class="form-label small mb-1">OpenAI API Key (GPT-4)</label>
+          <input type="password" class="form-control form-control-sm mb-2" id="openaiApiKey" placeholder="sk-... (เว้นว่างได้)">
+          <label class="form-label small mb-1">Gemini API Key</label>
+          <input type="password" class="form-control form-control-sm mb-3" id="geminiApiKey" placeholder="AIza... (เว้นว่างได้)">
           <button class="btn btn-primary btn-sm" onclick="saveAISettings()">
             <i class="bi bi-save me-1"></i>Save AI Settings
           </button>
@@ -1473,11 +1885,13 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
               <input class="form-check-input" type="checkbox" id="binance_th_enabled">
               <label class="form-check-label small" for="binance_th_enabled">Enable Binance TH</label>
             </div>
-            <div class="d-flex gap-2">
+            <div class="d-flex gap-2 flex-wrap">
               <button class="btn btn-primary btn-sm" onclick="saveExchangeKey('binance_th')"><i class="bi bi-save me-1"></i>Save</button>
-              <button class="btn btn-outline-secondary btn-sm" onclick="saveAndTest('binance_th')"><i class="bi bi-wifi me-1"></i>Save & Test</button>
+              <button class="btn btn-outline-info btn-sm" onclick="probeExchange('binance_th')"><i class="bi bi-wifi me-1"></i>ทดสอบ Connection</button>
             </div>
             <div id="extest-binance_th" class="mt-2" style="display:none;font-size:0.78rem"></div>
+            <!-- Probe result panel -->
+            <div id="probe-binance_th" class="mt-2 rounded p-2" style="display:none;background:var(--bg-main);font-size:0.78rem;border:1px solid var(--border)"></div>
           </div>
           <div id="ex-bitkub" class="ex-tab" style="display:none">
             <label class="form-label small mb-1">API Key</label>
@@ -1512,16 +1926,6 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
             </div>
             <div id="extest-okx" class="mt-2" style="display:none;font-size:0.78rem"></div>
           </div>
-        </div>
-      </div>
-
-      <div class="card mb-3">
-        <div class="card-header"><i class="bi bi-flag me-2"></i>Thai Market</div>
-        <div class="card-body">
-          <label class="form-label small mb-1">SEC Thailand API Key</label>
-          <small class="text-muted d-block mb-2">ลงทะเบียนฟรีที่ api-portal.sec.or.th</small>
-          <input type="password" class="form-control form-control-sm mb-2" id="secApiKey" placeholder="xxxxxxxxxxxxxxxx">
-          <button class="btn btn-primary btn-sm" onclick="saveThaiSettings()"><i class="bi bi-save me-1"></i>Save</button>
         </div>
       </div>
 
@@ -1603,6 +2007,8 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
 // State
 // ============================================================
 let ws = null;
+let _quoteCur = 'USDT';
+let _symbols  = [];
 let reconnectTimer = null;
 let portfolioData = { labels: [], values: [] };
 let currentSymbol = null;
@@ -1706,7 +2112,6 @@ function showSection(name, el) {
   if (name === 'portfolio') refreshPortfolio();
   if (name === 'trade-history') refreshHistory();
   if (name === 'analytics') { refreshTraining(); refreshLoopStatus(); refreshHourlyTrainer(); }
-  if (name === 'thai-market') loadThaiStocks();
   if (name === 'settings') loadSettings();
   if (name === 'trading' && currentSymbol) loadMTF();
   if (name === 'positions') refreshPositions();
@@ -1723,6 +2128,7 @@ function anlTab(tab, el) {
   document.getElementById('anl-backtest-section').style.display = tab === 'backtest' ? '' : 'none';
   document.querySelectorAll('[id^="anlTab-"]').forEach(b => b.classList.remove('active'));
   if (el) el.classList.add('active');
+  if (tab === 'training') { try { loadQuantLab(); } catch(e){} }
 }
 
 // shim for old ai-training section ref
@@ -1834,6 +2240,11 @@ async function fetchStatus() {
   } catch {}
 }
 
+let allRegimes   = {};
+let riskState    = {};
+let allPatterns  = {};
+let liveAnalytics = {};
+
 async function fetchPrices() {
   try {
     const r = await fetch('/api/prices');
@@ -1841,6 +2252,423 @@ async function fetchPrices() {
     renderPriceCards();
     updateTradingChart();
   } catch {}
+}
+
+async function fetchRegimes() {
+  try {
+    const r = await fetch('/api/regimes');
+    allRegimes = await r.json();
+    renderRegimePanel();
+    renderPriceCards();   // refresh regime badges on price cards
+    document.getElementById('regimeUpdated').textContent =
+      new Date().toLocaleTimeString('th', {hour:'2-digit', minute:'2-digit'});
+  } catch {}
+}
+
+async function fetchRiskState() {
+  try {
+    const r = await fetch('/api/risk');
+    riskState = await r.json();
+    renderRiskPanel();
+  } catch {}
+}
+
+// Hydrate market narratives so they show on load (not just after a fresh cycle)
+async function fetchNarratives() {
+  try {
+    const r = await fetch('/api/narratives');
+    const data = await r.json();
+    for (const [sym, narrative] of Object.entries(data)) {
+      allAnalyses[sym] = { ...(allAnalyses[sym] || {}), narrative };
+    }
+    if (currentSymbol && allAnalyses[currentSymbol]) updateAIPanel(currentSymbol);
+    renderNarrativePanel(data);
+    const el = document.getElementById('narrativeUpdated');
+    if (el) el.textContent = new Date().toLocaleTimeString('th', {hour:'2-digit', minute:'2-digit'});
+  } catch {}
+}
+
+function renderNarrativePanel(data) {
+  const panel = document.getElementById('narrativePanel');
+  if (!panel) return;
+  const entries = Object.entries(data).filter(([, v]) => v);
+  if (!entries.length) {
+    panel.innerHTML = '<div class="text-muted text-center small py-2">รอการวิเคราะห์รอบแรก...</div>';
+    return;
+  }
+  panel.innerHTML = '<div class="row g-2">' + entries.map(([sym, narrative]) => {
+    const a = allAnalyses[sym] || {};
+    const sig = a.signal || 'HOLD';
+    const cls = sig === 'BUY' ? 'nar-buy' : sig === 'SELL' ? 'nar-sell' : 'nar-hold';
+    const sigCls = sig === 'BUY' ? 'signal-buy' : sig === 'SELL' ? 'signal-sell' : 'signal-hold';
+    const conf = a.confidence != null ? `<div class="conf-bar mt-1"><div class="conf-fill" style="width:${(a.confidence*100).toFixed(0)}%;background:${sig==='BUY'?'var(--accent-buy)':sig==='SELL'?'var(--accent-red)':'var(--border2)'}"></div></div>` : '';
+    const base = sym.split('/')[0];
+    return `<div class="col-12 col-lg-6">
+      <div class="narrative-item ${cls}">
+        <div class="narrative-sym">
+          <div class="sym-name">${base}</div>
+          <span class="badge-signal ${sigCls}" style="font-size:0.55rem">${sig}</span>
+          ${conf}
+        </div>
+        <div class="narrative-text">${narrative}</div>
+      </div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+// Correlation matrix — pairwise price-return correlation across tracked symbols
+async function fetchCorrelations() {
+  try {
+    const r = await fetch('/api/correlations');
+    renderCorrelationPanel(await r.json());
+    const el = document.getElementById('corrUpdated');
+    if (el) el.textContent = new Date().toLocaleTimeString('th', {hour:'2-digit', minute:'2-digit'});
+  } catch {}
+}
+
+function _corrCell(v) {
+  if (v == null) return { bg: 'transparent', txt: '·', color: 'var(--text-muted)', title: '' };
+  const a = Math.abs(v);
+  const isDiag = v === 1.0;
+  let bg, color;
+  if (isDiag) {
+    bg = 'rgba(168,255,83,0.15)'; color = 'var(--accent)';
+  } else if (v >= 0) {
+    bg = `rgba(255,107,53,${(a * 0.9).toFixed(2)})`; color = a > 0.45 ? '#fff' : 'var(--text-muted)';
+  } else {
+    bg = `rgba(57,217,138,${(a * 0.9).toFixed(2)})`; color = a > 0.45 ? '#fff' : 'var(--text-muted)';
+  }
+  const risk = a >= 0.8 ? '⚠ สูงมาก' : a >= 0.6 ? 'สูง' : a >= 0.3 ? 'ปานกลาง' : 'ต่ำ';
+  return { bg, txt: isDiag ? '—' : v.toFixed(2), color, title: isDiag ? '' : `corr ${v.toFixed(2)} (${risk})` };
+}
+
+function renderCorrelationPanel(d) {
+  const panel = document.getElementById('correlationPanel');
+  if (!panel) return;
+  const syms = (d && d.symbols) || [];
+  const m = (d && d.matrix) || [];
+  if (syms.length < 2) {
+    panel.innerHTML = '<div class="text-muted text-center small py-3">ต้องมีข้อมูลราคาอย่างน้อย 2 เหรียญ (รอ 5-6 แท่งเทียน)</div>';
+    return;
+  }
+  const short = s => s.split('/')[0];
+  // Grid layout: header row + matrix rows
+  const N = syms.length;
+  const cellStyle = 'display:inline-flex;align-items:center;justify-content:center;min-width:52px;min-height:36px;border-radius:6px;';
+  const headerCells = syms.map(s => `<div style="${cellStyle}font-family:var(--font-mono);font-size:0.65rem;color:var(--text-muted);font-weight:600">${short(s)}</div>`).join('');
+
+  let rowsHtml = '';
+  for (let i = 0; i < N; i++) {
+    const rowLabel = `<div style="${cellStyle}min-width:48px;font-family:var(--font-mono);font-size:0.65rem;font-weight:700">${short(syms[i])}</div>`;
+    const cells = syms.map((_, j) => {
+      const c = _corrCell(m[i] ? m[i][j] : null);
+      return `<div class="corr-cell" style="${cellStyle}background:${c.bg};color:${c.color}" title="${c.title}">${c.txt}</div>`;
+    }).join('');
+    rowsHtml += `<div class="d-flex align-items-center gap-1 mb-1">${rowLabel}${cells}</div>`;
+  }
+
+  const highPairs = [];
+  for (let i = 0; i < N; i++) {
+    for (let j = i + 1; j < N; j++) {
+      const v = m[i] && m[i][j] != null ? m[i][j] : null;
+      if (v != null && Math.abs(v) >= 0.8) highPairs.push(`${short(syms[i])}↔${short(syms[j])} (${v.toFixed(2)})`);
+    }
+  }
+  const warning = highPairs.length
+    ? `<div class="mt-2 small" style="color:var(--accent-red)"><i class="bi bi-exclamation-triangle me-1"></i>Correlation Guard อาจบล็อก: ${highPairs.join(', ')}</div>`
+    : '';
+
+  panel.innerHTML = `
+    <div style="overflow-x:auto">
+      <div class="d-flex align-items-center gap-1 mb-1">
+        <div style="min-width:48px"></div>${headerCells}
+      </div>
+      ${rowsHtml}
+    </div>
+    <div class="d-flex align-items-center gap-3 mt-2">
+      <span style="font-size:0.62rem;color:var(--text-muted)">
+        <span style="display:inline-block;width:10px;height:10px;background:rgba(255,107,53,0.8);border-radius:2px;vertical-align:middle;margin-right:3px"></span>วิ่งทางเดียวกัน (ควรหลีกเลี่ยง)
+      </span>
+      <span style="font-size:0.62rem;color:var(--text-muted)">
+        <span style="display:inline-block;width:10px;height:10px;background:rgba(57,217,138,0.8);border-radius:2px;vertical-align:middle;margin-right:3px"></span>สวนทางกัน (กระจายเสี่ยงดี)
+      </span>
+    </div>
+    ${warning}`;
+}
+
+async function fetchPatterns(symbol) {
+  const sym = symbol || (Object.keys(allPrices)[0]) || 'BTC/USDT';
+  try {
+    const r = await fetch('/api/patterns?symbol=' + encodeURIComponent(sym));
+    const d = await r.json();
+    allPatterns[sym] = d;
+    renderPatternPanel(sym);
+  } catch {}
+}
+
+async function fetchAnalytics(days = 30) {
+  try {
+    const r = await fetch('/api/analytics?days=' + days);
+    liveAnalytics = await r.json();
+    renderAnalyticsPanel();
+    const el = document.getElementById('analyticsUpdated');
+    if (el) el.textContent = new Date().toLocaleTimeString('th', {hour:'2-digit', minute:'2-digit'});
+  } catch {}
+}
+
+let liveSentiment = {};
+async function fetchSentiment(symbol) {
+  const sym = symbol || (Object.keys(allPrices)[0]) || 'BTC/USDT';
+  try {
+    const r = await fetch('/api/sentiment?symbol=' + encodeURIComponent(sym));
+    liveSentiment = await r.json();
+    renderSentimentPanel();
+    const el = document.getElementById('sentimentUpdated');
+    if (el) el.textContent = new Date().toLocaleTimeString('th', {hour:'2-digit', minute:'2-digit'});
+  } catch {}
+}
+
+function _fngColor(v) {
+  if (v == null) return 'var(--text-muted)';
+  if (v <= 25) return '#e74c3c';
+  if (v <= 45) return '#e67e22';
+  if (v <= 55) return 'var(--text)';
+  if (v <= 75) return '#27ae60';
+  return '#2980b9';
+}
+
+function _biasLabel(bias) {
+  const map = {
+    'CONTRARIAN_BUY':  {label:'Strong Buy Zone', cls:'text-success'},
+    'CAUTIOUS_BUY':    {label:'Cautious Buy',     cls:'text-success'},
+    'NEUTRAL':         {label:'Neutral',           cls:'text-secondary'},
+    'CAUTIOUS_SELL':   {label:'Cautious Sell',     cls:'text-warning'},
+    'CONTRARIAN_SELL': {label:'Overbought Zone',   cls:'text-danger'},
+  };
+  const m = map[bias] || {label: bias || '—', cls: 'text-secondary'};
+  return `<span class="${m.cls}">${m.label}</span>`;
+}
+
+function _fundingColor(rate) {
+  if (rate == null) return 'var(--text-muted)';
+  if (rate > 0.001) return 'var(--accent-red)';   // very high positive → longs pay lots
+  if (rate > 0)     return 'var(--accent-buy)';
+  return '#e67e22'; // negative → shorts pay (bullish bias)
+}
+
+function renderSentimentPanel() {
+  const panel = document.getElementById('sentimentPanel');
+  if (!panel) return;
+  const s = liveSentiment;
+  if (!s || !s.fear_greed) {
+    panel.innerHTML = '<div class="text-muted text-center small py-2">รอข้อมูล...</div>';
+    return;
+  }
+
+  const fg = s.fear_greed || {};
+  const fr = s.funding_rate || {};
+  const oi = s.open_interest || {};
+  const fgv = fg.value;
+  const fgPct = fgv != null ? Math.round(fgv) : null;
+
+  // Gauge arc (SVG)
+  const gaugeAngle = fgv != null ? (fgv / 100) * 180 - 90 : -90;
+  const gaugeSvg = `
+    <svg width="120" height="65" viewBox="0 0 120 65">
+      <path d="M10,60 A50,50 0 0,1 110,60" fill="none" stroke="#e74c3c" stroke-width="8" stroke-dasharray="50 157"/>
+      <path d="M10,60 A50,50 0 0,1 110,60" fill="none" stroke="#e67e22" stroke-width="8" stroke-dasharray="30 157" stroke-dashoffset="-50"/>
+      <path d="M10,60 A50,50 0 0,1 110,60" fill="none" stroke="#95a5a6" stroke-width="8" stroke-dasharray="20 157" stroke-dashoffset="-80"/>
+      <path d="M10,60 A50,50 0 0,1 110,60" fill="none" stroke="#27ae60" stroke-width="8" stroke-dasharray="30 157" stroke-dashoffset="-100"/>
+      <path d="M10,60 A50,50 0 0,1 110,60" fill="none" stroke="#2980b9" stroke-width="8" stroke-dasharray="27 157" stroke-dashoffset="-130"/>
+      ${fgv != null ? `<line x1="60" y1="60" x2="${60 + 40*Math.cos((gaugeAngle-90)*Math.PI/180)}" y2="${60 + 40*Math.sin((gaugeAngle-90)*Math.PI/180)}" stroke="white" stroke-width="2" stroke-linecap="round"/>` : ''}
+      <circle cx="60" cy="60" r="4" fill="white"/>
+    </svg>`;
+
+  const fgLabel = fg.label || '—';
+  const bias = fg.trading_bias || 'NEUTRAL';
+
+  // Funding rate display
+  const frRate = fr.rate_pct != null ? (fr.rate_pct > 0 ? '+' : '') + fr.rate_pct.toFixed(4) + '%' : '—';
+  const frColor = _fundingColor(fr.rate);
+  const frNote = fr.rate != null
+    ? (fr.rate > 0.001 ? 'Longs pay heavily → bearish pressure' : fr.rate > 0 ? 'Longs pay (normal)' : 'Shorts pay → bullish pressure')
+    : '';
+
+  // OI display — prefer USDT notional, fall back to contract count, then error
+  let oiVal = '—';
+  let oiNote = 'Binance perpetual futures';
+  if (oi.usdt != null) {
+    oiVal = (oi.usdt >= 1e9 ? (oi.usdt/1e9).toFixed(2)+'B' : (oi.usdt/1e6).toFixed(0)+'M') + ' USDT';
+  } else if (oi.contracts != null) {
+    oiVal = Number(oi.contracts).toLocaleString(undefined, {maximumFractionDigits:0}) + ' contracts';
+  } else if (oi.error) {
+    oiNote = 'ไม่พร้อมใช้งาน (region-restricted)';
+  }
+
+  panel.innerHTML = `
+    <div class="d-flex flex-wrap gap-3 align-items-center py-1 px-2">
+      <!-- Fear & Greed Gauge -->
+      <div class="text-center" style="min-width:130px">
+        ${gaugeSvg}
+        <div style="font-family:var(--font-mono);font-size:1.5rem;font-weight:700;color:${_fngColor(fgv)};line-height:1">${fgPct ?? '—'}</div>
+        <div style="font-size:0.7rem;color:var(--text-muted)">${fgLabel}</div>
+        <div style="font-size:0.65rem;margin-top:2px">${_biasLabel(bias)}</div>
+      </div>
+      <!-- Metrics -->
+      <div class="d-flex flex-wrap gap-3 flex-grow-1">
+        <div style="min-width:140px">
+          <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em">Funding Rate (${s.symbol || 'BTC/USDT'})</div>
+          <div style="font-family:var(--font-mono);font-size:1.1rem;font-weight:700;color:${frColor}">${frRate}</div>
+          <div style="font-size:0.6rem;color:var(--text-muted)">${frNote}</div>
+        </div>
+        <div style="min-width:140px">
+          <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em">Open Interest</div>
+          <div style="font-family:var(--font-mono);font-size:1.1rem;font-weight:700">${oiVal}</div>
+          <div style="font-size:0.6rem;color:var(--text-muted)">${oiNote}</div>
+        </div>
+        <div style="min-width:200px;border-left:1px solid var(--border);padding-left:12px">
+          <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em">Interpretation</div>
+          <div style="font-size:0.7rem;line-height:1.5;margin-top:4px">
+            ${fgv != null && fgv <= 25 ? '<span style="color:#e74c3c">Extreme Fear: historically best time to accumulate</span>' :
+              fgv != null && fgv <= 45 ? '<span style="color:#e67e22">Fear: market oversold, consider cautious buys at key levels</span>' :
+              fgv != null && fgv <= 55 ? '<span style="color:var(--text-muted)">Neutral: no strong sentiment edge</span>' :
+              fgv != null && fgv <= 75 ? '<span style="color:#27ae60">Greed: market extended, tighten stops on new longs</span>' :
+              fgv != null ? '<span style="color:#e74c3c">Extreme Greed: historically risky to buy; watch for reversal</span>' :
+              '<span style="color:var(--text-muted)">No data</span>'}
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function _metricCard(label, value, color, sub) {
+  return `<div class="text-center px-2" style="min-width:90px">
+    <div style="font-family:var(--font-mono);font-size:1.1rem;font-weight:700;color:${color}">${value}</div>
+    <div style="font-size:0.62rem;color:var(--text-muted);line-height:1.2">${label}</div>
+    ${sub ? `<div style="font-size:0.6rem;color:var(--text-muted)">${sub}</div>` : ''}
+  </div>`;
+}
+
+function renderAnalyticsPanel() {
+  const panel = document.getElementById('analyticsPanel');
+  if (!panel) return;
+  const a = liveAnalytics;
+  if (!a || !a.total_trades) {
+    panel.innerHTML = '<div class="text-muted text-center small py-2">ยังไม่มีข้อมูล Trade ที่ปิดแล้ว</div>';
+    return;
+  }
+  const pf = a.profit_factor >= 99 ? '∞' : a.profit_factor.toFixed(2);
+  const sharpeC  = a.sharpe  >= 1   ? 'var(--accent-buy)' : a.sharpe  >= 0 ? 'var(--text)' : 'var(--accent-red)';
+  const sortinoC = a.sortino >= 1   ? 'var(--accent-buy)' : a.sortino >= 0 ? 'var(--text)' : 'var(--accent-red)';
+  const calmarC  = a.calmar  >= 0.5 ? 'var(--accent-buy)' : a.calmar  >= 0 ? 'var(--text)' : 'var(--accent-red)';
+  const pfC      = a.profit_factor >= 1.5 ? 'var(--accent-buy)' : a.profit_factor >= 1 ? 'var(--text)' : 'var(--accent-red)';
+  const retC     = a.total_return_pct >= 0 ? 'var(--accent-buy)' : 'var(--accent-red)';
+  const varC     = 'var(--accent-red)';
+
+  panel.innerHTML = `
+    <div class="d-flex flex-wrap gap-1 justify-content-around py-1">
+      ${_metricCard('Sharpe Ratio', a.sharpe.toFixed(2), sharpeC, '≥1 ดี')}
+      ${_metricCard('Sortino Ratio', a.sortino.toFixed(2), sortinoC, 'downside only')}
+      ${_metricCard('Calmar Ratio', a.calmar.toFixed(2), calmarC, 'ret/maxDD')}
+      ${_metricCard('VaR 95%', a.var_95_pct.toFixed(1)+'%', varC, 'worst 5% day')}
+      ${_metricCard('Profit Factor', pf, pfC, '≥1.5 ดี')}
+      ${_metricCard('Max DD', a.max_drawdown_pct.toFixed(1)+'%', a.max_drawdown_pct < -10 ? 'var(--accent-red)' : 'var(--text-muted)', '')}
+      ${_metricCard('Expectancy', a.expectancy_pct.toFixed(2)+'%', a.expectancy_pct >= 0 ? 'var(--accent-buy)' : 'var(--accent-red)', 'per trade')}
+      ${_metricCard('Win Streak', a.max_win_streak, 'var(--accent-buy)', '')}
+      ${_metricCard('Loss Streak', a.max_loss_streak, a.max_loss_streak >= 5 ? 'var(--accent-red)' : 'var(--text-muted)', '')}
+      ${_metricCard('Win Rate', a.win_rate.toFixed(1)+'%', a.win_rate >= 55 ? 'var(--accent-buy)' : 'var(--text)', a.total_trades + ' trades')}
+      ${_metricCard('Total Return', (a.total_return_pct >= 0 ? '+' : '') + a.total_return_pct.toFixed(1)+'%', retC, '')}
+    </div>
+    <div class="d-flex justify-content-center gap-4 mt-1" style="font-size:0.68rem;color:var(--text-muted)">
+      <span>Avg Win <span style="color:var(--accent-buy);font-family:var(--font-mono)">+${a.avg_win_pct.toFixed(2)}%</span></span>
+      <span>Avg Loss <span style="color:var(--accent-red);font-family:var(--font-mono)">${a.avg_loss_pct.toFixed(2)}%</span></span>
+      <span>Gross P <span style="color:var(--accent-buy);font-family:var(--font-mono)">+${a.gross_profit_pct.toFixed(1)}%</span></span>
+      <span>Gross L <span style="color:var(--accent-red);font-family:var(--font-mono)">-${a.gross_loss_pct.toFixed(1)}%</span></span>
+    </div>`;
+}
+
+function renderRegimePanel() {
+  const panel = document.getElementById('regimePanel');
+  if (!panel) return;
+  const entries = Object.entries(allRegimes);
+  if (!entries.length) { panel.innerHTML = '<div class="text-muted text-center small py-2">รอข้อมูล...</div>'; return; }
+
+  const regimeMeta = {
+    BULL_TREND:  {cls:'regime-bull',  icon:'↑', label:'BULL'},
+    BEAR_TREND:  {cls:'regime-bear',  icon:'↓', label:'BEAR'},
+    RANGING:     {cls:'regime-range', icon:'↔', label:'RANGE'},
+    VOLATILE:    {cls:'regime-vol',   icon:'⚡', label:'VOLATILE'},
+    CRASH:       {cls:'regime-crash', icon:'⚠', label:'CRASH'},
+  };
+
+  panel.innerHTML = entries.map(([sym, r]) => {
+    const m = regimeMeta[r.regime] || {cls:'regime-range', icon:'?', label:r.regime};
+    const base = sym.split('/')[0];
+    return `
+      <div class="d-flex align-items-center justify-content-between px-2 py-1" style="border-bottom:1px solid var(--border)">
+        <span style="font-family:var(--font-headline);font-size:0.82rem;font-weight:600">${base}</span>
+        <div class="text-center" style="flex:1;padding:0 6px">
+          <div style="font-size:0.68rem;color:var(--text-muted);font-family:var(--font-mono)">ADX ${r.adx}</div>
+        </div>
+        <span class="regime-badge ${m.cls}">${m.icon} ${m.label}</span>
+        <span style="font-size:0.65rem;color:var(--text-muted);margin-left:6px;font-family:var(--font-mono)">${(r.confidence*100).toFixed(0)}%</span>
+      </div>`;
+  }).join('');
+}
+
+function renderRiskPanel() {
+  const panel = document.getElementById('riskPanel');
+  const badge = document.getElementById('circuitBadge');
+  if (!panel || !riskState.equity) return;
+  const rs = riskState;
+  const dd = (rs.drawdown_pct * 100).toFixed(1);
+  const heat = (rs.portfolio_heat * 100).toFixed(1);
+  const heatColor = rs.portfolio_heat > 0.15 ? '#ff6b35' : rs.portfolio_heat > 0.08 ? '#ffc107' : '#39d98a';
+
+  if (badge) { badge.style.display = rs.circuit_open ? '' : 'none'; }
+
+  panel.innerHTML = `
+    <div class="mb-2">
+      <div class="d-flex justify-content-between mb-1">
+        <span class="stat-label" style="margin:0">Drawdown</span>
+        <span style="font-family:var(--font-mono);font-size:0.8rem;color:${parseFloat(dd)>5?'var(--accent-red)':'var(--text-main)'}">${dd}%</span>
+      </div>
+      <div class="heat-bar"><div class="heat-fill" style="width:${Math.min(parseFloat(dd)*10,100)}%;background:${parseFloat(dd)>5?'var(--accent-red)':'var(--accent-buy)'}"></div></div>
+    </div>
+    <div class="mb-2">
+      <div class="d-flex justify-content-between mb-1">
+        <span class="stat-label" style="margin:0">Portfolio Heat</span>
+        <span style="font-family:var(--font-mono);font-size:0.8rem;color:${heatColor}">${heat}%</span>
+      </div>
+      <div class="heat-bar"><div class="heat-fill" style="width:${Math.min(parseFloat(heat)*5,100)}%;background:${heatColor}"></div></div>
+    </div>
+    <div class="d-flex justify-content-between" style="font-size:0.75rem;color:var(--text-muted)">
+      <span>HWM: <strong style="color:var(--text-main)">$${(rs.high_water_mark||0).toFixed(0)}</strong></span>
+      <span>Daily PnL: <strong style="color:${rs.daily_pnl>=0?'var(--accent-buy)':'var(--accent-red)'}">${rs.daily_pnl>=0?'+':''}${(rs.daily_pnl||0).toFixed(2)}</strong></span>
+    </div>
+    ${rs.circuit_open ? `<div class="mt-2 text-center circuit-open" style="font-size:0.72rem">⚡ ${rs.circuit_reason}</div>` : ''}`;
+}
+
+function renderPatternPanel(sym) {
+  const panel = document.getElementById('patternPanel');
+  if (!panel) return;
+  const data = allPatterns[sym];
+  if (!data) { panel.innerHTML = '<div class="text-muted text-center small py-2">รอข้อมูล...</div>'; return; }
+  if (!data.patterns || !data.patterns.length) {
+    panel.innerHTML = '<div class="text-muted text-center small py-2">ไม่พบ pattern สำหรับ ' + sym + '</div>'; return;
+  }
+  panel.innerHTML = data.patterns.map(p => {
+    const cls = p.signal==='BUY' ? 'pat-buy' : p.signal==='SELL' ? 'pat-sell' : 'pat-neu';
+    const arrow = p.signal==='BUY' ? '↑' : p.signal==='SELL' ? '↓' : '↔';
+    return `
+      <div class="px-2 py-2" style="border-bottom:1px solid var(--border)">
+        <div class="d-flex align-items-center justify-content-between mb-1">
+          <span style="font-weight:600;font-size:0.8rem">${p.name_th}</span>
+          <span class="pat-pill ${cls}">${arrow} ${p.signal} ${(p.confidence*100).toFixed(0)}%</span>
+        </div>
+        <div class="text-muted" style="font-size:0.68rem">${p.description_th}</div>
+      </div>`;
+  }).join('');
 }
 
 async function fetchPortfolioStats() {
@@ -1855,8 +2683,11 @@ async function fetchPortfolioStats() {
       return;
     }
     const cur = d.quote_currency || 'USDT';
+    _quoteCur = cur;
+    // Sync preset currency labels
+    ['presetCurLabel','presetCurSuffix','liveBudgetCurLabel'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent=cur; });
     const sym = cur === 'USDT' ? '$' : '';
-    const initial = 10000;   // demo virtual baseline; PnL-vs-initial is meaningful in demo
+    const initial = d.initial_balance || (cur === 'THB' ? 350000 : 10000);   // demo virtual baseline; PnL-vs-initial is meaningful in demo
     animateNum('totalValue', d.total_value, sym, sym ? '' : ' ' + cur, 2);
     animateNum('cashValue',  d.cash_usdt,   sym, sym ? '' : ' ' + cur, 2);
     document.getElementById('positionCount').textContent = d.positions.length + ' positions';
@@ -1909,14 +2740,32 @@ async function fetchStats() {
 // ============================================================
 // Rendering
 // ============================================================
+const _REGIME_BADGE = {
+  BULL_TREND: {cls:'regime-bull',  txt:'↑ BULL'},
+  BEAR_TREND: {cls:'regime-bear',  txt:'↓ BEAR'},
+  RANGING:    {cls:'regime-range', txt:'↔ RANGE'},
+  VOLATILE:   {cls:'regime-vol',   txt:'⚡ VOL'},
+  CRASH:      {cls:'regime-crash', txt:'⚠ CRASH'},
+};
+
 function renderPriceCards() {
   const container = document.getElementById('priceCardsRow');
   const symbolSelect = document.getElementById('chartSymbolSelect');
-  const prevSymbols = new Set(Array.from(symbolSelect.options).map(o => o.value));
+  const patternSel   = document.getElementById('patternSymbolSelect');
+  const prevSymbols  = new Set(Array.from(symbolSelect.options).map(o => o.value));
 
   container.innerHTML = '';
   for (const [sym, d] of Object.entries(allPrices)) {
     const up = d.change_24h >= 0;
+    const regime = allRegimes[sym];
+    const rm = regime ? (_REGIME_BADGE[regime.regime] || {cls:'regime-range', txt:regime.regime}) : null;
+    const regimeBadge = rm ? `<span class="regime-badge ${rm.cls}" style="margin-top:4px;display:inline-block">${rm.txt}</span>` : '';
+
+    const a = allAnalyses[sym] || {};
+    const conf = a.confidence != null ? a.confidence : (d.confidence != null ? d.confidence : null);
+    const confBar = conf != null
+      ? `<div class="conf-bar"><div class="conf-fill" style="width:${(conf*100).toFixed(0)}%;background:${d.signal==='BUY'?'var(--accent-buy)':d.signal==='SELL'?'var(--accent-red)':'var(--border2)'}"></div></div>`
+      : '';
     const card = document.createElement('div');
     card.className = 'col-6 col-md-4 col-lg-2';
     card.innerHTML = `
@@ -1925,8 +2774,12 @@ function renderPriceCards() {
           <strong class="small">${sym.split('/')[0]}</strong>
           <span class="badge-signal ${d.signal==='BUY'?'signal-buy':d.signal==='SELL'?'signal-sell':'signal-hold'}">${d.signal}</span>
         </div>
-        <div class="fw-bold mt-1">$${formatPrice(d.price)}</div>
-        <div class="small ${up?'price-up':'price-down'}">${up?'+':''}${d.change_24h.toFixed(2)}%</div>
+        <div class="fw-bold mt-1">${formatPrice(d.price)} ${sym.split('/')[1] || _quoteCur}</div>
+        <div class="d-flex justify-content-between align-items-center">
+          <div class="small ${up?'price-up':'price-down'}">${up?'+':''}${d.change_24h.toFixed(2)}%</div>
+          ${regimeBadge}
+        </div>
+        ${confBar}
       </div>`;
     container.appendChild(card);
 
@@ -1935,10 +2788,18 @@ function renderPriceCards() {
       opt.value = sym; opt.textContent = sym;
       symbolSelect.appendChild(opt);
     }
+    // populate pattern symbol select
+    if (patternSel && !Array.from(patternSel.options).some(o => o.value === sym)) {
+      const o2 = document.createElement('option'); o2.value = sym; o2.textContent = sym;
+      patternSel.appendChild(o2);
+    }
   }
   if (!currentSymbol && Object.keys(allPrices).length > 0) {
     selectSymbol(Object.keys(allPrices)[0]);
   }
+  // Keep _symbols in sync so the Alerts form is always populated
+  _symbols = Object.keys(allPrices);
+  _populateAlertSymbols();
 }
 
 function formatPrice(p) {
@@ -1992,20 +2853,53 @@ function updateIndicatorPanel(sym) {
 function updateAIPanel(sym) {
   const a = allAnalyses[sym];
   if (!a) return;
-  const signalColor = a.signal === 'BUY' ? '#A8FF53' : a.signal === 'SELL' ? '#ff6b35' : '#555555';
-  document.getElementById('aiAnalysisPanel').innerHTML = `
-    <div class="d-flex justify-content-between mb-2">
-      <strong style="color:${signalColor}">${a.signal}</strong>
-      <span class="text-muted small">${((a.confidence||0)*100).toFixed(0)}% confidence</span>
+  const sig = a.signal;
+  const signalColor = sig === 'BUY' ? 'var(--accent-buy)' : sig === 'SELL' ? 'var(--accent-red)' : 'var(--text-muted)';
+  const sigCls      = sig === 'BUY' ? 'signal-buy' : sig === 'SELL' ? 'signal-sell' : 'signal-hold';
+
+  // Narrative block
+  const narrativeBlock = a.narrative
+    ? `<div class="mb-3 p-2" style="background:rgba(168,255,83,0.06);border-left:3px solid ${signalColor};border-radius:0 8px 8px 0;line-height:1.55">
+         <div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-mono);margin-bottom:3px">Market Narrative</div>
+         <span class="small">${a.narrative}</span>
+       </div>`
+    : '';
+
+  const hasSignal = sig != null;
+  const header = hasSignal ? `
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <span class="badge-signal ${sigCls}" style="font-size:0.75rem;padding:4px 12px">${sig}</span>
+      </div>
+      <div class="text-end">
+        <div style="font-family:var(--font-mono);font-size:1.1rem;color:${signalColor};font-weight:700">${((a.confidence||0)*100).toFixed(0)}%</div>
+        <div class="text-muted" style="font-size:0.6rem">confidence</div>
+      </div>
     </div>
-    <div class="small text-muted mb-2">${a.reasoning || ''}</div>
-    <div class="indicator-row"><span>EMA Trend</span><span class="${a.ema_trend==='BULLISH'?'price-up':a.ema_trend==='BEARISH'?'price-down':'text-muted'}">${a.ema_trend||'—'}</span></div>
-    <div class="indicator-row"><span>Volatility</span><span>${a.volatility||'—'}</span></div>
-    <div class="indicator-row"><span>BB Position</span>
-      <span>${((a.bb_position||0.5)*100).toFixed(0)}%
-        <span class="indicator-bar"><span class="indicator-fill" style="width:${(a.bb_position||0.5)*100}%;background:#A8FF53"></span></span>
-      </span></div>
-  `;
+    ${a.confidence != null ? `<div class="conf-bar mb-3"><div class="conf-fill" style="width:${(a.confidence*100).toFixed(0)}%;background:${signalColor}"></div></div>` : ''}` : '';
+
+  const _irow = (label, val, cls) =>
+    `<div class="indicator-row"><span class="text-muted">${label}</span><span class="${cls||''}">${val||'—'}</span></div>`;
+  const _ibar = (label, val) => {
+    const pct = ((val||0.5)*100).toFixed(0);
+    return `<div class="indicator-row"><span class="text-muted">${label}</span>
+      <span>${pct}% <span class="indicator-bar"><span class="indicator-fill" style="width:${pct}%;background:var(--accent)"></span></span></span></div>`;
+  };
+
+  const indicators = hasSignal ? `
+    ${a.reasoning ? `<div class="small text-muted mb-2" style="border-bottom:1px solid var(--border);padding-bottom:8px">${a.reasoning}</div>` : ''}
+    <div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-mono);margin-bottom:6px">Indicators</div>
+    ${_irow('EMA Trend', a.ema_trend, a.ema_trend==='BULLISH'?'price-up':a.ema_trend==='BEARISH'?'price-down':'')}
+    ${_irow('RSI Signal', a.rsi_signal, a.rsi_signal==='OVERSOLD'?'price-up':a.rsi_signal==='OVERBOUGHT'?'price-down':'')}
+    ${_irow('MACD', a.macd_trend, a.macd_trend==='BULLISH'?'price-up':a.macd_trend==='BEARISH'?'price-down':'')}
+    ${_irow('Volume', a.volume_signal)}
+    ${_irow('vs VWAP', a.price_vs_vwap, a.price_vs_vwap==='ABOVE'?'price-up':a.price_vs_vwap==='BELOW'?'price-down':'')}
+    ${_irow('Volatility', a.volatility)}
+    ${_ibar('BB Position', a.bb_position)}` : '';
+
+  const ts = document.getElementById('aiAnalysisTimestamp');
+  if (ts) ts.textContent = new Date().toLocaleTimeString('th', {hour:'2-digit', minute:'2-digit'});
+  document.getElementById('aiAnalysisPanel').innerHTML = header + narrativeBlock + indicators;
 }
 
 function updateOpenPositions(positions) {
@@ -2018,11 +2912,11 @@ function updateOpenPositions(positions) {
       const tp = p.take_profit || p.take_profit_price;
       return `<tr>
         <td class="fw-bold">${p.symbol}</td>
-        <td class="font-monospace">$${formatPrice(p.entry_price)}</td>
-        <td class="font-monospace">$${formatPrice(p.current_price || p.price)}</td>
+        <td class="font-monospace">${formatPrice(p.entry_price)} ${_quoteCur}</td>
+        <td class="font-monospace">${formatPrice(p.current_price || p.price)} ${_quoteCur}</td>
         <td class="${p.pnl_pct>=0?'text-success':'text-danger'}">${p.pnl_pct>=0?'+':''}${p.pnl_pct.toFixed(2)}%</td>
-        <td class="text-danger" style="font-size:0.7rem">${sl?'$'+formatPrice(sl):'—'}</td>
-        <td class="text-success" style="font-size:0.7rem">${tp?'$'+formatPrice(tp):'—'}</td>
+        <td class="text-danger" style="font-size:0.7rem">${sl?formatPrice(sl)+' '+_quoteCur:'—'}</td>
+        <td class="text-success" style="font-size:0.7rem">${tp?formatPrice(tp)+' '+_quoteCur:'—'}</td>
       </tr>`;
     }).join('')}
     </tbody></table>`;
@@ -2038,9 +2932,9 @@ function updateHoldings(positions, cash, total, cur) {
     rows += `<tr>
       <td>${p.symbol.split('/')[0]}</td>
       <td>${p.amount.toFixed(6)}</td>
-      <td>$${formatPrice(p.price)}</td>
-      <td>$${p.value.toFixed(2)}</td>
-      <td>$${formatPrice(p.entry_price)}</td>
+      <td>${formatPrice(p.price)} ${_quoteCur}</td>
+      <td>${p.value.toFixed(2)} ${_quoteCur}</td>
+      <td>${formatPrice(p.entry_price)} ${_quoteCur}</td>
       <td class="${p.pnl_pct>=0?'text-success':'text-danger'}">${p.pnl_pct>=0?'+':''}${p.pnl_pct.toFixed(2)}%</td>
     </tr>`;
   }
@@ -2127,9 +3021,13 @@ async function refreshHistory() {
     const trades = await r.json();
     document.getElementById('historyCount').textContent = trades.length + ' trades';
     const body = document.getElementById('historyBody');
-    if (!trades.length) { body.innerHTML = '<tr><td colspan="10" class="text-center text-muted p-3">ยังไม่มีประวัติ</td></tr>'; return; }
+    if (!trades.length) { body.innerHTML = '<tr><td colspan="11" class="text-center text-muted p-3">ยังไม่มีประวัติ</td></tr>'; return; }
     body.innerHTML = trades.map(t => {
       const pnlCls = !t.pnl_pct ? '' : t.pnl_pct >= 0 ? 'text-success' : 'text-danger';
+      const info = `#${t.id} ${t.side} ${t.symbol} @ ${formatPrice(t.price)} (${t.opened_at ? new Date(t.opened_at).toLocaleDateString('th') : ''})`;
+      const noteIcon = t.journal
+        ? `<i class="bi bi-journal-text" style="color:var(--accent)" title="${t.journal.slice(0,60)}"></i>`
+        : `<i class="bi bi-journal-plus" style="color:var(--text-muted)"></i>`;
       return `<tr>
         <td class="text-muted">${t.opened_at ? new Date(t.opened_at).toLocaleString('th') : '—'}</td>
         <td>${t.symbol}</td>
@@ -2141,6 +3039,7 @@ async function refreshHistory() {
         <td>${((t.confidence||0)*100).toFixed(0)}%</td>
         <td><span class="badge bg-${t.status==='closed'?(t.pnl_pct>=0?'success':'danger'):'warning'}">${t.status}</span></td>
         <td class="${pnlCls}">${t.pnl_pct!=null?(t.pnl_pct>=0?'+':'')+t.pnl_pct.toFixed(2)+'%':'—'}</td>
+        <td><button class="btn btn-link p-0" style="line-height:1;font-size:0.85rem" onclick="openJournalModal(${t.id},${JSON.stringify(info)},${JSON.stringify(t.journal||'')})" title="Trade Journal">${noteIcon}</button></td>
       </tr>`;
     }).join('');
   } catch {}
@@ -2376,12 +3275,26 @@ async function refreshLoopStatus() {
 // Settings
 // ============================================================
 async function hotSwapMode(mode) {
-  if (mode === 'live' && !confirm(
-    'Live Mode ใช้เงินจริง!\n\n' +
-    '⚠️ ต้องตั้งค่า Exchange API key ใน Settings → Exchange API Keys ก่อน\n\n' +
-    'คุณแน่ใจหรือไม่?'
-  )) return;
+  if (mode === 'live') {
+    // Show budget-confirmation modal instead of a plain confirm dialog
+    const cur = _quoteCur || 'USDT';
+    const curLabel = document.getElementById('liveBudgetCurLabel');
+    if (curLabel) curLabel.textContent = cur;
+    const modal = new bootstrap.Modal(document.getElementById('liveModeModal'));
+    modal.show();
+    return;
+  }
+  await _doModeSwap('demo', 0);
+}
 
+async function confirmLiveMode() {
+  const budget = parseFloat(document.getElementById('liveBudgetInput')?.value || '0') || 0;
+  const modal = bootstrap.Modal.getInstance(document.getElementById('liveModeModal'));
+  if (modal) modal.hide();
+  await _doModeSwap('live', budget);
+}
+
+async function _doModeSwap(mode, budgetUsdt) {
   const resultEl = document.getElementById('modeSwapResult');
   resultEl.style.display = '';
   resultEl.innerHTML = '<span class="text-muted"><span class="spinner-border spinner-border-sm me-1" style="width:10px;height:10px;border-width:1.5px"></span>กำลังสลับ mode…</span>';
@@ -2392,10 +3305,12 @@ async function hotSwapMode(mode) {
   if (btnLive) btnLive.disabled = true;
 
   try {
-    const r = await fetch('/api/mode/swap', {
+    const body = {mode, confirm: true};
+    if (mode === 'live') body.budget_usdt = budgetUsdt;
+    const r = await fetch('/api/mode', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({mode}),
+      body: JSON.stringify(body),
     });
     const d = await r.json();
     if (!r.ok) {
@@ -2403,9 +3318,11 @@ async function hotSwapMode(mode) {
       showToast('Mode Error', d.detail || 'Swap failed', 'danger');
       return;
     }
+    const cap = d.live_max_budget_usdt;
+    const capStr = cap > 0 ? ` · วงเงิน ${cap.toLocaleString()} ${_quoteCur}` : '';
     const exLabel = d.exchange ? ` (${d.exchange})` : '';
-    resultEl.innerHTML = `<span style="color:var(--accent-buy)">🟢 สลับเป็น ${d.mode.toUpperCase()}${exLabel} สำเร็จ</span>`;
-    showToast('Mode', `Switched to ${d.mode.toUpperCase()}${exLabel}`, mode === 'demo' ? 'success' : 'warning');
+    resultEl.innerHTML = `<span style="color:var(--accent-buy)">🟢 สลับเป็น ${d.mode.toUpperCase()}${exLabel}${capStr} สำเร็จ</span>`;
+    showToast('Mode', `Switched to ${d.mode.toUpperCase()}${exLabel}${capStr}`, mode === 'demo' ? 'success' : 'warning');
     _updateModeBadge(d.mode);
     refreshLiveReadiness();
     await fetchStatus();
@@ -2467,6 +3384,11 @@ async function saveAISettings() {
     }
   };
   if (!data.ai.claude.api_key) delete data.ai.claude.api_key;
+  // Only send GPT-4/Gemini keys when the user actually typed one (avoid wiping saved keys)
+  const openaiKey = document.getElementById('openaiApiKey').value;
+  const geminiKey = document.getElementById('geminiApiKey').value;
+  if (openaiKey) data.ai.openai = { api_key: openaiKey };
+  if (geminiKey) data.ai.gemini = { api_key: geminiKey };
   try {
     await fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
     showToast('Saved', 'AI settings saved', 'success');
@@ -2526,6 +3448,10 @@ async function loadSettings() {
     }
     // AI model
     if (d.ai?.claude?.model) document.getElementById('claudeModel').value = d.ai.claude.model;
+    if (d.ai?.default_model) document.getElementById('aiModelSelect').value = d.ai.default_model;
+    // Show masked keys as placeholder hints (server returns first 8 chars + ****)
+    if (d.ai?.openai?.api_key) document.getElementById('openaiApiKey').placeholder = d.ai.openai.api_key + ' (มีค่าแล้ว)';
+    if (d.ai?.gemini?.api_key) document.getElementById('geminiApiKey').placeholder = d.ai.gemini.api_key + ' (มีค่าแล้ว)';
     // Exchange enabled states
     ['binance', 'binance_th', 'bitkub', 'okx'].forEach(ex => {
       const cb = document.getElementById(`${ex}_enabled`);
@@ -2654,266 +3580,6 @@ function setChartRange(range, el) {
 }
 
 // ============================================================
-// Thai Market
-// ============================================================
-let thaiStocksData = [];
-let thaiFundsData  = [];
-let setChartObj    = null;
-let fundChartObj   = null;
-
-function thaiTab(tab, el) {
-  document.getElementById('panel-stocks').style.display = tab === 'stocks' ? '' : 'none';
-  document.getElementById('panel-funds').style.display  = tab === 'funds'  ? '' : 'none';
-  document.querySelectorAll('#sec-thai-market .tab-btn').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
-  if (tab === 'stocks' && !thaiStocksData.length) loadThaiStocks();
-  if (tab === 'funds'  && !thaiFundsData.length)  loadThaiFunds();
-}
-
-async function refreshThaiData() {
-  thaiStocksData = []; thaiFundsData = [];
-  if (document.getElementById('panel-stocks').style.display !== 'none') await loadThaiStocks();
-  else await loadThaiFunds();
-}
-
-async function loadThaiStocks() {
-  document.getElementById('setStockCards').innerHTML =
-    '<div class="col-12 text-muted text-center py-4"><div class="spinner-border spinner-border-sm text-secondary me-2"></div>กำลังวิเคราะห์...</div>';
-  try {
-    const r = await fetch('/api/thai/stocks');
-    thaiStocksData = await r.json();
-    renderSetCards(thaiStocksData);
-    // populate chart selector
-    const sel = document.getElementById('setChartSymbol');
-    sel.innerHTML = '';
-    thaiStocksData.forEach(s => {
-      const o = document.createElement('option');
-      o.value = s.symbol; o.textContent = `${s.name} (${s.symbol.replace('.BK','')})`;
-      sel.appendChild(o);
-    });
-    if (thaiStocksData.length) loadSetChart(thaiStocksData[0].symbol);
-    const src = thaiStocksData[0]?.analysis ? 'yfinance' : 'simulation';
-    document.getElementById('thaiDataSource').textContent = src;
-  } catch(e) { document.getElementById('setStockCards').innerHTML = '<div class="col-12 text-danger p-3">โหลดไม่ได้: '+e.message+'</div>'; }
-}
-
-function renderSetCards(stocks) {
-  const container = document.getElementById('setStockCards');
-  container.innerHTML = '';
-  const sectorColor = {
-    'พลังงาน':'rgba(210,153,34,0.15)', 'การเงิน':'rgba(56,139,253,0.12)',
-    'สื่อสาร':'rgba(163,113,247,0.12)', 'ขนส่ง':'rgba(46,160,67,0.12)',
-    'สุขภาพ':'rgba(248,81,73,0.1)', 'พาณิชย์':'rgba(88,166,255,0.12)',
-    'อุตสาหกรรม':'rgba(139,148,158,0.12)', 'ท่องเที่ยว':'rgba(63,185,80,0.1)',
-    'เกษตร':'rgba(57,217,138,0.08)',
-  };
-  stocks.forEach(s => {
-    const a = s.analysis || {};
-    const up = s.change_1d >= 0;
-    const sigCls = a.signal === 'BUY' ? 'signal-buy' : a.signal === 'SELL' ? 'signal-sell' : 'signal-hold';
-    const bgCol = sectorColor[s.sector] || 'rgba(48,54,61,0.3)';
-    const col = document.createElement('div');
-    col.className = 'col-6 col-md-4 col-lg-3 col-xl-2';
-    col.innerHTML = `
-      <div class="price-card" onclick="selectSetStock('${s.symbol}')" style="background:${bgCol};cursor:pointer">
-        <div class="d-flex justify-content-between align-items-start mb-1">
-          <div>
-            <strong class="small">${s.name}</strong><br>
-            <span style="font-size:0.65rem;color:var(--text-muted)">${s.sector}</span>
-          </div>
-          ${a.signal ? `<span class="badge-signal ${sigCls}">${a.signal}</span>` : ''}
-        </div>
-        <div class="fw-bold">฿${s.price?.toFixed(2)}</div>
-        <div class="small ${up?'price-up':'price-down'}">${up?'+':''}${s.change_1d?.toFixed(2)}%</div>
-        ${a.rsi ? `<div style="font-size:0.65rem;color:var(--text-muted);margin-top:3px">RSI ${a.rsi}</div>` : ''}
-      </div>`;
-    container.appendChild(col);
-  });
-}
-
-function selectSetStock(symbol) {
-  document.getElementById('setChartSymbol').value = symbol;
-  loadSetChart(symbol);
-}
-
-async function loadSetChart(symbol) {
-  if (!symbol) return;
-  const stock = thaiStocksData.find(s => s.symbol === symbol);
-  try {
-    const r = await fetch(`/api/thai/stocks/${encodeURIComponent(symbol)}/history?days=60`);
-    const history = await r.json();
-    if (!history.length) return;
-
-    const labels = history.map(h => h.date);
-    const closes = history.map(h => h.close);
-    const gridColor = 'rgba(34,34,34,0.8)';
-
-    if (!setChartObj) {
-      setChartObj = new ApexCharts(document.getElementById('setChart'), {
-        ..._apex,
-        chart: {..._apex.chart, type:'area', height:'100%'},
-        series: [{name: symbol, data: closes}],
-        xaxis: { categories: labels, tickAmount: 8, labels:{style:{colors:'#444',fontSize:'10px'},rotate:0} },
-        yaxis: { labels:{style:{colors:'#444',fontSize:'10px'}, formatter:v=>'฿'+v.toFixed(2)} },
-        stroke: { curve:'smooth', width:2 },
-        fill: { type:'gradient', gradient:{opacityFrom:0.2,opacityTo:0,stops:[0,100]} },
-        dataLabels: { enabled:false }, legend: { show:false },
-        colors: ['#d29922'],
-        markers: { size:0 },
-      });
-      setChartObj.render();
-    } else {
-      setChartObj.updateOptions({xaxis:{categories:labels},series:[{name:symbol,data:closes}]});
-    }
-
-    // Update analysis panel
-    if (stock?.analysis) {
-      const a = stock.analysis;
-      const sigColor = a.signal==='BUY'?'#A8FF53':a.signal==='SELL'?'#ff6b35':'#555555';
-      document.getElementById('setAnalysisPanel').innerHTML = `
-        <div class="d-flex justify-content-between mb-2">
-          <strong style="color:${sigColor}">${a.signal}</strong>
-          <span class="text-muted small">${(a.confidence*100).toFixed(0)}%</span>
-        </div>
-        <div class="small text-muted mb-3 p-2 rounded" style="background:rgba(48,54,61,0.4)">${a.reasoning}</div>
-        <div class="indicator-row"><span>RSI(14)</span>
-          <span style="color:${a.rsi<35?'#A8FF53':a.rsi>65?'#ff6b35':'#555555'}">${a.rsi} [${a.rsi_signal}]</span></div>
-        <div class="indicator-row"><span>MACD</span>
-          <span class="${a.macd_trend==='BULLISH'?'price-up':a.macd_trend==='BEARISH'?'price-down':'text-muted'}">${a.macd_trend}</span></div>
-        <div class="indicator-row"><span>EMA Trend</span>
-          <span class="${a.ema_trend==='BULLISH'?'price-up':a.ema_trend==='BEARISH'?'price-down':'text-muted'}">${a.ema_trend}</span></div>
-        <div class="indicator-row"><span>Bollinger</span>
-          <span class="${a.bb_signal==='OVERSOLD'?'price-up':a.bb_signal==='OVERBOUGHT'?'price-down':'text-muted'}">${a.bb_signal}</span></div>
-        <div class="indicator-row"><span>Volatility</span><span>${a.volatility}</span></div>
-        <div class="indicator-row"><span>Support</span><span class="price-up">฿${a.support}</span></div>
-        <div class="indicator-row"><span>Resistance</span><span class="price-down">฿${a.resistance}</span></div>`;
-    }
-  } catch(e) { console.error('loadSetChart', e); }
-}
-
-async function loadThaiFunds() {
-  document.getElementById('fundCards').innerHTML =
-    '<div class="col-12 text-muted text-center py-4"><div class="spinner-border spinner-border-sm text-secondary me-2"></div>กำลังโหลด NAV...</div>';
-  try {
-    const r = await fetch('/api/thai/funds');
-    thaiFundsData = await r.json();
-    renderFundCards(thaiFundsData);
-
-    const sel = document.getElementById('fundChartSelect');
-    sel.innerHTML = '';
-    thaiFundsData.forEach(f => {
-      const o = document.createElement('option');
-      o.value = f.code; o.textContent = f.name;
-      sel.appendChild(o);
-    });
-    if (thaiFundsData.length) loadFundChart(thaiFundsData[0].code);
-    const src = thaiFundsData[0]?.source || 'simulation';
-    document.getElementById('thaiDataSource').textContent = src;
-  } catch(e) { document.getElementById('fundCards').innerHTML = '<div class="col-12 text-danger p-3">'+e.message+'</div>'; }
-}
-
-function renderFundCards(funds) {
-  const container = document.getElementById('fundCards');
-  container.innerHTML = '';
-  const typeColor = {
-    equity:'rgba(46,160,67,0.12)', equity_esg:'rgba(46,160,67,0.08)',
-    fixed_income:'rgba(56,139,253,0.12)', money_market:'rgba(139,148,158,0.12)',
-    commodity:'rgba(210,153,34,0.12)', mixed:'rgba(163,113,247,0.12)',
-    foreign:'rgba(88,166,255,0.12)',
-  };
-  const typeLabel = {
-    equity:'หุ้นไทย', equity_esg:'หุ้น ESG', fixed_income:'ตราสารหนี้',
-    money_market:'ตลาดเงิน', commodity:'สินค้าโภคภัณฑ์', mixed:'ผสม', foreign:'ต่างประเทศ',
-  };
-  funds.forEach(f => {
-    const bg = typeColor[f.type] || 'rgba(48,54,61,0.2)';
-    const ret1d = f.ret_1d != null ? f.ret_1d : null;
-    const ret1m = f.ret_1m != null ? f.ret_1m : null;
-    const ret1y = f.ret_1y != null ? f.ret_1y : null;
-    const up = ret1d == null ? true : ret1d >= 0;
-    const col = document.createElement('div');
-    col.className = 'col-12 col-md-6 col-lg-4';
-    col.innerHTML = `
-      <div class="price-card" onclick="selectFund('${f.code}')" style="background:${bg}">
-        <div class="d-flex justify-content-between align-items-start mb-1">
-          <div>
-            <strong class="small">${f.name}</strong><br>
-            <span style="font-size:0.65rem;color:var(--text-muted)">${f.amcTH} · ${typeLabel[f.type]||f.type}</span>
-          </div>
-          ${f.source==='simulation'?'<span style="font-size:0.6rem;color:var(--text-muted);border:1px solid var(--border);border-radius:4px;padding:1px 5px">sim</span>':''}
-        </div>
-        <div class="fw-bold mt-1">฿${f.nav?.toFixed(4) || '—'}</div>
-        <div class="d-flex gap-3 mt-1" style="font-size:0.75rem">
-          <span>1D: <span class="${ret1d==null?'text-muted':ret1d>=0?'price-up':'price-down'}">${ret1d!=null?(ret1d>=0?'+':'')+ret1d.toFixed(2)+'%':'—'}</span></span>
-          <span>1M: <span class="${ret1m==null?'text-muted':ret1m>=0?'price-up':'price-down'}">${ret1m!=null?(ret1m>=0?'+':'')+ret1m.toFixed(2)+'%':'—'}</span></span>
-          <span>1Y: <span class="${ret1y==null?'text-muted':ret1y>=0?'price-up':'price-down'}">${ret1y!=null?(ret1y>=0?'+':'')+ret1y.toFixed(2)+'%':'—'}</span></span>
-        </div>
-      </div>`;
-    container.appendChild(col);
-  });
-}
-
-function selectFund(code) {
-  document.getElementById('fundChartSelect').value = code;
-  loadFundChart(code);
-}
-
-async function loadFundChart(code) {
-  const fund = thaiFundsData.find(f => f.code === code);
-  if (!fund) return;
-  try {
-    const history = fund.history || [];
-    if (!history.length) return;
-    const labels = history.map(h => h.date);
-    const navs   = history.map(h => h.nav);
-    const gridColor = 'rgba(34,34,34,0.8)';
-
-    if (!fundChartObj) {
-      fundChartObj = new ApexCharts(document.getElementById('fundChart'), {
-        ..._apex,
-        chart: {..._apex.chart, type:'area', height:'100%'},
-        series: [{name:'NAV (฿)', data: navs}],
-        xaxis: { categories: labels, tickAmount: 6, labels:{style:{colors:'#444',fontSize:'10px'},rotate:0} },
-        yaxis: { labels:{style:{colors:'#444',fontSize:'10px'}, formatter:v=>'฿'+v.toFixed(4)} },
-        stroke: { curve:'smooth', width:2 },
-        fill: { type:'gradient', gradient:{opacityFrom:0.2,opacityTo:0,stops:[0,100]} },
-        dataLabels: { enabled:false }, legend: { show:false },
-        colors: ['#A8FF53'],
-        markers: { size:0 },
-      });
-      fundChartObj.render();
-    } else {
-      fundChartObj.updateOptions({xaxis:{categories:labels},series:[{name:`${fund.name} NAV`,data:navs}]});
-    }
-
-    const typeLabel = {
-      equity:'หุ้นไทย',equity_esg:'หุ้น ESG',fixed_income:'ตราสารหนี้',
-      money_market:'ตลาดเงิน',commodity:'สินค้าโภคภัณฑ์',mixed:'ผสม',foreign:'ต่างประเทศ'
-    };
-    document.getElementById('fundInfoPanel').innerHTML = `
-      <div class="fw-bold mb-2">${fund.name}</div>
-      <div class="indicator-row"><span>บลจ.</span><span>${fund.amcTH}</span></div>
-      <div class="indicator-row"><span>ประเภท</span><span>${typeLabel[fund.type]||fund.type}</span></div>
-      <div class="indicator-row"><span>NAV/หน่วย</span><span>฿${fund.nav?.toFixed(4)||'—'}</span></div>
-      <div class="indicator-row"><span>1 วัน</span>
-        <span class="${!fund.ret_1d?'text-muted':fund.ret_1d>=0?'price-up':'price-down'}">${fund.ret_1d!=null?(fund.ret_1d>=0?'+':'')+fund.ret_1d.toFixed(2)+'%':'—'}</span></div>
-      <div class="indicator-row"><span>1 เดือน</span>
-        <span class="${!fund.ret_1m?'text-muted':fund.ret_1m>=0?'price-up':'price-down'}">${fund.ret_1m!=null?(fund.ret_1m>=0?'+':'')+fund.ret_1m.toFixed(2)+'%':'—'}</span></div>
-      <div class="indicator-row"><span>3 เดือน</span>
-        <span class="${!fund.ret_3m?'text-muted':fund.ret_3m>=0?'price-up':'price-down'}">${fund.ret_3m!=null?(fund.ret_3m>=0?'+':'')+fund.ret_3m.toFixed(2)+'%':'—'}</span></div>
-      <div class="indicator-row"><span>6 เดือน</span>
-        <span class="${!fund.ret_6m?'text-muted':fund.ret_6m>=0?'price-up':'price-down'}">${fund.ret_6m!=null?(fund.ret_6m>=0?'+':'')+fund.ret_6m.toFixed(2)+'%':'—'}</span></div>
-      <div class="indicator-row"><span>1 ปี</span>
-        <span class="${!fund.ret_1y?'text-muted':fund.ret_1y>=0?'price-up':'price-down'}">${fund.ret_1y!=null?(fund.ret_1y>=0?'+':'')+fund.ret_1y.toFixed(2)+'%':'—'}</span></div>
-      <div class="indicator-row"><span>YTD</span>
-        <span class="${!fund.ret_ytd?'text-muted':fund.ret_ytd>=0?'price-up':'price-down'}">${fund.ret_ytd!=null?(fund.ret_ytd>=0?'+':'')+fund.ret_ytd.toFixed(2)+'%':'—'}</span></div>
-      <div class="mt-2">
-        <span style="font-size:0.65rem;color:var(--text-muted)">แหล่งข้อมูล: ${fund.source==='sec_api'?'SEC Thailand':'Simulation'}</span>
-      </div>`;
-  } catch(e) { console.error('loadFundChart', e); }
-}
-
-// ============================================================
 // Multi-Timeframe Analysis (H)
 // ============================================================
 async function loadMTF() {
@@ -2998,87 +3664,244 @@ async function refreshPortfolio() {
 // ============================================================
 let btEquityChart = null;
 
+function _btHide() {
+  ['btMetrics','btChartCard','btTradesCard','btCompareCard','btBreakdownRow',
+   'btHourlyCard','btExitCard','wfCard'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
+  const nd = document.getElementById('btNoData'); if (nd) nd.style.display = '';
+}
+let _btHourlyChart = null;
+
 async function runBacktest() {
   const btn = document.getElementById('btRunBtn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Running...';
-  document.getElementById('btNoData').style.display = '';
-  document.getElementById('btMetrics').style.display = 'none';
-  document.getElementById('btChartCard').style.display = 'none';
-  document.getElementById('btTradesCard').style.display = 'none';
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Running AI Backtest...';
+  _btHide();
 
   try {
     const r = await fetch('/api/backtest', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
-        symbol: document.getElementById('btSymbol').value,
-        days:   parseInt(document.getElementById('btDays').value),
-        tp_pct: parseFloat(document.getElementById('btTp').value) / 100,
-        sl_pct: parseFloat(document.getElementById('btSl').value) / 100,
+        symbol:  document.getElementById('btSymbol').value,
+        days:    parseInt(document.getElementById('btDays').value),
+        tp_pct:  parseFloat(document.getElementById('btTp').value) / 100,
+        sl_pct:  parseFloat(document.getElementById('btSl').value) / 100,
       })
     });
     const d = await r.json();
     if (!r.ok) { showToast('Error', d.detail || 'Backtest failed', 'danger'); return; }
 
-    const retColor = d.total_return_pct >= 0 ? '#A8FF53' : '#ff6b35';
-    document.getElementById('btReturn').textContent   = (d.total_return_pct >= 0 ? '+' : '') + d.total_return_pct.toFixed(2) + '%';
-    document.getElementById('btReturn').style.color   = retColor;
-    document.getElementById('btWinRate').textContent   = d.win_rate.toFixed(1) + '%';
-    document.getElementById('btSharpe').textContent    = d.sharpe.toFixed(2);
-    document.getElementById('btDrawdown').textContent  = d.max_drawdown_pct.toFixed(2) + '%';
-    document.getElementById('btMetrics').style.display = '';
-    document.getElementById('btNoData').style.display  = 'none';
+    const nd = document.getElementById('btNoData'); if (nd) nd.style.display = 'none';
 
-    if (d.equity_curve && d.equity_curve.length) {
-      const labels = d.equity_curve.map(p => p.i);
-      const values = d.equity_curve.map(p => p.v);
-      const gridColor = 'rgba(34,34,34,0.8)';
+    // ── Primary metrics (autotrade) ────────────────────────────────
+    const aiRet = d.total_return_pct;
+    const retColor = aiRet >= 0 ? '#A8FF53' : '#ff6b35';
+    document.getElementById('btReturn').textContent  = (aiRet >= 0 ? '+' : '') + aiRet.toFixed(2) + '%';
+    document.getElementById('btReturn').style.color  = retColor;
+    document.getElementById('btWinRate').textContent  = d.win_rate.toFixed(1) + '%';
+    document.getElementById('btSharpe').textContent   = d.sharpe.toFixed(2);
+    document.getElementById('btDrawdown').textContent = d.max_drawdown_pct.toFixed(2) + '%';
+    document.getElementById('btMetrics').style.display = '';
+
+    // ── 3-way comparison table (full analytics) ───────────────────
+    if (d.comparison) {
+      const cmp = d.comparison;
+      const fmtRet = (v) => `<span style="color:${v>=0?'#A8FF53':'#ff6b35'}">${v>=0?'+':''}${v.toFixed(2)}%</span>`;
+      const fmtN   = (v, dec=2, suffix='') => v == null ? '—' : v.toFixed(dec) + suffix;
+      const fmtPF  = (v) => v == null ? '—' : (v >= 99 ? '∞' : v.toFixed(2));
+      const pfColor = (v) => v >= 1.5 ? '#39d98a' : v >= 1 ? '#ccc' : '#ff6b35';
+      const srColor = (v) => v >= 1 ? '#39d98a' : v >= 0 ? '#ccc' : '#ff6b35';
+
+      // Update table headers to show all analytics columns
+      const thead = document.querySelector('#btCompareCard thead tr');
+      if (thead) thead.innerHTML = `
+        <th>Mode</th><th>Return</th><th>Win%</th>
+        <th title="Sharpe Ratio">Sharpe</th>
+        <th title="Sortino Ratio">Sortino</th>
+        <th title="Calmar Ratio">Calmar</th>
+        <th title="Value at Risk 95%">VaR 95%</th>
+        <th title="Profit Factor">P.Factor</th>
+        <th>MaxDD</th>
+        <th title="Max consecutive wins/losses">Streak W/L</th>
+        <th>Final $</th>`;
+
+      const rows = [
+        {label:'🔵 Basic (EMA)', k:'basic',     style:'color:#7cb9e8'},
+        {label:'🟡 Hybrid',      k:'hybrid',    style:'color:#ffc107'},
+        {label:'🟢 AI Autotrade',k:'autotrade', style:'color:#39d98a;font-weight:700'},
+      ].map(({label, k, style}) => {
+        const c = cmp[k] || {};
+        return `<tr>
+          <td style="${style}">${label}</td>
+          <td>${fmtRet(c.total_return_pct||0)}</td>
+          <td>${fmtN(c.win_rate,1,'%')}</td>
+          <td style="color:${srColor(c.sharpe||0)}">${fmtN(c.sharpe)}</td>
+          <td style="color:${srColor(c.sortino||0)}">${fmtN(c.sortino)}</td>
+          <td style="color:${srColor(c.calmar||0)}">${fmtN(c.calmar)}</td>
+          <td style="color:#ff6b35">${fmtN(c.var_95_pct,1,'%')}</td>
+          <td style="color:${pfColor(c.profit_factor||0)}">${fmtPF(c.profit_factor)}</td>
+          <td class="text-danger">${fmtN(c.max_drawdown_pct,2,'%')}</td>
+          <td style="font-size:0.75rem"><span style="color:#39d98a">${c.max_win_streak||0}W</span> / <span style="color:#ff6b35">${c.max_loss_streak||0}L</span></td>
+          <td style="font-family:var(--font-mono)">$${(c.final_capital||0).toFixed(0)}</td>
+        </tr>`;
+      }).join('');
+      document.getElementById('btCompareBody').innerHTML = rows;
+      document.getElementById('btCompareCard').style.display = '';
+    }
+
+    // ── Multi-series equity chart ──────────────────────────────────
+    if (d.comparison) {
+      const cmp = d.comparison;
+      const mkSeries = (key, name) => {
+        const curve = (cmp[key]||{}).equity_curve || [];
+        return {name, data: curve.map(p => p.v)};
+      };
+      const xLabels = ((cmp.autotrade||{}).equity_curve || []).map((_, i) => i);
+      const series  = [
+        mkSeries('basic',     'Basic'),
+        mkSeries('hybrid',    'Hybrid'),
+        mkSeries('autotrade', 'AI Autotrade'),
+      ];
       const equityEl = document.getElementById('btEquityChart');
-      if (!btEquityChart) {
-        btEquityChart = new ApexCharts(equityEl, {
-          ..._apex,
-          chart: {..._apex.chart, type:'area', height:'100%'},
-          series: [{name:'Equity', data:values}],
-          xaxis: { categories:labels, labels:{show:false}, axisBorder:{show:false}, axisTicks:{show:false} },
-          yaxis: { labels:{style:{colors:'#444',fontSize:'10px'}, formatter:v=>'$'+v.toFixed(0)} },
-          stroke: { curve:'smooth', width:2 },
-          fill: { type:'gradient', gradient:{opacityFrom:0.22,opacityTo:0,stops:[0,100]} },
-          dataLabels: { enabled:false }, legend: { show:false },
-          colors: [retColor],
-          markers: { size:0 },
-        });
-        btEquityChart.render();
-      } else {
-        btEquityChart.updateOptions({colors:[retColor],xaxis:{categories:labels}},false,false);
-        btEquityChart.updateSeries([{name:'Equity',data:values}],false);
-      }
+      const apexCfg = {
+        chart: {type:'line', height:220, background:'transparent', toolbar:{show:false},
+                animations:{enabled:false}, fontFamily:'var(--font-mono)'},
+        series,
+        colors: ['#7cb9e8','#ffc107','#39d98a'],
+        stroke: {curve:'smooth', width:[1.5,1.5,2.5]},
+        xaxis: {categories:xLabels, labels:{show:false}, axisBorder:{show:false}, axisTicks:{show:false}},
+        yaxis: {labels:{style:{colors:'#555',fontSize:'10px'}, formatter:v=>'$'+v.toFixed(0)}},
+        grid: {borderColor:'#1a1a1a', strokeDashArray:3},
+        legend: {labels:{colors:'#888'}, position:'top', fontSize:'11px'},
+        dataLabels:{enabled:false}, markers:{size:0},
+        theme:{mode:'dark'},
+        tooltip:{theme:'dark'},
+      };
+      if (btEquityChart) { btEquityChart.destroy(); btEquityChart = null; }
+      btEquityChart = new ApexCharts(equityEl, apexCfg);
+      btEquityChart.render();
+
       const srcEl = document.getElementById('btSource');
       if (srcEl) {
         const real = d.data_source === 'binance';
-        srcEl.textContent = real ? '● Binance real data' : '● simulated data';
-        srcEl.style.background = real ? 'rgba(57,217,138,0.15)' : 'rgba(210,153,34,0.15)';
-        srcEl.style.color = real ? 'var(--accent-buy)' : 'var(--accent-yellow)';
+        srcEl.textContent = real ? '● Binance' : '● simulated';
+        srcEl.style.background = real ? 'rgba(57,217,138,0.15)' : 'rgba(255,193,7,0.15)';
+        srcEl.style.color = real ? '#39d98a' : '#ffc107';
       }
       document.getElementById('btChartCard').style.display = '';
     }
 
+    // ── Regime breakdown ───────────────────────────────────────────
+    const regStats = d.regime_stats || {};
+    const patStats = d.pattern_stats || {};
+    const regimeMeta = {BULL_TREND:'↑ BULL',BEAR_TREND:'↓ BEAR',RANGING:'↔ RANGE',VOLATILE:'⚡ VOL',CRASH:'⚠ CRASH'};
+    const regimeColor= {BULL_TREND:'#39d98a',BEAR_TREND:'#ff6b35',RANGING:'#A8FF53',VOLATILE:'#ffc107',CRASH:'#ff4d6d'};
+    if (Object.keys(regStats).length) {
+      document.getElementById('btRegimeBody').innerHTML =
+        Object.entries(regStats).sort((a,b)=>b[1].trades-a[1].trades).map(([rn, rs]) => {
+          const color = regimeColor[rn]||'#888';
+          return `<tr>
+            <td><span style="color:${color};font-weight:600;font-size:0.75rem">${regimeMeta[rn]||rn}</span></td>
+            <td style="font-family:var(--font-mono)">${rs.trades}</td>
+            <td style="color:${rs.win_rate>=50?'#39d98a':'#ff6b35'}">${rs.win_rate}%</td>
+            <td style="color:${rs.avg_pnl>=0?'#39d98a':'#ff6b35'}">${rs.avg_pnl>=0?'+':''}${rs.avg_pnl}%</td>
+          </tr>`;
+        }).join('');
+    }
+    if (Object.keys(patStats).length) {
+      document.getElementById('btPatternBody').innerHTML =
+        Object.entries(patStats).map(([pn, ps]) => `<tr>
+          <td style="font-size:0.75rem">${pn}</td>
+          <td style="font-family:var(--font-mono)">${ps.trades}</td>
+          <td style="color:${ps.win_rate>=50?'#39d98a':'#ff6b35'}">${ps.win_rate}%</td>
+          <td style="color:${ps.avg_pnl>=0?'#39d98a':'#ff6b35'}">${ps.avg_pnl>=0?'+':''}${ps.avg_pnl}%</td>
+        </tr>`).join('');
+    }
+    if (Object.keys(regStats).length || Object.keys(patStats).length) {
+      document.getElementById('btBreakdownRow').style.display = '';
+    }
+
+    // ── Trade log ─────────────────────────────────────────────────
     if (d.trades && d.trades.length) {
       document.getElementById('btTradeCount').textContent = d.total_trades + ' total trades';
-      document.getElementById('btTradesBody').innerHTML = d.trades.map(t => `
-        <tr>
-          <td class="text-muted" style="font-size:0.75rem">${t.open_at.split('T')[0]}</td>
-          <td class="text-muted" style="font-size:0.75rem">${t.close_at.split('T')[0]}</td>
+      const _exitLabel = {take_profit:'TP',roi_table:'ROI',trailing_stop:'Trail',stop_loss:'SL',end_of_period:'EoP'};
+      const _exitColor = {take_profit:'#39d98a',roi_table:'#A8FF53',trailing_stop:'#5bc8ff',stop_loss:'#ff6b35',end_of_period:'#666'};
+      document.getElementById('btTradesBody').innerHTML = d.trades.map(t => {
+        const pats = (t.patterns||[]).map(p => `<span class="regime-badge regime-range" style="font-size:0.55rem">${p}</span>`).join(' ');
+        const er = t.exit_reason||'';
+        const erLabel = _exitLabel[er] || er.substring(0,4);
+        const erColor = _exitColor[er] || '#888';
+        return `<tr>
+          <td class="text-muted" style="font-size:0.72rem">${(t.open_at||'').split('T')[0]}</td>
+          <td class="text-muted" style="font-size:0.72rem">${(t.close_at||'').split('T')[0]}</td>
           <td class="${t.side==='BUY'?'text-success':'text-danger'}">${t.side}</td>
           <td class="${t.pnl_pct>=0?'text-success':'text-danger'}">${t.pnl_pct>=0?'+':''}${t.pnl_pct}%</td>
           <td>${t.win ? '✅' : '❌'}</td>
-          <td><span class="badge" style="font-size:0.65rem;background:rgba(100,100,100,0.2)">${t.regime}</span></td>
-        </tr>`).join('');
+          <td><span style="color:${erColor};font-size:0.68rem;font-weight:600">${erLabel}</span></td>
+          <td><span class="regime-badge ${t.regime==='BULL_TREND'?'regime-bull':t.regime==='BEAR_TREND'?'regime-bear':t.regime==='VOLATILE'?'regime-vol':t.regime==='CRASH'?'regime-crash':'regime-range'}" style="font-size:0.58rem">${(t.regime||'').replace('_',' ')}</span></td>
+          <td style="font-size:0.65rem">${pats||'—'}</td>
+          <td class="text-muted" style="font-size:0.7rem">${t.size_pct||0}%</td>
+        </tr>`;
+      }).join('');
       document.getElementById('btTradesCard').style.display = '';
     }
 
+    // ── Hourly signal quality heatmap ─────────────────────────────
+    const hourly = d.hourly_stats || {};
+    if (Object.keys(hourly).length) {
+      const hrs = Array.from({length:24}, (_,h) => String(h));
+      const vals = hrs.map(h => hourly[h] ? hourly[h].avg_pnl : 0);
+      const wrs  = hrs.map(h => hourly[h] ? hourly[h].win_rate : 0);
+      const trds = hrs.map(h => hourly[h] ? hourly[h].trades : 0);
+      if (_btHourlyChart) { _btHourlyChart.destroy(); _btHourlyChart = null; }
+      _btHourlyChart = new ApexCharts(document.getElementById('btHourlyChart'), {
+        chart: {type:'bar', height:130, background:'transparent', toolbar:{show:false}, animations:{enabled:false}, fontFamily:'var(--font-mono)'},
+        series: [{name:'Avg PnL%', data: vals}],
+        colors: [({value}) => value >= 0 ? '#39d98a' : '#ff6b35'],
+        xaxis: {categories: hrs, labels:{style:{colors:'#555',fontSize:'9px'}}, title:{text:'UTC Hour', style:{color:'#444',fontSize:'10px'}}},
+        yaxis: {labels:{style:{colors:'#555',fontSize:'9px'}, formatter:v=>v.toFixed(1)+'%'}},
+        grid: {borderColor:'#1a1a1a', strokeDashArray:3},
+        dataLabels:{enabled:false}, plotOptions:{bar:{columnWidth:'80%'}},
+        theme:{mode:'dark'}, tooltip:{theme:'dark',
+          custom({dataPointIndex:i}) {
+            const h = hrs[i]; const t = trds[i]; const w = wrs[i]; const p = vals[i];
+            return `<div style="padding:6px 10px;font-size:0.72rem;background:#1a1a1a;border:1px solid #333">
+              <b>${h}:00 UTC</b><br>Trades: ${t}<br>Win: ${w}%<br>Avg: ${p>=0?'+':''}${p.toFixed(2)}%</div>`;
+          }
+        },
+      });
+      _btHourlyChart.render();
+      document.getElementById('btHourlyCard').style.display = '';
+    }
+
+    // ── Exit reason breakdown ──────────────────────────────────────
+    const exitStats = d.exit_reason_stats || {};
+    const exitTotal = Object.values(exitStats).reduce((s,v)=>s+v,0) || 1;
+    const _ec = {take_profit:'#39d98a',roi_table:'#A8FF53',trailing_stop:'#5bc8ff',stop_loss:'#ff6b35',end_of_period:'#555'};
+    const _en = {take_profit:'Take Profit',roi_table:'ROI Table',trailing_stop:'Trailing SL',stop_loss:'Stop Loss',end_of_period:'End of Period'};
+    if (Object.keys(exitStats).length) {
+      document.getElementById('btExitBars').innerHTML =
+        Object.entries(exitStats).sort((a,b)=>b[1]-a[1]).map(([k,v]) => {
+          const pct = (v/exitTotal*100).toFixed(1);
+          const c = _ec[k]||'#888';
+          return `<div style="text-align:center;flex:1;min-width:70px">
+            <div style="background:${c}22;border:1px solid ${c}55;border-radius:6px;padding:6px 4px">
+              <div style="color:${c};font-size:0.95rem;font-weight:700;font-family:var(--font-mono)">${v}</div>
+              <div style="color:${c};font-size:0.6rem;margin-top:2px">${pct}%</div>
+            </div>
+            <div style="color:#666;font-size:0.6rem;margin-top:4px">${_en[k]||k}</div>
+          </div>`;
+        }).join('');
+      document.getElementById('btExitCard').style.display = '';
+    }
+
     const srcLabel = d.data_source === 'binance' ? 'Binance' : 'simulated';
-    showToast('Backtest Complete', `${d.symbol} ${d.days}d (${srcLabel}) | Return: ${d.total_return_pct.toFixed(2)}% | Sharpe: ${d.sharpe.toFixed(2)}`, d.total_return_pct >= 0 ? 'success' : 'warning');
+    const aiVsBasic = d.comparison ? (d.comparison.autotrade.total_return_pct - d.comparison.basic.total_return_pct) : 0;
+    showToast('Backtest Complete',
+      `${d.symbol} ${d.days}d | AI: ${aiRet>=0?'+':''}${aiRet.toFixed(2)}% | vs Basic: ${aiVsBasic>=0?'+':''}${aiVsBasic.toFixed(2)}%`,
+      aiRet >= 0 ? 'success' : 'warning');
   } catch(e) { showToast('Error', e.message, 'danger'); }
   finally {
     btn.disabled = false;
@@ -3086,14 +3909,128 @@ async function runBacktest() {
   }
 }
 
-async function saveThaiSettings() {
-  const key = document.getElementById('secApiKey').value;
-  if (key) {
-    await fetch('/api/thai/settings', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({sec_api_key: key}),
-    });
-    showToast('Saved', 'SEC API key saved — NAV จะดึงจาก SEC Thailand', 'success');
+// Quant Lab: SHAP importance + HRP weights + cointegration pairs (ML4T)
+async function loadQuantLab() {
+  const btn = document.getElementById('quantLabBtn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; }
+  try {
+    const [shapR, hrpR, ciR] = await Promise.all([
+      fetch('/api/ml/feature-importance').then(r=>r.json()).catch(()=>({features:[]})),
+      fetch('/api/portfolio/hrp').then(r=>r.json()).catch(()=>({weights:[]})),
+      fetch('/api/pairs/cointegration').then(r=>r.json()).catch(()=>({pairs:[]})),
+    ]);
+
+    // SHAP horizontal bars
+    const feats = shapR.features || [];
+    const mt = document.getElementById('shapModelType');
+    if (mt) mt.textContent = feats.length ? `(${shapR.model_type||'?'}${shapR.accuracy?', acc '+(shapR.accuracy*100).toFixed(0)+'%':''})` : '';
+    const maxImp = feats.length ? Math.max(...feats.map(f=>f.importance)) || 1 : 1;
+    document.getElementById('shapBars').innerHTML = feats.length
+      ? feats.slice(0,10).map(f => {
+          const w = Math.max(2, (f.importance/maxImp*100)).toFixed(0);
+          return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <div style="width:96px;font-size:0.66rem;color:#aaa;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${f.feature}">${f.feature}</div>
+            <div style="flex:1;background:#1a1a1a;border-radius:3px;height:14px;position:relative">
+              <div style="width:${w}%;background:linear-gradient(90deg,#5bc8ff,#A8FF53);height:100%;border-radius:3px"></div>
+            </div>
+            <div style="width:42px;font-size:0.62rem;color:#5bc8ff;font-family:var(--font-mono)">${f.importance.toFixed(3)}</div>
+          </div>`;
+        }).join('')
+      : '<span class="text-muted" style="font-size:0.72rem">โมเดลยังไม่ได้เทรน (ต้องมี trade ปิดอย่างน้อย 30 รายการ)</span>';
+
+    // HRP weights
+    const hrp = hrpR.weights || [];
+    document.getElementById('hrpBody').innerHTML = hrp.length
+      ? hrp.map(w => {
+          const mc = w.multiplier>=1?'#39d98a':'#ff6b35';
+          return `<tr>
+            <td>${w.symbol}</td>
+            <td style="font-family:var(--font-mono)">${(w.weight*100).toFixed(1)}%</td>
+            <td style="color:${w.vs_equal>=1?'#39d98a':'#ff6b35'}">${w.vs_equal}×</td>
+            <td style="color:${mc};font-weight:600">${w.multiplier}×</td>
+          </tr>`;
+        }).join('')
+      : '<tr><td colspan="4" class="text-muted text-center">ต้องการ ≥2 symbols ที่มีประวัติราคา</td></tr>';
+
+    // Cointegration pairs
+    const pairs = ciR.pairs || [];
+    document.getElementById('cointList').innerHTML = pairs.length
+      ? pairs.map(p => {
+          const hl = p.half_life ? p.half_life.toFixed(1)+' bars' : '—';
+          return `<div style="background:rgba(255,193,7,0.08);border:1px solid rgba(255,193,7,0.2);border-radius:5px;padding:5px 7px;margin-bottom:5px">
+            <div style="color:#ffc107;font-weight:600">${p.pair[0]} ↔ ${p.pair[1]}</div>
+            <div style="color:#888;font-size:0.64rem">p=${p.p_value.toFixed(4)} | β=${p.hedge_ratio.toFixed(2)} | HL=${hl}</div>
+          </div>`;
+        }).join('')
+      : '<span class="text-muted" style="font-size:0.72rem">ไม่พบคู่ cointegrated (p<0.05)</span>';
+  } catch(e) {
+    showToast('Quant Lab Error', e.message, 'danger');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Refresh'; }
+  }
+}
+
+// Walk-Forward Validation (Jesse-style)
+async function runWalkForward() {
+  const btn = document.getElementById('wfRunBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Running...';
+  document.getElementById('wfCard').style.display = 'none';
+  try {
+    const symbol = document.getElementById('btSymbol').value;
+    const days   = parseInt(document.getElementById('btDays').value) || 90;
+    const tp     = parseFloat(document.getElementById('btTp').value) / 100 || 0.04;
+    const sl     = parseFloat(document.getElementById('btSl').value) / 100 || 0.02;
+    const r = await fetch(`/api/backtest/walkforward?symbol=${encodeURIComponent(symbol)}&days=${Math.max(days,60)}&tp_pct=${tp}&sl_pct=${sl}&folds=3`);
+    const d = await r.json();
+    if (d.error) { showToast('Walk-Forward Error', d.error, 'warning'); return; }
+
+    // Summary stats
+    const s = d.summary || {};
+    const ovRisk = s.overfit_risk || 'N/A';
+    const ovColor = ovRisk==='LOW'?'#39d98a':ovRisk==='MEDIUM'?'#ffc107':'#ff6b35';
+    const badge = document.getElementById('wfOverfitBadge');
+    badge.textContent = 'Overfit Risk: ' + ovRisk;
+    badge.style.background = ovColor + '22';
+    badge.style.color = ovColor;
+
+    document.getElementById('wfSummaryRow').innerHTML = [
+      ['Avg OOS Return', (s.avg_oos_return_pct>=0?'+':'')+s.avg_oos_return_pct?.toFixed(2)+'%', s.avg_oos_return_pct>=0?'#39d98a':'#ff6b35'],
+      ['Avg OOS Sharpe', s.avg_oos_sharpe?.toFixed(2)||'—', s.avg_oos_sharpe>=0.5?'#39d98a':s.avg_oos_sharpe>=0?'#ccc':'#ff6b35'],
+      ['Profitable Folds', `${s.profitable_folds||0}/${s.total_folds||0}`, '#A8FF53'],
+      ['Consistency', (s.consistency_pct?.toFixed(1)||'0')+'%', s.consistency_pct>=50?'#39d98a':'#ff6b35'],
+    ].map(([label,val,color])=>`
+      <div class="col-6 col-md-3">
+        <div class="stat-card" style="background:${color}0d;border:1px solid ${color}33;padding:10px">
+          <div class="stat-label">${label}</div>
+          <div class="stat-value" style="color:${color};font-size:1.1rem">${val}</div>
+        </div>
+      </div>`).join('');
+
+    // Fold table
+    document.getElementById('wfFoldsBody').innerHTML = (d.folds||[]).map(f => {
+      const oosColor = f.oos_return_pct>=0?'#39d98a':'#ff6b35';
+      const degVal   = f.degradation==null ? '—' : f.degradation.toFixed(2)+'x';
+      const degColor = f.degradation==null?'#666':f.degradation>=0.75?'#39d98a':f.degradation>=0.4?'#ffc107':'#ff6b35';
+      return `<tr>
+        <td style="font-family:var(--font-mono)">#${f.fold}</td>
+        <td style="color:#A8FF53">${f.optimized_tp_pct}%</td>
+        <td style="color:#ff6b35">${f.optimized_sl_pct}%</td>
+        <td style="color:${f.is_sharpe>=0.5?'#39d98a':f.is_sharpe>=0?'#ccc':'#ff6b35'}">${f.is_sharpe?.toFixed(2)}</td>
+        <td style="color:${f.is_return_pct>=0?'#39d98a':'#ff6b35'}">${f.is_return_pct>=0?'+':''}${f.is_return_pct?.toFixed(2)}%</td>
+        <td style="color:${oosColor};font-weight:600">${f.oos_return_pct>=0?'+':''}${f.oos_return_pct?.toFixed(2)}%</td>
+        <td style="color:${f.oos_sharpe>=0.5?'#39d98a':f.oos_sharpe>=0?'#ccc':'#ff6b35'}">${f.oos_sharpe?.toFixed(2)}</td>
+        <td style="color:${f.oos_win_rate>=50?'#39d98a':'#ff6b35'}">${f.oos_win_rate}%</td>
+        <td style="color:${degColor};font-weight:600">${degVal}</td>
+      </tr>`;
+    }).join('');
+
+    document.getElementById('wfCard').style.display = '';
+    showToast('Walk-Forward Complete', `${d.symbol} | OOS Avg: ${s.avg_oos_return_pct>=0?'+':''}${s.avg_oos_return_pct?.toFixed(2)}% | Overfit: ${ovRisk}`, ovRisk==='LOW'?'success':'warning');
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+  finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Walk-Forward Validation';
   }
 }
 
@@ -3101,12 +4038,13 @@ async function saveThaiSettings() {
 // Dashboard State (Signal Funnel + PnL Today + Agent Status)
 // ============================================================
 const AGENT_META = {
-  analyzer:   {icon: 'bi-search',      label: 'Analyzer'},
-  strategist: {icon: 'bi-diagram-3',   label: 'Strategist'},
+  analyzer:   {icon: 'bi-search',           label: 'Analyzer'},
+  strategist: {icon: 'bi-diagram-3',        label: 'Strategist'},
   executor:   {icon: 'bi-lightning-charge', label: 'Executor'},
-  trainer:    {icon: 'bi-mortarboard', label: 'Trainer'},
+  trainer:    {icon: 'bi-mortarboard',      label: 'ML Trainer'},
+  risk:       {icon: 'bi-shield-exclamation', label: 'Risk Engine'},
 };
-const AGENT_ORDER = ['analyzer', 'strategist', 'executor', 'trainer'];
+const AGENT_ORDER = ['analyzer', 'strategist', 'executor', 'trainer', 'risk'];
 
 function _pnlColor(v) { return v > 0 ? 'var(--accent-buy)' : v < 0 ? 'var(--accent-red)' : 'var(--text-muted)'; }
 function _pnlFmt(v) { return (v >= 0 ? '+' : '') + v.toFixed(2); }
@@ -3142,8 +4080,23 @@ function renderDashboardState(d) {
   }
   const op = document.getElementById('pnlOpenPos');
   if (op && d.open_positions != null) op.textContent = d.open_positions;
+  // Signal cache savings (incremental analysis)
+  if (d.signal_cache) {
+    const sc = d.signal_cache;
+    const box  = document.getElementById('funCacheBox');
+    const hr   = document.getElementById('funCacheHitRate');
+    const bar  = document.getElementById('funCacheBar');
+    const txt  = document.getElementById('funCacheSaved');
+    const show = sc.enabled && (sc.hits > 0 || sc.calls_saved > 0);
+    if (box) box.classList.toggle('d-none', !show);
+    if (hr)  hr.textContent  = `hit ${(sc.hit_rate * 100).toFixed(0)}%`;
+    if (bar) bar.style.width = `${(sc.hit_rate * 100).toFixed(0)}%`;
+    if (txt) txt.textContent = sc.calls_saved > 0 ? `ประหยัด Claude API ไป ${sc.calls_saved} ครั้ง` : 'รอข้อมูล...';
+  }
   // Agents
   if (d.agents) renderAgents(d.agents);
+  // Risk state embedded in dashboard update
+  if (d.risk) { riskState = d.risk; renderRiskPanel(); }
 }
 
 function renderAgents(agents) {
@@ -3532,6 +4485,13 @@ async function init() {
   await refreshDashboardState();
   await refreshPositions();
   await refreshNotifications();
+  await fetchRegimes();
+  await fetchRiskState();
+  await fetchNarratives();
+  await fetchCorrelations();
+  await fetchPatterns(Object.keys(allPrices)[0] || 'BTC/USDT');
+  await fetchAnalytics();
+  await fetchSentiment(Object.keys(allPrices)[0] || 'BTC/USDT');
   setInterval(fetchPrices, 5000);
   setInterval(fetchPortfolioStats, 10000);
   setInterval(fetchStats, 30000);
@@ -3541,14 +4501,76 @@ async function init() {
   setInterval(refreshLoopStatus, 3000);
   setInterval(refreshPositions, 15000);    // fallback poll (WS pushes too)
   setInterval(refreshNotifications, 30000);
+  setInterval(fetchRegimes, 15000);
+  setInterval(fetchRiskState, 10000);
+  setInterval(fetchNarratives, 30000);
+  setInterval(fetchCorrelations, 30000);
+  setInterval(fetchAnalytics, 60000);
+  setInterval(() => fetchSentiment(Object.keys(allPrices)[0] || 'BTC/USDT'), 300000); // 5 min
   // E: Chart auto-refresh every 15 minutes
   setInterval(updateTradingChart, 15 * 60 * 1000);
+  await fetchKillSwitchStatus();
+  setInterval(fetchKillSwitchStatus, 10000);
+}
+
+// ── Kill Switch + Dry-Run controls ───────────────────────────────────────
+async function fetchKillSwitchStatus() {
+  try {
+    const d = await fetch('/api/trading/kill-switch').then(r => r.json());
+    _applyKillState(d.killed, d.dry_run);
+  } catch (_) {}
+}
+
+function _applyKillState(killed, dryRun) {
+  const badge    = document.getElementById('killStatusBadge');
+  const drBadge  = document.getElementById('dryRunBadge');
+  const killBtn  = document.getElementById('killSwitchBtn');
+  const resumBtn = document.getElementById('resumeTradeBtn');
+  const toggle   = document.getElementById('dryRunToggle');
+  if (killed) {
+    badge.textContent = 'TRADING HALTED';
+    badge.className   = 'badge bg-danger';
+    killBtn.classList.add('d-none');
+    resumBtn.classList.remove('d-none');
+  } else {
+    badge.textContent = 'TRADING ACTIVE';
+    badge.className   = 'badge bg-success';
+    killBtn.classList.remove('d-none');
+    resumBtn.classList.add('d-none');
+  }
+  if (drBadge) drBadge.classList.toggle('d-none', !dryRun);
+  if (toggle)  toggle.checked = !!dryRun;
+}
+
+async function activateKillSwitch() {
+  if (!confirm('Activate kill switch? All new trades will be halted immediately.')) return;
+  const d = await fetch('/api/trading/kill-switch?action=activate', { method: 'POST' }).then(r => r.json());
+  _applyKillState(d.killed, undefined);
+  _addNotif({ type: 'warning', message: 'Kill switch activated — trading halted', ts: new Date().toISOString() });
+}
+
+async function deactivateKillSwitch() {
+  const d = await fetch('/api/trading/kill-switch?action=deactivate', { method: 'POST' }).then(r => r.json());
+  _applyKillState(d.killed, undefined);
+  _addNotif({ type: 'info', message: 'Kill switch deactivated — trading resumed', ts: new Date().toISOString() });
+}
+
+async function toggleDryRun(enabled) {
+  const d = await fetch(`/api/trading/dry-run?enabled=${enabled}`, { method: 'POST' }).then(r => r.json());
+  const drBadge = document.getElementById('dryRunBadge');
+  if (drBadge) drBadge.classList.toggle('d-none', !d.dry_run);
+}
+
+function _addNotif(item) {
+  // Lightweight local notification push (websocket handles persistence)
+  const panel = document.getElementById('notificationsPanel');
+  if (!panel) return;
 }
 
 init();
 </script>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/bootstrap.bundle.min.js"></script>
 
 <!-- ── Floating Chat Button ── -->
 <button id="chatFab" onclick="toggleChat()" title="AI Assistant">
@@ -3592,6 +4614,303 @@ init();
     </button>
   </div>
 </div>
+
+
+<script>
+// ── Price Alerts ─────────────────────────────────────────────────────────────
+
+function _populateAlertSymbols() {
+  const sel = document.getElementById('alertSymbol');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '';
+  (_symbols || []).forEach(s => {
+    const o = document.createElement('option');
+    o.value = s; o.textContent = s;
+    if (s === current) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+
+async function loadAlerts() {
+  _populateAlertSymbols();
+  try {
+    const rows = await fetch('/api/alerts').then(r => r.json());
+    const listEl  = document.getElementById('alertsList');
+    const emptyEl = document.getElementById('alertsEmpty');
+    if (!rows.length) {
+      if (listEl)  listEl.style.display  = 'none';
+      if (emptyEl) emptyEl.style.display = '';
+      return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+    if (listEl)  listEl.style.display  = '';
+    listEl.innerHTML = rows.map(a => {
+      const fired = a.triggered_at ? `<span class="text-muted" style="font-size:0.68rem">แจ้งล่าสุด ${new Date(a.triggered_at).toLocaleString('th-TH',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'})}</span>` : '';
+      const badge = a.active
+        ? `<span class="badge bg-success" style="font-size:0.62rem">Active</span>`
+        : `<span class="badge bg-secondary" style="font-size:0.62rem">Off</span>`;
+      const arrow = a.condition === 'above' ? '📈' : '📉';
+      const cond  = a.condition === 'above' ? 'ขึ้นถึง' : 'ลงถึง';
+      const repeat = a.repeat ? `<span class="badge" style="font-size:0.6rem;background:var(--bg-main);color:var(--text-muted);border:1px solid var(--border)">ซ้ำ</span>` : '';
+      return `<div class="d-flex align-items-center gap-2 px-3 py-2" style="border-bottom:1px solid var(--border);font-size:0.8rem">
+        <span style="font-size:1rem">${arrow}</span>
+        <div class="flex-grow-1 min-width-0">
+          <div class="fw-bold">${a.symbol} ${cond} <span style="color:var(--accent)">${(+a.target_price).toLocaleString(undefined,{maximumFractionDigits:4})}</span></div>
+          ${a.note ? `<div class="text-muted" style="font-size:0.72rem">📝 ${a.note}</div>` : ''}
+          <div class="d-flex gap-1 align-items-center mt-1">${badge}${repeat}${fired}</div>
+        </div>
+        <div class="d-flex gap-1 flex-shrink-0">
+          <button class="btn btn-outline-secondary btn-sm px-1 py-0" onclick="toggleAlert(${a.id})" title="${a.active ? 'ปิด' : 'เปิด'}">
+            <i class="bi bi-${a.active ? 'pause-fill' : 'play-fill'}" style="font-size:0.7rem"></i>
+          </button>
+          <button class="btn btn-outline-danger btn-sm px-1 py-0" onclick="deleteAlert(${a.id})" title="ลบ">
+            <i class="bi bi-trash" style="font-size:0.7rem"></i>
+          </button>
+        </div>
+      </div>`;
+    }).join('');
+
+    // Badge count on nav
+    const active = rows.filter(a => a.active).length;
+    const navEl = document.getElementById('navAlerts');
+    if (navEl) {
+      navEl.innerHTML = active
+        ? `Alerts <span class="badge rounded-pill" style="background:var(--accent);color:#000;font-size:0.6rem;vertical-align:middle;padding:2px 5px">${active}</span>`
+        : 'Alerts';
+    }
+  } catch(e) { console.error('loadAlerts', e); }
+}
+
+async function createAlert() {
+  const symbol     = document.getElementById('alertSymbol')?.value;
+  const condition  = document.getElementById('alertCondition')?.value;
+  const target     = parseFloat(document.getElementById('alertPrice')?.value);
+  const note       = document.getElementById('alertNote')?.value?.trim() || '';
+  const repeat     = document.getElementById('alertRepeat')?.checked;
+  const resultEl   = document.getElementById('alertCreateResult');
+
+  if (!symbol || !condition) return;
+  if (isNaN(target) || target <= 0) {
+    if (resultEl) { resultEl.style.display=''; resultEl.innerHTML='<span class="text-danger">ใส่ราคาเป้าหมายให้ถูกต้อง</span>'; }
+    return;
+  }
+  try {
+    const r = await fetch('/api/alerts', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({symbol, condition, target_price: target, note, repeat}),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Failed');
+    if (resultEl) { resultEl.style.display=''; resultEl.innerHTML=`<span class="text-success">✓ เพิ่มแล้ว: ${symbol} ${condition} ${target.toLocaleString()}</span>`; }
+    document.getElementById('alertPrice').value = '';
+    document.getElementById('alertNote').value  = '';
+    await loadAlerts();
+  } catch(e) {
+    if (resultEl) { resultEl.style.display=''; resultEl.innerHTML=`<span class="text-danger">🔴 ${e.message}</span>`; }
+  }
+}
+
+async function toggleAlert(id) {
+  try {
+    await fetch(`/api/alerts/${id}/toggle`, {method:'POST'});
+    await loadAlerts();
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+}
+
+async function deleteAlert(id) {
+  if (!confirm('ลบการแจ้งเตือนนี้?')) return;
+  try {
+    await fetch(`/api/alerts/${id}`, {method:'DELETE'});
+    await loadAlerts();
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+}
+
+// ── Trade Journal ─────────────────────────────────────────────────────────────
+
+let _journalTradeId = null;
+
+function openJournalModal(tradeId, info, existingNote) {
+  _journalTradeId = tradeId;
+  const infoEl = document.getElementById('journalTradeInfo');
+  const textEl = document.getElementById('journalText');
+  const countEl = document.getElementById('journalCharCount');
+  if (infoEl) infoEl.textContent = info || '';
+  if (textEl) {
+    textEl.value = existingNote || '';
+    if (countEl) countEl.textContent = `${textEl.value.length} / 2000`;
+    textEl.oninput = () => { if (countEl) countEl.textContent = `${textEl.value.length} / 2000`; };
+  }
+  new bootstrap.Modal(document.getElementById('journalModal')).show();
+}
+
+async function saveJournal() {
+  if (!_journalTradeId) return;
+  const note = document.getElementById('journalText')?.value || '';
+  try {
+    const r = await fetch(`/api/trades/${_journalTradeId}/note`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({note}),
+    });
+    if (!r.ok) throw new Error((await r.json()).detail);
+    bootstrap.Modal.getInstance(document.getElementById('journalModal')).hide();
+    showToast('Journal', 'บันทึกแล้ว', 'success');
+    loadTrades();
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+}
+
+// ── Trading Schedule ──────────────────────────────────────────────────────────
+
+async function saveSchedule() {
+  const enabled    = document.getElementById('schedEnabled')?.checked;
+  const start      = document.getElementById('schedStart')?.value || '00:00';
+  const end        = document.getElementById('schedEnd')?.value   || '06:00';
+  const no_weekend = document.getElementById('schedNoWeekend')?.checked;
+  const resultEl   = document.getElementById('schedSaveResult');
+  try {
+    await fetch('/api/settings', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ trading: { schedule: { enabled, no_trade_start: start, no_trade_end: end, no_weekend } } }),
+    });
+    if (resultEl) { resultEl.style.display=''; resultEl.style.color='var(--accent-buy)'; resultEl.textContent='✓ บันทึกแล้ว'; setTimeout(() => resultEl.style.display='none', 2500); }
+  } catch(e) {
+    if (resultEl) { resultEl.style.display=''; resultEl.style.color='var(--accent-red)'; resultEl.textContent='🔴 ' + e.message; }
+  }
+}
+
+// Extend loadSettings to populate schedule + wire alerts on section switch
+const _origLoadSettings = typeof loadSettings === 'function' ? loadSettings : null;
+async function loadSettings() {
+  if (_origLoadSettings) await _origLoadSettings();
+  try {
+    const r = await fetch('/api/settings');
+    const d = await r.json();
+    const sched = d.trading?.schedule || {};
+    const schedEnabled = document.getElementById('schedEnabled');
+    if (schedEnabled) schedEnabled.checked = !!sched.enabled;
+    const schedStart = document.getElementById('schedStart');
+    if (schedStart && sched.no_trade_start) schedStart.value = sched.no_trade_start;
+    const schedEnd = document.getElementById('schedEnd');
+    if (schedEnd && sched.no_trade_end) schedEnd.value = sched.no_trade_end;
+    const schedNoWeekend = document.getElementById('schedNoWeekend');
+    if (schedNoWeekend) schedNoWeekend.checked = !!sched.no_weekend;
+  } catch {}
+}
+
+// Load alerts when the alerts section becomes active
+const _showSectionBase = showSection;
+showSection = function(name, el) {
+  _showSectionBase(name, el);
+  if (name === 'alerts') loadAlerts();
+};
+
+// ── Exchange Connection Probe ─────────────────────────────────────────────────
+
+async function probeExchange(name) {
+  const resultEl = document.getElementById(`probe-${name}`);
+  if (!resultEl) return;
+  const apiKey    = (document.getElementById(`${name}_api_key`)    || {}).value || '';
+  const apiSecret = (document.getElementById(`${name}_api_secret`) || {}).value || '';
+
+  resultEl.style.display = '';
+  resultEl.innerHTML = '<span class="text-muted"><span class="spinner-border spinner-border-sm me-1" style="width:10px;height:10px;border-width:1.5px"></span>กำลังทดสอบ…</span>';
+
+  try {
+    const r = await fetch('/api/exchange/probe', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({exchange: name, api_key: apiKey, api_secret: apiSecret}),
+    });
+    const d = await r.json();
+    if (!r.ok) { resultEl.innerHTML = `<span class="text-danger">🔴 ${d.detail}</span>`; return; }
+
+    const pubRow = d.public_ok
+      ? `<div>🟢 <b>Public API</b> — BTC ราคา ${(d.price||0).toLocaleString()} <span class="text-muted">(${d.latency_ms}ms)</span></div>`
+      : `<div>🔴 <b>Public API</b> — ไม่สามารถเชื่อมต่อได้</div>`;
+
+    let authRow = '';
+    if (d.auth_ok === null) {
+      authRow = `<div>⚪ <b>Auth API</b> — ยังไม่ได้ใส่ API Key</div>`;
+    } else if (d.auth_ok) {
+      const balItems = Object.entries(d.balance || {})
+        .map(([a, b]) => `${a}: <b>${b.free.toLocaleString(undefined,{maximumFractionDigits:4})}</b>`)
+        .join(' · ');
+      authRow = `<div>🟢 <b>Auth API</b> — ยืนยัน Key สำเร็จ<br>
+        <span class="text-muted" style="font-size:0.72rem">💼 Balance: ${balItems || 'ยังไม่มีสินทรัพย์'}</span></div>`;
+    } else {
+      authRow = `<div>🔴 <b>Auth API</b> — ${d.error || 'Key ไม่ถูกต้องหรือไม่มีสิทธิ์'}</div>`;
+    }
+
+    resultEl.innerHTML = pubRow + authRow;
+
+    if (d.auth_ok) {
+      showToast('Connection OK', `${name}: เชื่อมต่อและยืนยัน API Key สำเร็จ`, 'success');
+    } else if (d.public_ok) {
+      showToast('Partial', `${name}: Public API ได้ แต่ Auth ยังไม่ผ่าน`, 'warning');
+    }
+  } catch(e) {
+    resultEl.innerHTML = `<span class="text-danger">🔴 ${e.message}</span>`;
+  }
+}
+
+// ── Small-Budget Preset ───────────────────────────────────────────────────────
+
+async function applySmallBudgetPreset() {
+  const budget  = parseFloat(document.getElementById('presetBudget')?.value || '500') || 500;
+  const cur     = _quoteCur || 'USDT';
+  const resultEl = document.getElementById('presetResult');
+
+  // Derive safe params for this budget:
+  // min_trade = Binance TH floor (~100 THB / ~3 USDT)
+  const minTrade = cur === 'THB' ? 100 : 3;
+  // max_trade = 80% of budget, leave 20% buffer
+  const maxTrade = Math.floor(budget * 0.80);
+  // fallback_risk_pct: need portfolio × fallback > min_trade → fallback > min_trade/budget
+  const fallback = Math.min(0.50, Math.max(0.25, (minTrade * 1.5) / budget));
+  // stop loss widens for small budgets (need room to breathe)
+  const slPct    = budget < 1000 ? 5 : budget < 5000 ? 4 : 3;
+  const tpPct    = slPct * 2;
+
+  if (resultEl) { resultEl.style.display=''; resultEl.innerHTML = '<span class="text-muted">กำลังบันทึก…</span>'; }
+
+  try {
+    await fetch('/api/settings', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        position_sizer: {
+          kelly_fraction:    1.0,
+          min_trade_usdt:    minTrade,
+          max_trade_usdt:    maxTrade,
+          fallback_risk_pct: parseFloat(fallback.toFixed(3)),
+        },
+        trading: {
+          max_open_trades:    1,
+          max_position_pct:   0.80,
+          stop_loss_pct:      slPct / 100,
+          take_profit_pct:    tpPct / 100,
+          risk_per_trade_pct: 0.05,
+          max_daily_loss_pct: 0.10,
+          live_max_budget_usdt: budget,
+        },
+      }),
+    });
+
+    if (resultEl) {
+      resultEl.innerHTML = `<span style="color:var(--accent-buy)">
+        ✓ ปรับแล้ว — Kelly=100% · Min ${minTrade}${cur} · Max ${maxTrade}${cur}/trade · SL ${slPct}% · TP ${tpPct}% · Max 1 position · Budget cap ${budget}${cur}
+      </span>`;
+    }
+    showToast('Preset Applied', `ตั้งค่าสำหรับงบ ${budget.toLocaleString()} ${cur} แล้ว`, 'success');
+    // Reload settings UI fields
+    await loadSettings();
+
+    // Populate budget field in Live mode modal too
+    const liveBudgetEl = document.getElementById('liveBudgetInput');
+    if (liveBudgetEl) liveBudgetEl.value = budget;
+  } catch(e) {
+    if (resultEl) { resultEl.innerHTML = `<span class="text-danger">🔴 ${e.message}</span>`; }
+  }
+}
+</script>
 
 </body>
 </html>

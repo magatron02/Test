@@ -3,7 +3,6 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 import numpy as np
-import pandas as pd
 
 from ..exchanges.base import OHLCV
 
@@ -48,6 +47,33 @@ class MarketAnalysis:
     overall_signal: str = "HOLD"
     signal_strength: float = 0.0
     features: Dict = field(default_factory=dict)
+
+    # Chart patterns (populated by detect_patterns)
+    patterns: List = field(default_factory=list)
+    pattern_summary: str = ""
+
+    # Extended indicators (populated when available)
+    supertrend_signal: str = "NEUTRAL"   # BUY | SELL | NEUTRAL
+    stoch_rsi_k: float = 50.0
+    stoch_rsi_signal: str = "NEUTRAL"
+    williams_r: float = -50.0
+    cci: float = 0.0
+    rsi_divergence: str = "NONE"         # BULLISH | BEARISH | NONE
+    ichimoku_signal: str = "NEUTRAL"     # BULL | BEAR | NEUTRAL
+    smc_buy: float = 0.0
+    smc_sell: float = 0.0
+    smc_summary: str = ""
+    aroon_signal: str = "NEUTRAL"
+    market_regime: str = ""              # set by AITrader after detect_regime (BULL_TREND, …)
+
+    # Quant features (ML4T Ch.4/Ch.9) — Kalman trend, GARCH vol forecast, WorldQuant alphas
+    kalman_trend: str = "FLAT"           # BULLISH | BEARISH | FLAT (denoised)
+    kalman_velocity: float = 0.0
+    kalman_deviation_pct: float = 0.0    # raw price vs filtered (overextension)
+    garch_forecast_vol_pct: float = 0.0  # forward 5-bar volatility forecast
+    garch_vol_ratio: float = 1.0         # forecast/current (>1 = rising vol)
+    garch_regime_hint: str = "STABLE"    # RISING_VOL | FALLING_VOL | STABLE
+    alphas: Dict = field(default_factory=dict)   # WorldQuant formulaic alpha values
 
 
 def _ema(series: np.ndarray, period: int) -> np.ndarray:
@@ -115,7 +141,8 @@ def _ohlcv_to_arrays(candles: List[OHLCV]):
 
 
 def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
-            rsi_period: int = 14, bb_period: int = 20, atr_period: int = 14) -> MarketAnalysis:
+            rsi_period: int = 14, bb_period: int = 20, atr_period: int = 14,
+            rsi_oversold: float = 30.0, rsi_overbought: float = 70.0) -> MarketAnalysis:
     if len(candles) < 30:
         return MarketAnalysis(symbol=symbol, price=price, change_24h=change_24h)
 
@@ -124,9 +151,9 @@ def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
 
     # RSI
     result.rsi = _rsi(closes, rsi_period)
-    if result.rsi < 30:
+    if result.rsi < rsi_oversold:
         result.rsi_signal = "OVERSOLD"
-    elif result.rsi > 70:
+    elif result.rsi > rsi_overbought:
         result.rsi_signal = "OVERBOUGHT"
 
     # MACD
@@ -204,6 +231,118 @@ def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
     elif result.price_vs_vwap == "BELOW" and result.volume_signal == "HIGH":
         sell_score += 0.10
 
+    # ── Chart pattern detection ────────────────────────────────────────
+    try:
+        from .chart_patterns import detect_patterns, patterns_to_signal_boost
+        patterns = detect_patterns(closes, highs, lows, min_confidence=0.50)
+        result.patterns = patterns
+        pat_buy, pat_sell, result.pattern_summary = patterns_to_signal_boost(patterns)
+        buy_score  += pat_buy
+        sell_score += pat_sell
+    except Exception as e:
+        logger.debug("Chart pattern detection skipped: %s", e)
+
+    # ── Advanced indicators (AI trading knowledge) ─────────────────────
+    try:
+        from .indicators_extra import (
+            supertrend, stoch_rsi, williams_r as calc_wr, cci as calc_cci,
+            rsi_divergence, ichimoku, ichimoku_signal_score, aroon,
+        )
+        # SuperTrend
+        st = supertrend(closes, highs, lows)
+        result.supertrend_signal = st["signal"]
+        if st["signal"] == "BUY":
+            buy_score  += 0.15
+        elif st["signal"] == "SELL":
+            sell_score += 0.15
+
+        # Stochastic RSI
+        srsi = stoch_rsi(closes)
+        result.stoch_rsi_k      = srsi["k"]
+        result.stoch_rsi_signal = srsi["signal"]
+        if srsi["signal"] == "OVERSOLD":
+            buy_score  += 0.10
+        elif srsi["signal"] == "OVERBOUGHT":
+            sell_score += 0.10
+
+        # Williams %R
+        wr = calc_wr(closes, highs, lows)
+        result.williams_r = wr
+        if wr < -80:
+            buy_score  += 0.08
+        elif wr > -20:
+            sell_score += 0.08
+
+        # CCI
+        cci_val = calc_cci(closes, highs, lows)
+        result.cci = cci_val
+        if cci_val < -100:
+            buy_score  += 0.08
+        elif cci_val > 100:
+            sell_score += 0.08
+
+        # RSI Divergence
+        div = rsi_divergence(closes)
+        result.rsi_divergence = div
+        if div == "BULLISH":
+            buy_score  += 0.12
+        elif div == "BEARISH":
+            sell_score += 0.12
+
+        # Ichimoku Cloud
+        ichi = ichimoku(closes, highs, lows)
+        ichi_buy, ichi_sell = ichimoku_signal_score(ichi)
+        result.ichimoku_signal = "BULL" if ichi_buy > ichi_sell else ("BEAR" if ichi_sell > ichi_buy else "NEUTRAL")
+        buy_score  += ichi_buy  * 0.20
+        sell_score += ichi_sell * 0.20
+
+        # Aroon
+        arr = aroon(highs, lows)
+        result.aroon_signal = arr["signal"]
+        if arr["signal"] == "BULL":
+            buy_score  += 0.08
+        elif arr["signal"] == "BEAR":
+            sell_score += 0.08
+
+    except Exception as e:
+        logger.debug("Extended indicators skipped: %s", e)
+
+    # ── SMC (Smart Money Concepts) ─────────────────────────────────────
+    try:
+        from .smc_detector import analyse_smc
+        smc = analyse_smc(closes, opens, highs, lows)
+        result.smc_buy     = smc.buy_score
+        result.smc_sell    = smc.sell_score
+        result.smc_summary = smc.summary
+        buy_score  += smc.buy_score  * 0.25
+        sell_score += smc.sell_score * 0.25
+    except Exception as e:
+        logger.debug("SMC detection skipped: %s", e)
+
+    # ── Quant features: Kalman trend, GARCH vol forecast, WorldQuant alphas ──
+    try:
+        from .quant_features import kalman_trend, garch_volatility, worldquant_alphas
+
+        kal = kalman_trend(closes)
+        result.kalman_trend         = kal.get("trend", "FLAT")
+        result.kalman_velocity      = kal.get("velocity", 0.0)
+        result.kalman_deviation_pct = kal.get("deviation_pct", 0.0)
+        # Kalman trend adds confluence weight (denoised, less whipsaw than EMA)
+        if result.kalman_trend == "BULLISH":
+            buy_score  += 0.10
+        elif result.kalman_trend == "BEARISH":
+            sell_score += 0.10
+
+        rets = np.diff(closes) / np.where(closes[:-1] != 0, closes[:-1], 1) * 100
+        garch = garch_volatility(rets)
+        result.garch_forecast_vol_pct = garch.get("forecast_vol_pct", 0.0)
+        result.garch_vol_ratio        = garch.get("vol_ratio", 1.0)
+        result.garch_regime_hint      = garch.get("regime_hint", "STABLE")
+
+        result.alphas = worldquant_alphas(opens, highs, lows, closes, vols)
+    except Exception as e:
+        logger.debug("Quant features skipped: %s", e)
+
     if buy_score > sell_score and buy_score > 0.4:
         result.overall_signal = "BUY"
         result.signal_strength = min(buy_score, 1.0)
@@ -215,15 +354,32 @@ def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
         result.signal_strength = max(buy_score, sell_score)
 
     result.features = {
-        "rsi": result.rsi,
-        "macd_hist": result.macd_hist,
-        "ema_9": result.ema_9,
-        "ema_21": result.ema_21,
-        "bb_position": result.bb_position,
-        "atr_pct": result.atr_pct,
-        "volume_ratio": result.volume_ratio,
-        "price_vs_vwap": 1 if result.price_vs_vwap == "ABOVE" else 0,
-        "change_24h": change_24h,
+        "rsi":              result.rsi,
+        "macd_hist":        result.macd_hist,
+        "ema_9":            result.ema_9,
+        "ema_21":           result.ema_21,
+        "bb_position":      result.bb_position,
+        "atr_pct":          result.atr_pct,
+        "volume_ratio":     result.volume_ratio,
+        "price_vs_vwap":    1 if result.price_vs_vwap == "ABOVE" else 0,
+        "change_24h":       change_24h,
+        # Extended features for ML training
+        "stoch_rsi_k":      result.stoch_rsi_k,
+        "williams_r":       result.williams_r,
+        "cci":              result.cci,
+        "smc_buy":          result.smc_buy,
+        "smc_sell":         result.smc_sell,
+        "ichimoku_bull":    1 if result.ichimoku_signal == "BULL" else 0,
+        "supertrend_buy":   1 if result.supertrend_signal == "BUY" else 0,
+        "rsi_div_bull":     1 if result.rsi_divergence == "BULLISH" else 0,
+        "rsi_div_bear":     1 if result.rsi_divergence == "BEARISH" else 0,
+        # Quant features (ML4T)
+        "kalman_velocity":  result.kalman_velocity,
+        "kalman_dev_pct":   result.kalman_deviation_pct,
+        "garch_vol_ratio":  result.garch_vol_ratio,
     }
+    # Merge WorldQuant alphas (prefixed) into the feature vector
+    for name, val in (result.alphas or {}).items():
+        result.features[f"wq_{name}"] = val
 
     return result

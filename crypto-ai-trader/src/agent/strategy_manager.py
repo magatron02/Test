@@ -1,10 +1,12 @@
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Dict, Optional
 
 from .market_analyzer import MarketAnalysis
 from ..core.config import settings
+from ..core.persistence import atomic_write_json, safe_read_json
 
 logger = logging.getLogger(__name__)
 
@@ -20,13 +22,57 @@ class TradingSignal:
 
 
 class StrategyManager:
-    def __init__(self):
-        self._last_dca: Dict[str, datetime] = {}
+    def __init__(self, data_dir: Optional[Path] = None):
+        self._dca_path: Optional[Path] = (
+            Path(data_dir) / "dca_timers.json" if data_dir else None
+        )
+        self._last_dca: Dict[str, datetime] = self._load_dca_timers()
         self._strategy_weights = {
             "dca": 0.30,
             "trend": 0.35,
             "mean_reversion": 0.35,
         }
+        # Walk-forward optimizer overrides (F5.1) — None = use config/hardcoded defaults
+        self._opt_rsi_oversold:  Optional[float] = None
+        self._opt_rsi_overbought: Optional[float] = None
+
+    # ── DCA timer persistence ─────────────────────────────────────────────
+
+    def _load_dca_timers(self) -> Dict[str, datetime]:
+        if self._dca_path is None:
+            return {}
+        data = safe_read_json(self._dca_path)
+        if not isinstance(data, dict):
+            return {}
+        result: Dict[str, datetime] = {}
+        for sym, iso in data.items():
+            try:
+                result[sym] = datetime.fromisoformat(iso)
+            except Exception:
+                pass
+        if result:
+            logger.info("StrategyManager: restored DCA timers for %d symbols", len(result))
+        return result
+
+    def _save_dca_timers(self):
+        if self._dca_path is not None:
+            atomic_write_json(
+                self._dca_path,
+                {sym: dt.isoformat() for sym, dt in self._last_dca.items()},
+            )
+
+    def set_opt_params(
+        self,
+        rsi_oversold:  Optional[float] = None,
+        rsi_overbought: Optional[float] = None,
+    ):
+        """Apply walk-forward optimized RSI bands. Pass None to clear."""
+        self._opt_rsi_oversold  = rsi_oversold
+        self._opt_rsi_overbought = rsi_overbought
+        logger.info(
+            "StrategyManager: opt RSI bands updated oversold=%.0f overbought=%.0f",
+            rsi_oversold or 0.0, rsi_overbought or 0.0,
+        )
 
     def update_weights(self, weights: Dict[str, float]):
         """Updated by AI trainer based on performance."""
@@ -35,13 +81,16 @@ class StrategyManager:
 
     def dca_signal(self, analysis: MarketAnalysis) -> TradingSignal:
         cfg = settings.get("strategy", "dca") or {}
-        rsi_buy = float(cfg.get("rsi_buy_threshold", 35))
-        rsi_sell = float(cfg.get("rsi_sell_threshold", 65))
+        # Optimizer override takes precedence over the config value when present
+        rsi_buy  = self._opt_rsi_oversold  if self._opt_rsi_oversold  is not None \
+                   else float(cfg.get("rsi_buy_threshold",  35))
+        rsi_sell = self._opt_rsi_overbought if self._opt_rsi_overbought is not None \
+                   else float(cfg.get("rsi_sell_threshold", 65))
         interval_h = float(cfg.get("interval_hours", 24))
 
         symbol = analysis.symbol
         last = self._last_dca.get(symbol)
-        if last and datetime.utcnow() - last < timedelta(hours=interval_h):
+        if last and datetime.now(timezone.utc) - last < timedelta(hours=interval_h):
             return TradingSignal("HOLD", 0.0, "dca", "DCA interval not reached", 0.03, 0.06)
 
         if analysis.rsi < rsi_buy:
@@ -163,14 +212,63 @@ class StrategyManager:
         return TradingSignal("HOLD", max(buy_score, sell_score), "hybrid", "Insufficient confidence", 0.03, 0.06)
 
     def record_dca(self, symbol: str):
-        self._last_dca[symbol] = datetime.utcnow()
+        self._last_dca[symbol] = datetime.now(timezone.utc)
+        self._save_dca_timers()
+
+    def ichimoku_strategy(self, analysis: MarketAnalysis) -> TradingSignal:
+        """Ichimoku Cloud strategy — all-in-one Japanese trend system."""
+        sig = analysis.ichimoku_signal
+        if sig == "BULL":
+            conf = 0.72
+            if analysis.supertrend_signal == "BUY":
+                conf = min(conf + 0.10, 0.90)
+            return TradingSignal("BUY", conf, "ichimoku", "Ichimoku bullish: TK cross + above cloud", 0.025, 0.05)
+        elif sig == "BEAR":
+            conf = 0.72
+            if analysis.supertrend_signal == "SELL":
+                conf = min(conf + 0.10, 0.90)
+            return TradingSignal("SELL", conf, "ichimoku", "Ichimoku bearish: TK cross + below cloud", 0.025, 0.05)
+        return TradingSignal("HOLD", 0.30, "ichimoku", "Price inside Ichimoku cloud — no signal", 0.025, 0.05)
+
+    def smc_strategy(self, analysis: MarketAnalysis) -> TradingSignal:
+        """Smart Money Concepts strategy — institutional price action."""
+        bs, ss = analysis.smc_buy, analysis.smc_sell
+        min_score = 0.40
+        if bs > ss and bs >= min_score:
+            conf = min(0.50 + bs, 0.90)
+            return TradingSignal("BUY", conf, "smc",
+                                 f"SMC buy: {analysis.smc_summary}", 0.02, 0.05)
+        elif ss > bs and ss >= min_score:
+            conf = min(0.50 + ss, 0.90)
+            return TradingSignal("SELL", conf, "smc",
+                                 f"SMC sell: {analysis.smc_summary}", 0.02, 0.05)
+        return TradingSignal("HOLD", max(bs, ss), "smc",
+                             f"SMC: {analysis.smc_summary}", 0.02, 0.05)
+
+    def signal_for_strategy(
+        self,
+        strategy: str,
+        analysis: MarketAnalysis,
+        ml_signal: Optional[TradingSignal] = None,
+    ) -> TradingSignal:
+        """Dispatch to a single named strategy (used by regime/RL-driven selection).
+
+        Selecting one strategy that fits the current regime avoids the
+        trend-vs-mean-reversion conflict that cancels out the blended
+        ``hybrid_signal`` (e.g. in an uptrend ``trend`` wants BUY while
+        ``mean_reversion`` wants SELL, netting to HOLD)."""
+        if strategy == "dca":
+            return self.dca_signal(analysis)
+        if strategy == "trend":
+            return self.trend_signal(analysis)
+        if strategy == "mean_reversion":
+            return self.mean_reversion_signal(analysis)
+        if strategy == "ichimoku":
+            return self.ichimoku_strategy(analysis)
+        if strategy == "smc":
+            return self.smc_strategy(analysis)
+        return self.hybrid_signal(analysis, ml_signal)
 
     def get_signal(self, analysis: MarketAnalysis, ml_signal: Optional[TradingSignal] = None) -> TradingSignal:
         strategy = settings.get("strategy", "primary", default="hybrid")
-        if strategy == "dca":
-            return self.dca_signal(analysis)
-        elif strategy == "trend":
-            return self.trend_signal(analysis)
-        elif strategy == "mean_reversion":
-            return self.mean_reversion_signal(analysis)
-        return self.hybrid_signal(analysis, ml_signal)
+        return self.signal_for_strategy(strategy, analysis, ml_signal)

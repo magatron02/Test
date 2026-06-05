@@ -1,21 +1,38 @@
+import json
 import logging
 import pickle
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
+from .drift_detector import DriftDetector
 from .strategy_manager import TradingSignal
 from ..core.config import settings
 from ..core.database import SessionLocal, TrainingRecord
 
 logger = logging.getLogger(__name__)
 
+_CHAMPION_META_FILE = "gbm_champion_meta.json"
+# Challenger must exceed champion AUC by this margin before promotion.
+_MIN_AUC_IMPROVEMENT = 0.02
+
 FEATURE_KEYS = [
     "rsi", "macd_hist", "bb_position", "atr_pct",
     "volume_ratio", "price_vs_vwap", "change_24h",
     "ema_9_vs_21",  # computed
+]
+
+# Extended, ordered feature set for the gradient-boosting model (ML4T Ch.12).
+# Kept stable so persisted models stay compatible across restarts.
+GBM_FEATURE_KEYS = [
+    "rsi", "macd_hist", "bb_position", "atr_pct", "volume_ratio",
+    "price_vs_vwap", "change_24h", "ema_9_vs_21",
+    "stoch_rsi_k", "williams_r", "cci", "smc_buy", "smc_sell",
+    "ichimoku_bull", "supertrend_buy", "rsi_div_bull", "rsi_div_bear",
+    "kalman_velocity", "kalman_dev_pct", "garch_vol_ratio",
+    "wq_alpha101", "wq_mom_5", "wq_mom_10", "wq_vol_zscore", "wq_close_to_high",
 ]
 
 
@@ -29,8 +46,26 @@ class AITrainer:
             "last_trained": None,
             "accuracy": None,
             "training_trades": 0,
+            "model_type": "none",
         }
         self._trades_since_train = 0
+        # F5.3 — champion/challenger: track best promoted AUC
+        self._champion_auc: float = self._load_champion_auc()
+        self._last_challenger_auc: Optional[float] = None
+        # F3.4 — drift detection
+        self._drift_detector = DriftDetector()
+        self._recent_features: Dict[str, List[float]] = {}   # feature → recent values
+        self._predict_count = 0
+        # Gradient-boosting model with SHAP explanations (primary when available)
+        self._gbm = None
+        try:
+            from .ml_models import GBMSignalModel
+            self._gbm = GBMSignalModel(settings.models_dir)
+            if self._gbm.load():
+                self._stats["model_type"] = "lightgbm"
+                logger.info("Loaded existing LightGBM signal model")
+        except Exception as e:
+            logger.debug("GBM model unavailable, using RandomForest: %s", e)
         self._load_model()
 
     def _load_model(self):
@@ -105,6 +140,34 @@ class AITrainer:
             ema_9_vs_21,
         ]
 
+    def _extract_gbm_features(self, features: Dict) -> List[float]:
+        """Build the extended GBM feature vector in a stable column order.
+
+        Unlike the RandomForest path this keeps raw (unscaled) values — tree
+        models are scale-invariant, and SHAP reads cleaner on native units.
+        """
+        f = dict(features)
+        f["ema_9_vs_21"] = 1.0 if f.get("ema_9", 0) > f.get("ema_21", 0) else -1.0
+        return [float(f.get(k, 0.0) or 0.0) for k in GBM_FEATURE_KEYS]
+
+    # ── F5.3 Champion / Challenger helpers ───────────────────────────────
+
+    def _load_champion_auc(self) -> float:
+        path = settings.models_dir / _CHAMPION_META_FILE
+        if path.exists():
+            try:
+                with open(path) as f:
+                    return float(json.load(f).get("auc_oos", 0.0))
+            except Exception:
+                pass
+        return 0.0
+
+    def _save_champion_meta(self, meta: dict) -> None:
+        path = settings.models_dir / _CHAMPION_META_FILE
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w") as f:
+            json.dump(meta, f, indent=2)
+
     def train(self) -> bool:
         from sklearn.ensemble import RandomForestClassifier
         from sklearn.model_selection import cross_val_score
@@ -134,6 +197,68 @@ class AITrainer:
         X_arr = np.array(X)
         y_arr = np.array(y)
 
+        # ── Primary: LightGBM + SHAP with champion/challenger gate (F5.3) ──
+        if self._gbm is not None:
+            try:
+                Xg = np.array([
+                    self._extract_gbm_features(r.features)
+                    for r in records if r.features and r.label is not None
+                ])
+                yg = y_arr
+                res = self._gbm.fit_challenger(Xg, yg, GBM_FEATURE_KEYS)
+                auc_oos = res.get("auc_oos")
+                self._last_challenger_auc = auc_oos
+
+                if auc_oos is None:
+                    logger.warning("GBM challenger eval failed (%s); falling back to RandomForest",
+                                   res.get("error"))
+                else:
+                    challenger_wins = auc_oos > self._champion_auc + _MIN_AUC_IMPROVEMENT
+                    if challenger_wins:
+                        self._gbm.save()
+                        now = datetime.now(timezone.utc).isoformat()
+                        self._save_champion_meta({
+                            "auc_oos":       auc_oos,
+                            "accuracy":      res.get("accuracy"),
+                            "n_total":       res.get("n_total"),
+                            "promoted_at":   now,
+                        })
+                        prev_auc = self._champion_auc
+                        self._champion_auc = auc_oos
+                        self._trades_since_train = 0
+                        self._stats.update({
+                            "last_trained":        now,
+                            "accuracy":            res.get("accuracy"),
+                            "training_trades":     len(records),
+                            "model_type":          "lightgbm",
+                            "champion_auc":        round(auc_oos, 4),
+                            "challenger_auc":      round(auc_oos, 4),
+                            "challenger_promoted": True,
+                        })
+                        logger.info(
+                            "LightGBM challenger PROMOTED: AUC %.4f → %.4f (+%.4f > threshold %.2f)",
+                            prev_auc, auc_oos, auc_oos - prev_auc, _MIN_AUC_IMPROVEMENT,
+                        )
+                        self._record_drift_baseline(records, use_gbm=True)
+                        return True
+                    else:
+                        # Reject challenger — reload saved champion from disk
+                        self._gbm.load()
+                        self._trades_since_train = 0
+                        self._stats.update({
+                            "challenger_auc":      round(auc_oos, 4),
+                            "challenger_promoted": False,
+                            "champion_auc":        round(self._champion_auc, 4),
+                        })
+                        logger.info(
+                            "LightGBM challenger REJECTED: AUC %.4f ≤ champion %.4f + %.2f",
+                            auc_oos, self._champion_auc, _MIN_AUC_IMPROVEMENT,
+                        )
+                        return False
+            except Exception as e:
+                logger.warning("GBM training error, using RandomForest: %s", e)
+
+        # ── Fallback: RandomForest ──────────────────────────────────────────
         model = RandomForestClassifier(n_estimators=100, max_depth=6, random_state=42, n_jobs=-1)
         scores = cross_val_score(model, X_arr, y_arr, cv=min(5, len(X) // 10 + 1), scoring="accuracy")
         accuracy = float(scores.mean())
@@ -144,19 +269,109 @@ class AITrainer:
         self._trades_since_train = 0
 
         self._stats.update({
-            "last_trained": datetime.utcnow().isoformat(),
+            "last_trained": datetime.now(timezone.utc).isoformat(),
             "accuracy": round(accuracy, 3),
             "training_trades": len(records),
+            "model_type": "random_forest",
         })
 
         logger.info(f"Model trained on {len(records)} samples, accuracy={accuracy:.3f}")
+        self._record_drift_baseline(records, use_gbm=False)
         return True
 
+    # ── F3.4 Drift helpers ────────────────────────────────────────────────
+
+    def _record_drift_baseline(self, records, *, use_gbm: bool):
+        """Snapshot training-time feature distributions for PSI baseline."""
+        baseline: Dict[str, List[float]] = {}
+        key_list = GBM_FEATURE_KEYS if use_gbm else FEATURE_KEYS
+        for r in records:
+            if not r.features:
+                continue
+            vec = (self._extract_gbm_features(r.features) if use_gbm
+                   else self._extract_features(r.features))
+            for i, k in enumerate(key_list):
+                baseline.setdefault(k, []).append(float(vec[i]))
+        self._drift_detector.record_baseline(baseline)
+        self._recent_features = {}
+        self._predict_count = 0
+
+    def _accumulate_predict_features(self, features: Dict, *, use_gbm: bool):
+        """Buffer incoming feature values for drift check."""
+        key_list = GBM_FEATURE_KEYS if use_gbm else FEATURE_KEYS
+        vec = (self._extract_gbm_features(features) if use_gbm
+               else self._extract_features(features))
+        for i, k in enumerate(key_list):
+            self._recent_features.setdefault(k, []).append(float(vec[i]))
+
+    def _maybe_check_drift(self):
+        """Check drift every 50 predictions; trigger retrain on significant drift."""
+        self._predict_count += 1
+        if self._predict_count % 50 != 0:
+            return
+        if not self._drift_detector.has_baseline():
+            return
+        drift, _ = self._drift_detector.check(self._recent_features)
+        if drift:
+            logger.warning("Drift detected — scheduling retrain")
+            self.train()
+
+    def score(self, features: Dict) -> float:
+        """
+        Side-effect-free model confidence in [0, 1] for a single feature row.
+
+        Unlike :meth:`predict` this does NOT accumulate drift statistics or build
+        a TradingSignal — it is meant for batch/offline use (e.g. the param
+        optimizer scoring many historical candles). Returns 0.5 when no model
+        is ready.
+        """
+        if self._gbm is not None and self._gbm.ready:
+            try:
+                pred = self._gbm.predict(np.array(self._extract_gbm_features(features)))
+                if pred:
+                    return float(pred.get("confidence", 0.5))
+            except Exception:
+                pass
+        if self._model is not None:
+            try:
+                feat_vec = np.array([self._extract_features(features)])
+                return float(max(self._model.predict_proba(feat_vec)[0]))
+            except Exception:
+                pass
+        return 0.5
+
     def predict(self, features: Dict) -> Optional[TradingSignal]:
+        # ── Primary: LightGBM with SHAP-backed reasoning ────────────────────
+        if self._gbm is not None and self._gbm.ready:
+            try:
+                x = np.array(self._extract_gbm_features(features))
+                pred = self._gbm.predict(x)
+                if pred:
+                    self._accumulate_predict_features(features, use_gbm=True)
+                    self._maybe_check_drift()
+                    top = self._gbm.explain(x)[:3]
+                    drivers = ", ".join(
+                        f"{d['feature']}({d['shap']:+.2f})" for d in top
+                    ) if top else "—"
+                    return TradingSignal(
+                        action=pred["action"],
+                        confidence=pred["confidence"],
+                        strategy="ml",
+                        reasoning=(f"LightGBM {pred['confidence']:.0%} | "
+                                   f"top drivers: {drivers}"),
+                        stop_loss_pct=0.03,
+                        take_profit_pct=0.06,
+                    )
+            except Exception as e:
+                logger.debug("GBM predict failed, trying RandomForest: %s", e)
+
+        # ── Fallback: RandomForest ──────────────────────────────────────────
         if self._model is None:
             return None
         try:
             feat_vec = np.array([self._extract_features(features)])
+            self._accumulate_predict_features(features, use_gbm=False)
+            self._maybe_check_drift()
             pred = self._model.predict(feat_vec)[0]
             proba = self._model.predict_proba(feat_vec)[0]
             confidence = float(max(proba))
@@ -173,6 +388,23 @@ class AITrainer:
             logger.warning(f"ML prediction failed: {e}")
             return None
 
+    def feature_importance(self) -> List[dict]:
+        """Return global SHAP feature importance (ML4T Ch.12) for the dashboard."""
+        if self._gbm is not None and self._gbm.ready:
+            try:
+                return self._gbm.global_importance()
+            except Exception as e:
+                logger.debug("SHAP importance unavailable: %s", e)
+        # Fallback: RandomForest feature_importances_
+        if self._model is not None and hasattr(self._model, "feature_importances_"):
+            imps = self._model.feature_importances_
+            return sorted(
+                [{"feature": k, "importance": float(v)}
+                 for k, v in zip(FEATURE_KEYS, imps)],
+                key=lambda d: -d["importance"],
+            )
+        return []
+
     @property
     def stats(self) -> dict:
         db = SessionLocal()
@@ -183,5 +415,11 @@ class AITrainer:
             db.close()
         self._stats["total_records"] = total
         self._stats["labelled_records"] = labelled
-        self._stats["model_ready"] = self._model is not None
+        gbm_ready = self._gbm is not None and self._gbm.ready
+        self._stats["model_ready"] = gbm_ready or (self._model is not None)
+        self._stats["drift"] = self._drift_detector.summary()
+        # F5.3 champion/challenger live snapshot
+        self._stats.setdefault("champion_auc",        round(self._champion_auc, 4))
+        self._stats.setdefault("challenger_auc",       self._last_challenger_auc)
+        self._stats.setdefault("challenger_promoted",  None)
         return dict(self._stats)

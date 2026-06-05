@@ -15,7 +15,7 @@ import asyncio
 import logging
 import math
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional
 
 from ..core.database import SessionLocal, Trade
@@ -61,7 +61,7 @@ def regime_ohlcv(symbol: str, base_price: float, limit: int = 120) -> list:
 
     candles = []
     p = state["price"]
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     for i in range(limit):
         if state["remaining"] <= 0:
@@ -161,7 +161,7 @@ class TrainingLoop:
 
     # ── internals ───────────────────────────────────────────
     def _log(self, msg: str):
-        ts = datetime.utcnow().strftime("%H:%M:%S")
+        ts = datetime.now(timezone.utc).strftime("%H:%M:%S")
         line = f"[{ts}] {msg}"
         logger.info(line)
         self.status["log"] = ([line] + self.status["log"])[:80]

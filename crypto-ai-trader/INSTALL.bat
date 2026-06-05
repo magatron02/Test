@@ -1,13 +1,13 @@
 @echo off
 cd /d "%~dp0"
 setlocal enabledelayedexpansion
-title Aiterra v1.0.0 - Install
+title Aiterra v1.2.0 - Install
 color 0A
 
 cls
 echo.
 echo  ============================================================
-echo   Aiterra v1.0.0  --  AI Crypto Trader
+echo   Aiterra v1.2.0  --  AI Crypto Trader
 echo   First Time Setup / Install
 echo  ============================================================
 echo.
@@ -92,15 +92,18 @@ echo    [OK] All packages installed
 
 REM --- 5. Config + folders ------------------------------------
 echo.
-echo  [5/5] Setting up config and folders...
+echo  [5/5] Setting up config and importing any previous data...
 if not exist data   mkdir data
 if not exist models mkdir models
 
-if not exist config\settings.yml (
-    copy config\settings.example.yml config\settings.yml >nul
-    echo    [OK] config\settings.yml created
-) else (
-    echo    [OK] config\settings.yml already exists
+REM migrate.py auto-imports settings / history / model from an older
+REM Aiterra folder if one exists nearby, otherwise creates a fresh config.
+python migrate.py
+if errorlevel 1 (
+    REM Never block install on migration — fall back to a plain fresh config.
+    if not exist config\settings.yml (
+        copy config\settings.example.yml config\settings.yml >nul
+    )
 )
 
 REM --- Done ---------------------------------------------------
@@ -133,7 +136,7 @@ set /p STARTAPP=  Start Aiterra now? [Y/N] :
 if /i "!STARTAPP!"=="Y" (
     echo.
     echo  Starting Aiterra...
-    start "" cmd /k "title Aiterra v1.0.0 && call venv\Scripts\activate.bat && python -m src.main"
+    start "" cmd /k "title Aiterra v1.2.0 && call venv\Scripts\activate.bat && python -m src.main"
     timeout /t 4 /nobreak >nul
     start "" "http://localhost:8888"
 ) else (
