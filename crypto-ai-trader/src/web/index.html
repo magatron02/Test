@@ -712,6 +712,97 @@ ol.small, ul.small, .small.text-muted,
     </div>
   </div>
 
+  <!-- Resilience Row (v1.4.0/v2.0.0) — Tail Risk · Model Drift · Param Opt · ML Champion -->
+  <div class="row g-3 mb-3" id="resilienceRow">
+    <!-- Tail Risk -->
+    <div class="col-md-3">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-activity me-2"></i>Tail Risk <span class="text-muted" style="font-size:0.65rem;font-weight:400">VaR · CVaR · MC</span></span>
+          <span id="varCircuitBadge" style="display:none;font-size:0.65rem;font-weight:700;color:#ff4d6d">⚡ VaR HALT</span>
+        </div>
+        <div class="card-body p-2" id="tailRiskPanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+    <!-- Model Drift -->
+    <div class="col-md-3">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-arrow-repeat me-2"></i>Model Drift <span class="text-muted" style="font-size:0.65rem;font-weight:400">PSI</span></span>
+          <span id="driftBadge" style="display:none;font-size:0.65rem;font-weight:700;color:#ffc107">⚠ DRIFT</span>
+        </div>
+        <div class="card-body p-2" id="driftPanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+    <!-- Param Optimizer -->
+    <div class="col-md-3">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-sliders me-2"></i>Param Opt <span class="text-muted" style="font-size:0.65rem;font-weight:400">Walk-forward</span></span>
+          <span id="paramChampBadge" style="display:none;font-size:0.65rem;font-weight:700;color:#39d98a">✓ NEW</span>
+        </div>
+        <div class="card-body p-2" id="paramOptPanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+    <!-- ML Champion/Challenger -->
+    <div class="col-md-3">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-trophy me-2"></i>ML Model <span class="text-muted" style="font-size:0.65rem;font-weight:400">Champion/Challenger</span></span>
+          <span id="mlChampBadge" style="display:none;font-size:0.65rem;font-weight:700;color:#39d98a">↑ PROMOTED</span>
+        </div>
+        <div class="card-body p-2" id="mlChampPanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Trade Memory Row (v2.0.0 F2.3) — learned setup performance -->
+  <div class="row g-3 mb-3" id="memoryRow">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-journal-bookmark me-2"></i>Trade Memory <span class="text-muted" style="font-size:0.65rem;font-weight:400">เรียนรู้จากผลเทรดจริง · regime × strategy × confidence × RSI</span></span>
+          <span id="memoryStatBadge" class="text-muted" style="font-size:0.65rem;font-weight:600"></span>
+        </div>
+        <div class="card-body p-2" id="tradeJournalPanel">
+          <div class="text-muted text-center small py-2">ยังไม่มีประวัติเทรดที่ปิดแล้ว</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Arbitrage Row -->
+  <div class="row g-3 mb-3" id="arbitrageRow">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-arrow-left-right me-2"></i>Arbitrage
+            <span class="text-muted" style="font-size:0.65rem;font-weight:400">
+              Triangular &amp; Funding Rate · สแกนทุก cycle
+            </span>
+          </span>
+          <div class="d-flex gap-2 align-items-center">
+            <span id="arbStatBadge" class="text-muted" style="font-size:0.65rem;font-weight:600"></span>
+            <button class="btn btn-outline-secondary btn-sm" style="padding:1px 8px;font-size:0.7rem"
+                    onclick="triggerArbScan()">↻ Scan</button>
+          </div>
+        </div>
+        <div class="card-body p-2" id="arbitragePanel">
+          <div class="text-muted text-center small py-2">รอผลสแกน...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
   <!-- Sentiment & On-chain Row -->
   <div class="row g-3 mb-3" id="sentimentRow">
     <div class="col-12">
@@ -4097,6 +4188,328 @@ function renderDashboardState(d) {
   if (d.agents) renderAgents(d.agents);
   // Risk state embedded in dashboard update
   if (d.risk) { riskState = d.risk; renderRiskPanel(); }
+  // v1.4.0 Resilience panels
+  if (d.risk && d.risk.tail_risk) renderTailRiskPanel(d.risk.tail_risk, d.risk.limits || {});
+  if (d.trainer_drift)            renderDriftPanel(d.trainer_drift);
+  if (d.param_opt)                renderParamOptPanel(d.param_opt);
+  if (d.ml_champion != null)      renderMlChampPanel(d.ml_champion);
+  if (d.trade_journal)            renderTradeJournalPanel(d.trade_journal);
+  if (d.arbitrage != null)        renderArbitragePanel(d.arbitrage);
+}
+
+// ── v1.4.0 Resilience panels ───────────────────────────────────────────────
+
+function renderTailRiskPanel(tr, limits) {
+  const panel = document.getElementById('tailRiskPanel');
+  const badge = document.getElementById('varCircuitBadge');
+  if (!panel) return;
+
+  const pct = (v, dp=1) => v != null ? (v * 100).toFixed(dp) + '%' : '—';
+  const limVar = limits.max_var_pct || 0.05;
+  const limRuin = limits.max_prob_ruin || 0.40;
+
+  const varPct  = tr.var_pct  || 0;
+  const cvarPct = tr.cvar_pct || 0;
+  const pRuin   = tr.prob_ruin || 0;
+  const p95dd   = tr.p95_maxdd || 0;
+
+  const varRatio  = Math.min(varPct  / limVar,  1.0);
+  const ruinRatio = Math.min(pRuin   / limRuin, 1.0);
+  const varColor  = varRatio  > 0.8 ? '#ff4d6d' : varRatio  > 0.5 ? '#ffc107' : '#39d98a';
+  const ruinColor = ruinRatio > 0.8 ? '#ff4d6d' : ruinRatio > 0.5 ? '#ffc107' : '#39d98a';
+
+  if (badge) badge.style.display = (varRatio >= 1.0 || ruinRatio >= 1.0) ? '' : 'none';
+
+  const n = tr.n_paths || 0;
+  const h = tr.horizon  || 0;
+
+  panel.innerHTML = `
+    <div class="mb-2">
+      <div class="d-flex justify-content-between mb-1">
+        <span class="stat-label" style="margin:0">95% VaR <span style="font-size:0.62rem;color:var(--text-muted)">(lim ${pct(limVar,0)})</span></span>
+        <span style="font-family:var(--font-mono);font-size:0.8rem;color:${varColor}">${pct(varPct)}</span>
+      </div>
+      <div class="heat-bar"><div class="heat-fill" style="width:${(varRatio*100).toFixed(0)}%;background:${varColor}"></div></div>
+    </div>
+    <div class="mb-2">
+      <div class="d-flex justify-content-between mb-1">
+        <span class="stat-label" style="margin:0">CVaR (Expected Shortfall)</span>
+        <span style="font-family:var(--font-mono);font-size:0.8rem;color:${varColor}">${pct(cvarPct)}</span>
+      </div>
+    </div>
+    <div class="mb-2">
+      <div class="d-flex justify-content-between mb-1">
+        <span class="stat-label" style="margin:0">Prob Ruin <span style="font-size:0.62rem;color:var(--text-muted)">(DD>20% in ${h}d, lim ${pct(limRuin,0)})</span></span>
+        <span style="font-family:var(--font-mono);font-size:0.8rem;color:${ruinColor}">${pct(pRuin)}</span>
+      </div>
+      <div class="heat-bar"><div class="heat-fill" style="width:${(ruinRatio*100).toFixed(0)}%;background:${ruinColor}"></div></div>
+    </div>
+    <div class="d-flex justify-content-between" style="font-size:0.7rem;color:var(--text-muted)">
+      <span>P95 Max-DD: <strong style="font-family:var(--font-mono);color:var(--text-main)">${pct(p95dd)}</strong></span>
+      <span style="font-size:0.62rem">${n ? n.toLocaleString()+' paths' : ''}</span>
+    </div>`;
+}
+
+function renderDriftPanel(drift) {
+  const panel = document.getElementById('driftPanel');
+  const badge = document.getElementById('driftBadge');
+  if (!panel) return;
+
+  const hasDrift = drift.drift_count > 0;
+  const maxPsi   = drift.max_psi || 0;
+  const threshold = drift.threshold || 0.20;
+  const features  = drift.per_feature || {};
+  const hasBL     = drift.has_baseline;
+
+  if (badge) badge.style.display = (maxPsi > threshold) ? '' : 'none';
+
+  const psiColor = v => v > threshold ? '#ff4d6d' : v > 0.10 ? '#ffc107' : '#39d98a';
+  const psiLabel = v => v > threshold ? 'significant' : v > 0.10 ? 'minor' : 'stable';
+
+  const featureRows = Object.entries(features)
+    .sort(([,a],[,b]) => b - a)
+    .slice(0, 6)
+    .map(([f, v]) => {
+      const fill = Math.min(v / (threshold * 2), 1.0) * 100;
+      return `<div class="d-flex align-items-center gap-2 py-1" style="border-bottom:1px solid var(--border)">
+        <span style="font-size:0.68rem;font-family:var(--font-mono);flex:0 0 90px;color:var(--text-muted)">${f}</span>
+        <div class="heat-bar flex-fill"><div class="heat-fill" style="width:${fill.toFixed(0)}%;background:${psiColor(v)}"></div></div>
+        <span style="font-size:0.68rem;font-family:var(--font-mono);flex:0 0 42px;text-align:right;color:${psiColor(v)}">${v.toFixed(3)}</span>
+      </div>`;
+    }).join('');
+
+  panel.innerHTML = `
+    <div class="d-flex justify-content-between mb-2" style="font-size:0.75rem">
+      <span>Baseline: <strong style="color:${hasBL?'var(--accent-buy)':'var(--text-muted)'}">${hasBL ? 'recorded' : 'none yet'}</strong></span>
+      <span>Drift events: <strong style="color:${hasDrift?'#ffc107':'var(--text-main)'}">${drift.drift_count || 0}</strong></span>
+    </div>
+    <div class="d-flex justify-content-between mb-2" style="font-size:0.75rem">
+      <span>Max PSI: <strong style="font-family:var(--font-mono);color:${psiColor(maxPsi)}">${maxPsi.toFixed(3)}</strong></span>
+      <span style="font-size:0.68rem;color:${psiColor(maxPsi)}">${psiLabel(maxPsi)}</span>
+    </div>
+    <div style="font-size:0.65rem;color:var(--text-muted);margin-bottom:4px">PSI per feature (threshold ${threshold.toFixed(2)})</div>
+    ${featureRows || '<div class="text-muted text-center small py-1">รอ baseline...</div>'}`;
+}
+
+function renderParamOptPanel(opt) {
+  const panel = document.getElementById('paramOptPanel');
+  const badge = document.getElementById('paramChampBadge');
+  if (!panel) return;
+
+  if (!opt || opt.status === 'not_run') {
+    panel.innerHTML = '<div class="text-muted text-center small py-2">ยังไม่ได้รัน (ต้องการ ≥60 แท่ง)</div>';
+    return;
+  }
+
+  const bp    = opt.best_params || {};
+  const sharpe = opt.best_sharpe;
+  const challS = opt.last_challenger_sharpe;
+  const promoted = challS != null && sharpe != null && challS > sharpe - 0.01;
+  if (badge) badge.style.display = (challS != null && challS > (sharpe || -999) - 0.001) ? '' : 'none';
+
+  const paramRows = [
+    ['RSI Oversold',   bp.rsi_oversold,   ''],
+    ['RSI Overbought', bp.rsi_overbought,  ''],
+    ['ATR SL Mult',    bp.atr_sl_mult,     '×'],
+    ['Min Confidence', bp.min_confidence != null ? (bp.min_confidence * 100).toFixed(0) + '%' : null, ''],
+  ].filter(([,v]) => v != null).map(([label, val, suffix]) =>
+    `<div class="d-flex justify-content-between py-1" style="border-bottom:1px solid var(--border);font-size:0.72rem">
+      <span style="color:var(--text-muted)">${label}</span>
+      <strong style="font-family:var(--font-mono)">${val}${suffix}</strong>
+    </div>`
+  ).join('');
+
+  const sharpeColor = sharpe > 0 ? '#39d98a' : sharpe > -1 ? '#ffc107' : '#ff4d6d';
+  const opt_at = opt.optimized_at ? new Date(opt.optimized_at + 'Z').toLocaleString('th', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+
+  panel.innerHTML = `
+    <div class="d-flex justify-content-between mb-2" style="font-size:0.75rem">
+      <span>Champion Sharpe: <strong style="font-family:var(--font-mono);color:${sharpeColor}">${sharpe != null ? sharpe.toFixed(3) : '—'}</strong></span>
+      ${challS != null ? `<span style="font-size:0.68rem;color:var(--text-muted)">challenger: ${challS.toFixed(3)}</span>` : ''}
+    </div>
+    ${paramRows}
+    <div class="mt-2" style="font-size:0.62rem;color:var(--text-muted);text-align:right">
+      last opt: ${opt_at} · ${opt.n_combos || 0} combos
+    </div>`;
+}
+
+function renderMlChampPanel(mc) {
+  const panel = document.getElementById('mlChampPanel');
+  const badge = document.getElementById('mlChampBadge');
+  if (!panel) return;
+  if (!mc || mc.model_type === 'none' || mc.model_type == null) {
+    panel.innerHTML = '<div class="text-muted text-center small py-2">ยังไม่มีโมเดล</div>';
+    if (badge) badge.style.display = 'none';
+    return;
+  }
+  const champAuc = mc.champion_auc;
+  const challAuc = mc.challenger_auc;
+  const promoted = mc.challenger_promoted === true;
+  const rejected  = mc.challenger_promoted === false;
+  if (badge) {
+    badge.style.display = promoted ? '' : 'none';
+  }
+  const aucColor = (v) => v == null ? 'var(--text-muted)' : v >= 0.60 ? '#39d98a' : v >= 0.52 ? '#ffc107' : '#ff4d6d';
+  const fmtAuc = (v) => v != null ? v.toFixed(4) : '—';
+  const acc = mc.accuracy != null ? (mc.accuracy * 100).toFixed(1) + '%' : '—';
+  const lastT = mc.last_trained
+    ? new Date(mc.last_trained + (mc.last_trained.includes('Z') ? '' : 'Z'))
+        .toLocaleString('th', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
+    : '—';
+  const typeLabel = mc.model_type === 'lightgbm' ? 'LightGBM' : mc.model_type === 'random_forest' ? 'RandomForest' : mc.model_type || '—';
+
+  const challRow = challAuc != null ? `
+    <div class="d-flex justify-content-between py-1" style="border-bottom:1px solid var(--border);font-size:0.72rem">
+      <span style="color:var(--text-muted)">Challenger AUC</span>
+      <strong style="font-family:var(--font-mono);color:${aucColor(challAuc)}">${fmtAuc(challAuc)}
+        ${promoted ? '<span style="color:#39d98a;font-size:0.65rem">↑ promoted</span>' : rejected ? '<span style="color:#ff4d6d;font-size:0.65rem">✕ rejected</span>' : ''}
+      </strong>
+    </div>` : '';
+
+  panel.innerHTML = `
+    <div class="d-flex justify-content-between py-1" style="border-bottom:1px solid var(--border);font-size:0.72rem">
+      <span style="color:var(--text-muted)">Champion AUC</span>
+      <strong style="font-family:var(--font-mono);color:${aucColor(champAuc)}">${fmtAuc(champAuc)}</strong>
+    </div>
+    ${challRow}
+    <div class="d-flex justify-content-between py-1" style="border-bottom:1px solid var(--border);font-size:0.72rem">
+      <span style="color:var(--text-muted)">CV Accuracy</span>
+      <strong style="font-family:var(--font-mono)">${acc}</strong>
+    </div>
+    <div class="mt-2" style="font-size:0.62rem;color:var(--text-muted);text-align:right">
+      ${typeLabel} · ${lastT}
+    </div>`;
+}
+
+function renderTradeJournalPanel(mem) {
+  const panel = document.getElementById('tradeJournalPanel');
+  const badge = document.getElementById('memoryStatBadge');
+  if (!panel) return;
+
+  if (!mem || !mem.total_trades) {
+    panel.innerHTML = '<div class="text-muted text-center small py-2">ยังไม่มีประวัติเทรดที่ปิดแล้ว</div>';
+    if (badge) badge.textContent = '';
+    return;
+  }
+
+  const wr = (mem.overall_win_rate != null) ? (mem.overall_win_rate * 100).toFixed(0) + '%' : '—';
+  const wrColor = mem.overall_win_rate >= 0.5 ? '#39d98a' : '#ff4d6d';
+  if (badge) badge.textContent =
+    `${mem.total_trades} เทรด · ${mem.distinct_setups} setups · ${mem.confident_setups} ยืนยันแล้ว`;
+
+  const sigLabel = (s) => {
+    const [reg, strat, band, rsi] = String(s).split('|');
+    return `${reg} · ${strat} · ${band} · ${rsi}`;
+  };
+  const row = (d, good) => {
+    const exp = (d.expectancy >= 0 ? '+' : '') + d.expectancy.toFixed(2) + '%';
+    const c = good ? '#39d98a' : '#ff4d6d';
+    return `<div class="d-flex justify-content-between py-1" style="border-bottom:1px solid var(--border);font-size:0.68rem">
+        <span style="color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%">${sigLabel(d.signature)}</span>
+        <span style="font-family:var(--font-mono)"><strong style="color:${c}">${exp}</strong> <span style="color:var(--text-muted)">${(d.win_rate*100).toFixed(0)}% · n=${d.n}</span></span>
+      </div>`;
+  };
+  const best  = (mem.best  || []).map(d => row(d, true)).join('')  || '<div class="text-muted small py-1">—</div>';
+  const worst = (mem.worst || []).map(d => row(d, false)).join('') || '<div class="text-muted small py-1">—</div>';
+
+  panel.innerHTML = `
+    <div class="d-flex justify-content-between mb-2" style="font-size:0.75rem">
+      <span>Overall win-rate: <strong style="font-family:var(--font-mono);color:${wrColor}">${wr}</strong></span>
+      <span style="font-size:0.66rem;color:var(--text-muted)">veto กันเซ็ตอัพที่ขาดทุนซ้ำ (≥${mem.min_samples} ตัวอย่าง)</span>
+    </div>
+    <div class="row g-2">
+      <div class="col-md-6">
+        <div style="font-size:0.66rem;color:#39d98a;font-weight:700;margin-bottom:2px">✓ เซ็ตอัพที่ดีที่สุด</div>
+        ${best}
+      </div>
+      <div class="col-md-6">
+        <div style="font-size:0.66rem;color:#ff4d6d;font-weight:700;margin-bottom:2px">✗ เซ็ตอัพที่ควรเลี่ยง / veto</div>
+        ${worst}
+      </div>
+    </div>`;
+}
+
+// ── Arbitrage Panel ───────────────────────────────────────────────────────────
+
+async function triggerArbScan() {
+  const panel = document.getElementById('arbitragePanel');
+  if (panel) panel.innerHTML = '<div class="text-muted text-center small py-2">กำลังสแกน...</div>';
+  try {
+    const r = await fetch('/api/arbitrage/scan', {method:'POST'});
+    const data = await r.json();
+    renderArbitragePanel(data);
+  } catch(e) {
+    if (panel) panel.innerHTML = '<div class="text-danger small py-2">สแกนไม่สำเร็จ</div>';
+  }
+}
+
+function renderArbitragePanel(data) {
+  const panel = document.getElementById('arbitragePanel');
+  const badge = document.getElementById('arbStatBadge');
+  if (!panel) return;
+  if (!data) { panel.innerHTML = '<div class="text-muted text-center small py-2">รอผลสแกน...</div>'; return; }
+
+  const tri  = data.tri_opportunities  || [];
+  const fund = data.funding_rates      || [];
+  const exec = data.executed           || [];
+
+  if (badge) {
+    const viableFund = fund.filter(f => f.viable).length;
+    badge.textContent = `tri: ${tri.length} · funding viable: ${viableFund}`;
+  }
+
+  // ── Triangular Arb ──────────────────────────────────────────────────────────
+  const triRows = tri.slice(0, 5).map(o => {
+    const c = o.net_profit_pct >= 0 ? '#39d98a' : '#ff4d6d';
+    const sign = o.net_profit_pct >= 0 ? '+' : '';
+    return `<div class="d-flex justify-content-between py-1"
+               style="border-bottom:1px solid var(--border);font-size:0.68rem">
+      <span style="color:var(--text-muted)">${o.cycle}</span>
+      <span style="font-family:var(--font-mono)">
+        <strong style="color:${c}">${sign}${o.net_profit_pct.toFixed(3)}%</strong>
+        <span style="color:var(--text-muted);font-size:0.62rem"> · $${o.amount_usdt}</span>
+      </span>
+    </div>`;
+  }).join('') || '<div class="text-muted small py-1">ไม่พบ opportunity ที่ผ่าน threshold</div>';
+
+  const execBadge = exec.length
+    ? exec.map(e => `<span class="badge bg-success me-1">${e.cycle}${e.dry_run ? ' (dry)' : ''} +$${(e.profit_usdt||0).toFixed(4)}</span>`).join('')
+    : '';
+
+  // ── Funding Rate ────────────────────────────────────────────────────────────
+  const fundRows = fund.slice(0, 8).map(f => {
+    const c = f.viable ? '#39d98a' : 'var(--text-muted)';
+    const arrow = f.direction === 'LONG_SPOT_SHORT_PERP' ? '↑' : '↓';
+    const dir = f.direction === 'LONG_SPOT_SHORT_PERP' ? 'Long spot + Short perp' : 'Short spot + Long perp';
+    return `<div class="d-flex justify-content-between py-1"
+               style="border-bottom:1px solid var(--border);font-size:0.68rem">
+      <span><span style="font-weight:600">${f.symbol.split('/')[0]}</span>
+        <span style="color:var(--text-muted);font-size:0.62rem"> ${arrow} ${dir}</span>
+      </span>
+      <span style="font-family:var(--font-mono)">
+        <strong style="color:${c}">${f.annualized_pct.toFixed(1)}%/yr</strong>
+        <span style="color:var(--text-muted);font-size:0.62rem"> (${(f.rate_pct_8h>=0?'+':'')}${f.rate_pct_8h.toFixed(4)}%/8h)</span>
+      </span>
+    </div>`;
+  }).join('') || '<div class="text-muted small py-1">ไม่มีข้อมูล funding rate</div>';
+
+  panel.innerHTML = `
+    <div class="row g-2">
+      <div class="col-md-6">
+        <div style="font-size:0.66rem;color:var(--accent);font-weight:700;margin-bottom:4px">
+          <i class="bi bi-triangle me-1"></i>Triangular Arbitrage
+          ${execBadge ? `<span style="font-size:0.60rem;font-weight:400;margin-left:6px">${execBadge}</span>` : ''}
+        </div>
+        ${triRows}
+      </div>
+      <div class="col-md-6">
+        <div style="font-size:0.66rem;color:#6ea8fe;font-weight:700;margin-bottom:4px">
+          <i class="bi bi-currency-exchange me-1"></i>Funding Rate Carry Trade
+          <span style="font-size:0.60rem;color:var(--text-muted);font-weight:400"> (advisory)</span>
+        </div>
+        ${fundRows}
+      </div>
+    </div>`;
 }
 
 function renderAgents(agents) {

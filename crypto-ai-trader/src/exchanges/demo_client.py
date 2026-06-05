@@ -6,6 +6,8 @@ import time as _time
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
+from .base import OrderbookTop
+
 import aiohttp
 
 from .base import Balance, BaseExchange, OHLCV, Order, Ticker
@@ -217,6 +219,30 @@ class DemoExchange(BaseExchange):
             "positions": dict(self._positions),
             "total_orders": len(self._orders),
         }
+
+    async def get_orderbook_top(self, symbol: str) -> Optional[OrderbookTop]:
+        """Simulated orderbook: real price ± 0.03% spread."""
+        try:
+            ticker = await self.get_ticker(symbol)
+            spread_half = ticker.price * 0.0003
+            return OrderbookTop(
+                symbol,
+                ticker.price - spread_half,
+                ticker.price + spread_half,
+                round(spread_half / ticker.price * 200, 6),
+            )
+        except Exception:
+            return None
+
+    async def get_funding_rate(self, symbol: str) -> Optional[dict]:
+        """Simulated funding rate — small positive bias reflecting bull-market norm."""
+        base = symbol.split("/")[0]
+        rng  = random.Random(hash(base) ^ int(_time.time() / 28800))  # changes every 8h
+        rate = rng.gauss(0.0001, 0.00025)    # avg 0.01%/8h, σ 0.025%
+        next_ms = int(
+            (datetime.utcnow() + timedelta(hours=rng.uniform(0.5, 7.5))).timestamp() * 1000
+        )
+        return {"fundingRate": rate, "fundingDatetime": str(next_ms)}
 
     def reset(self):
         self._cash = self._initial_cash
