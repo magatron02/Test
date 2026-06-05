@@ -23,6 +23,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+from ..core.persistence import atomic_write_pickle
+
 from .strategy_manager import StrategyManager
 
 logger = logging.getLogger(__name__)
@@ -92,12 +94,7 @@ class RLTrainer:
         p = self._rl_path()
         if not p:
             return
-        try:
-            p.parent.mkdir(parents=True, exist_ok=True)
-            with open(p, "wb") as f:
-                pickle.dump({"arms": self._arms, "total_pulls": self._total_pulls}, f)
-        except Exception as e:
-            logger.warning("Could not save RL state: %s", e)
+        atomic_write_pickle(p, {"arms": self._arms, "total_pulls": self._total_pulls})
 
     # ── Public API ────────────────────────────────────────────────────────
 
@@ -218,12 +215,7 @@ class ModelBandit:
         p = self._path()
         if not p:
             return
-        try:
-            p.parent.mkdir(parents=True, exist_ok=True)
-            with open(p, "wb") as f:
-                pickle.dump({"arms": self._arms, "total_pulls": self._total_pulls}, f)
-        except Exception as e:
-            logger.warning("Could not save model bandit state: %s", e)
+        atomic_write_pickle(p, {"arms": self._arms, "total_pulls": self._total_pulls})
 
     # ── Public API ────────────────────────────────────────────────────────
 

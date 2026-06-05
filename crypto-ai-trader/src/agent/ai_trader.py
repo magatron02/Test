@@ -18,6 +18,7 @@ from .trade_journal import TradeJournal
 from .trainer import AITrainer
 from ..core.config import settings
 from ..core.database import SessionLocal, Trade, Portfolio
+from ..core.persistence import atomic_write_json, safe_read_json
 from ..exchanges.base import BaseExchange
 from ..notifications import line_notify, telegram_notify
 
@@ -43,7 +44,7 @@ async def _notify_trade(action: str, symbol: str, price: float, pnl_pct: float =
 class AITrader:
     def __init__(self, exchange: BaseExchange):
         self._exchange    = exchange
-        self._strategy    = StrategyManager()
+        self._strategy    = StrategyManager(data_dir=settings.data_dir)
         self._trainer     = AITrainer()
         self._claude      = ClaudeAnalyzer(exchange=exchange)
 
@@ -51,7 +52,7 @@ class AITrader:
         risk_cfg = settings.get("risk", default={}) or {}
         sizer_cfg = settings.get("position_sizer", default={}) or {}
         self._risk        = RiskEngine(config=risk_cfg)
-        self._sizer       = PositionSizer(config=sizer_cfg)
+        self._sizer       = PositionSizer(config=sizer_cfg, models_dir=settings.models_dir)
         self._rl          = RLTrainer(models_dir=settings.models_dir)
         self._model_bandit = ModelBandit(models_dir=settings.models_dir)  # F2.1
         self._exit_mgr    = ExitManager()                                   # F2.2
@@ -80,11 +81,18 @@ class AITrader:
         self._broadcast_fn = None
         self._daily_pnl: float = 0.0
         self._daily_reset_date: str = ""
+        # Serialises open/close so parallel analysis can't double-open a symbol
+        # or mutate _open_trades concurrently.
+        self._trade_lock = asyncio.Lock()
+        # Crash-safe runtime snapshot (open positions + daily PnL survive restart)
+        self._state_path = settings.data_dir / "runtime_state.json"
 
         # Dry-run: paper trade without hitting the exchange
         self._dry_run: bool = bool(settings.get("trading", "dry_run", default=False))
         # Kill switch: halts all new trades when activated
         self._killed: bool  = False
+        # Used by stop() to unblock the sleep in start() immediately.
+        self._stop_event = asyncio.Event()
 
         # Signal funnel + agent activity (dashboard)
         self._signal_stats: Dict[str, object] = {
@@ -100,6 +108,59 @@ class AITrader:
             "trainer":    {"status": "idle", "detail": "พร้อมทำงาน", "ts": None},
             "risk":       {"status": "idle", "detail": "พร้อมทำงาน", "ts": None},
         }
+
+        # Restore open positions + daily PnL from the last snapshot so a restart
+        # doesn't reset the daily-loss limit or orphan in-flight trades.
+        self._restore_runtime_state()
+
+    # ── Crash-safe runtime state ──────────────────────────────────────────
+
+    def _restore_runtime_state(self):
+        """Reload open trades, daily PnL and signal funnel from the snapshot."""
+        data = safe_read_json(self._state_path)
+        if not isinstance(data, dict):
+            return
+        try:
+            today = date.today().isoformat()
+            # Daily PnL only carries over within the same calendar day.
+            if data.get("daily_reset_date") == today:
+                self._daily_pnl        = float(data.get("daily_pnl", 0.0))
+                self._daily_reset_date = today
+                if isinstance(data.get("signal_stats"), dict):
+                    self._signal_stats = data["signal_stats"]
+            open_trades = data.get("open_trades", {})
+            if isinstance(open_trades, dict):
+                self._open_trades = open_trades
+                # Re-register open risk so portfolio heat is correct immediately,
+                # and rehydrate opened_at back into a datetime (JSON stored ISO).
+                for sym, tr in self._open_trades.items():
+                    oa = tr.get("opened_at")
+                    if isinstance(oa, str):
+                        try:
+                            tr["opened_at"] = datetime.fromisoformat(oa)
+                        except ValueError:
+                            tr["opened_at"] = datetime.utcnow()
+                    try:
+                        risk_amt = float(tr.get("cost", 0.0)) * float(tr.get("stop_loss_pct", 0.0) or 0.03)
+                        self._risk.register_open_trade(sym, risk_amt)
+                    except Exception:
+                        pass
+            logger.info(
+                "Restored runtime state: %d open positions, daily_pnl=%.2f",
+                len(self._open_trades), self._daily_pnl,
+            )
+        except Exception as exc:
+            logger.warning("Could not restore runtime state: %s", exc)
+            self._open_trades = {}
+
+    def _save_runtime_state(self):
+        """Atomically persist open trades + daily PnL (called after every open/close)."""
+        atomic_write_json(self._state_path, {
+            "daily_pnl":        self._daily_pnl,
+            "daily_reset_date": self._daily_reset_date,
+            "signal_stats":     self._signal_stats,
+            "open_trades":      self._open_trades,
+        })
 
     def _apply_opt_params(self):
         """
@@ -150,6 +211,7 @@ class AITrader:
             }
             self._daily_pnl = 0.0
             self._daily_reset_date = today
+            self._save_runtime_state()   # persist the cleared state immediately
 
     def _set_agent(self, name: str, status: str, detail: str):
         if name in self._agent_activity:
@@ -674,11 +736,26 @@ class AITrader:
         regime: RegimeResult,
         force: bool = False,
     ) -> bool:
+        # Serialise the whole open path so concurrent callers (main loop +
+        # manual API trade) can't double-open a symbol or race on cash.
+        async with self._trade_lock:
+            return await self._execute_trade_locked(symbol, signal, analysis, regime, force)
+
+    async def _execute_trade_locked(
+        self,
+        symbol: str,
+        signal: TradingSignal,
+        analysis: MarketAnalysis,
+        regime: RegimeResult,
+        force: bool = False,
+    ) -> bool:
         if symbol in self._open_trades and signal.action == "BUY":
             return False
 
         if symbol in self._open_trades and signal.action == "SELL":
-            await self._close_trade(symbol, analysis.price, "signal_reversal")
+            # We already hold the trade lock — close without re-acquiring it.
+            await self._close_trade(symbol, analysis.price, "signal_reversal",
+                                    acquire_lock=False)
             return True
 
         if signal.action not in ("BUY", "SELL"):
@@ -840,9 +917,13 @@ class AITrader:
             self._model_bandit.record_trade(trade_id, _model_key, regime.regime)
 
             if signal.action == "BUY":
-                self._open_trades[symbol] = {**trade_data, "trade_id": trade_id}
+                self._open_trades[symbol] = {
+                    **trade_data, "trade_id": trade_id,
+                    "stop_loss_pct": signal.stop_loss_pct,   # for exact risk re-register on restart
+                }
                 risk_amount = order.cost * signal.stop_loss_pct
                 self._risk.register_open_trade(symbol, risk_amount)
+                self._save_runtime_state()   # crash-safe snapshot after open
 
             # Position state changed → drop cached decision so next cycle is fresh
             self._signal_cache.invalidate(symbol)
@@ -875,7 +956,14 @@ class AITrader:
 
     # ── Trade exit ────────────────────────────────────────────────────────
 
-    async def _close_trade(self, symbol: str, price: float, reason: str) -> dict:
+    async def _close_trade(self, symbol: str, price: float, reason: str,
+                           *, acquire_lock: bool = True) -> dict:
+        if acquire_lock:
+            async with self._trade_lock:
+                return await self._close_trade_locked(symbol, price, reason)
+        return await self._close_trade_locked(symbol, price, reason)
+
+    async def _close_trade_locked(self, symbol: str, price: float, reason: str) -> dict:
         if symbol not in self._open_trades:
             return {}
         trade = self._open_trades[symbol]
@@ -918,30 +1006,41 @@ class AITrader:
                     db.commit()
             finally:
                 db.close()
+        except Exception as e:
+            # Order or DB write failed — position is NOT closed; leave in-memory
+            # state intact so the next cycle retries. No orphan created.
+            logger.error("Close failed for %s: %s", symbol, e)
+            return {}
 
-            trade_id = trade["trade_id"]
-            regime   = trade.get("regime", "RANGING")
+        # ── Position is now closed on the exchange + DB. The in-memory truth
+        # MUST converge regardless of what the downstream bookkeeping does, or
+        # we orphan a closed position. Do the critical state mutation first.
+        trade_id = trade["trade_id"]
+        regime   = trade.get("regime", "RANGING")
+        self._daily_pnl += pnl
+        self._open_trades.pop(symbol, None)
+        self._risk.deregister_trade(symbol)
+        self._signal_cache.invalidate(symbol)   # context changed after exit
+        self._save_runtime_state()              # snapshot the closed state
 
+        # ── Best-effort learning + notifications. Failures here are logged but
+        # never resurrect the position or block the close.
+        try:
             self._trainer.update_outcome(trade_id, pnl_pct)
             self._rl.update_outcome(trade_id, pnl_pct, self._strategy)
             self._model_bandit.update_outcome(trade_id, pnl_pct)  # F2.1
             self._sizer.update_outcome(symbol, pnl_pct)
-            self._risk.deregister_trade(symbol)
-
-            # F2.3 — fold this outcome into trade memory so future setups with
-            # the same signature inherit its win-rate/expectancy.
-            self._journal.record(
+            self._journal.record(   # F2.3 — fold outcome into trade memory
                 regime     = regime,
                 strategy   = trade.get("strategy", "UNKNOWN"),
                 confidence = float(trade.get("confidence", 0.0)),
                 rsi_signal = trade.get("rsi_signal", "NEUTRAL"),
                 pnl_pct    = pnl_pct,
             )
+        except Exception as e:
+            logger.warning("Post-close bookkeeping failed for %s: %s", symbol, e)
 
-            self._daily_pnl += pnl
-            del self._open_trades[symbol]
-            self._signal_cache.invalidate(symbol)   # context changed after exit
-
+        try:
             await self._broadcast("trade_closed", {
                 "symbol":      symbol,
                 "reason":      reason,
@@ -951,12 +1050,12 @@ class AITrader:
                 "pnl_pct":     pnl_pct,
                 "regime":      regime,
             })
-            logger.info("Closed %s: %s | PnL: %+.2f%%", symbol, reason, pnl_pct)
             await _notify_trade("SELL", symbol, order.price, pnl_pct)
-            return {"price": order.price, "pnl": pnl, "pnl_pct": pnl_pct}
         except Exception as e:
-            logger.error("Close failed for %s: %s", symbol, e)
-            return {}
+            logger.debug("Close notification failed for %s: %s", symbol, e)
+
+        logger.info("Closed %s: %s | PnL: %+.2f%%", symbol, reason, pnl_pct)
+        return {"price": order.price, "pnl": pnl, "pnl_pct": pnl_pct}
 
     async def _check_exit_conditions(self, symbol: str):
         if symbol not in self._open_trades:
@@ -1152,6 +1251,7 @@ class AITrader:
 
     async def start(self):
         self._running = True
+        self._stop_event.clear()
         interval = settings.analysis_interval
         logger.info(
             "AI Trader started — interval=%ds, mode=%s, model=%s",
@@ -1162,10 +1262,17 @@ class AITrader:
                 await self.run_cycle()
             except Exception as e:
                 logger.error("Trading cycle error: %s", e)
-            await asyncio.sleep(interval)
+            # Use an event-based wait so stop() can unblock immediately.
+            try:
+                await asyncio.wait_for(self._stop_event.wait(), timeout=interval)
+            except asyncio.TimeoutError:
+                pass   # normal timeout — proceed to next cycle
+            if self._stop_event.is_set():
+                break
 
     def stop(self):
         self._running = False
+        self._stop_event.set()
 
     def kill(self):
         """Activate kill switch — no new trades until resume() is called."""

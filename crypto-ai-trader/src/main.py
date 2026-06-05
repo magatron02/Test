@@ -168,9 +168,13 @@ async def startup():
 @app.on_event("shutdown")
 async def shutdown():
     if _trader:
-        _trader.stop()
+        _trader.stop()   # signals the event — unlocks the inter-cycle sleep
     if _trader_task:
-        _trader_task.cancel()
+        # Give the current cycle up to 30 s to finish cleanly, then force-cancel.
+        try:
+            await asyncio.wait_for(asyncio.shield(_trader_task), timeout=30)
+        except (asyncio.TimeoutError, asyncio.CancelledError, Exception):
+            _trader_task.cancel()
     # Close exchange HTTP sessions to avoid ResourceWarning on exit
     try:
         if _trader and hasattr(_trader._exchange, "close"):

@@ -284,6 +284,58 @@ async def get_settings():
     return cfg
 
 
+# (section, key) → (type_coerce_fn, min_val, max_val)
+# None min/max means no range check.
+_SETTINGS_SCHEMA: Dict[tuple, tuple] = {
+    ("trading", "take_profit_pct"):    (float, 0.001, 0.50),
+    ("trading", "stop_loss_pct"):      (float, 0.001, 0.50),
+    ("trading", "min_confidence"):     (float, 0.10,  1.0),
+    ("trading", "analysis_interval"):  (int,   30,    86400),
+    ("trading", "risk_per_trade_pct"): (float, 0.001, 0.20),
+    ("trading", "max_daily_loss_pct"): (float, 0.001, 1.0),
+    ("trading", "max_open_trades"):    (int,   1,     50),
+    ("trading", "max_position_pct"):   (float, 0.01,  1.0),
+    ("trading", "dry_run"):            (bool,  None,  None),
+    ("trading", "live_max_budget_usdt"): (float, 0.0, 1e7),
+    ("risk",    "max_drawdown_pct"):   (float, 0.01,  1.0),
+    ("risk",    "max_daily_loss_pct"): (float, 0.001, 1.0),
+    ("risk",    "max_portfolio_heat"): (float, 0.01,  1.0),
+    ("risk",    "max_position_pct"):   (float, 0.01,  1.0),
+    ("backtest","fee_pct"):            (float, 0.0,   0.05),
+    ("backtest","slippage_pct"):       (float, 0.0,   0.05),
+    ("position_sizer", "kelly_fraction"):   (float, 0.01, 1.0),
+    ("position_sizer", "min_trade_usdt"):   (float, 1.0, 1e6),
+    ("position_sizer", "max_trade_usdt"):   (float, 1.0, 1e6),
+    ("position_sizer", "fallback_risk_pct"):(float, 0.001, 0.20),
+    ("position_sizer", "target_atr_pct"):   (float, 0.1,  20.0),
+}
+
+
+def _coerce_and_validate(section: str, key: str, value: Any) -> Any:
+    """Type-coerce and range-check a setting value. Raises HTTPException on failure."""
+    schema = _SETTINGS_SCHEMA.get((section, key))
+    if schema is None:
+        return value   # no schema for this key — pass through unchanged
+    coerce_fn, lo, hi = schema
+    try:
+        if coerce_fn is bool:
+            if isinstance(value, bool):
+                coerced = value
+            elif isinstance(value, str):
+                coerced = value.lower() in ("true", "1", "yes")
+            else:
+                coerced = bool(value)
+        else:
+            coerced = coerce_fn(value)
+    except (TypeError, ValueError):
+        raise HTTPException(400, f"'{section}.{key}' must be a {coerce_fn.__name__}")
+    if lo is not None and coerced < lo:
+        raise HTTPException(400, f"'{section}.{key}' must be >= {lo}")
+    if hi is not None and coerced > hi:
+        raise HTTPException(400, f"'{section}.{key}' must be <= {hi}")
+    return coerced
+
+
 _SETTINGS_ALLOWLIST: Dict[str, set] = {
     "trading": {
         "take_profit_pct", "stop_loss_pct", "min_confidence",
@@ -326,6 +378,7 @@ async def update_settings(data: Dict[str, Any]):
             for key, val in values.items():
                 if key not in allowed_keys:
                     raise HTTPException(400, f"Key '{section}.{key}' is not writable via API")
+                val = _coerce_and_validate(section, key, val)
                 settings.set(val, section, key)
         else:
             # scalar top-level key

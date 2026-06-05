@@ -1,10 +1,12 @@
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Dict, Optional
 
 from .market_analyzer import MarketAnalysis
 from ..core.config import settings
+from ..core.persistence import atomic_write_json, safe_read_json
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +22,11 @@ class TradingSignal:
 
 
 class StrategyManager:
-    def __init__(self):
-        self._last_dca: Dict[str, datetime] = {}
+    def __init__(self, data_dir: Optional[Path] = None):
+        self._dca_path: Optional[Path] = (
+            Path(data_dir) / "dca_timers.json" if data_dir else None
+        )
+        self._last_dca: Dict[str, datetime] = self._load_dca_timers()
         self._strategy_weights = {
             "dca": 0.30,
             "trend": 0.35,
@@ -30,6 +35,31 @@ class StrategyManager:
         # Walk-forward optimizer overrides (F5.1) — None = use config/hardcoded defaults
         self._opt_rsi_oversold:  Optional[float] = None
         self._opt_rsi_overbought: Optional[float] = None
+
+    # ── DCA timer persistence ─────────────────────────────────────────────
+
+    def _load_dca_timers(self) -> Dict[str, datetime]:
+        if self._dca_path is None:
+            return {}
+        data = safe_read_json(self._dca_path)
+        if not isinstance(data, dict):
+            return {}
+        result: Dict[str, datetime] = {}
+        for sym, iso in data.items():
+            try:
+                result[sym] = datetime.fromisoformat(iso)
+            except Exception:
+                pass
+        if result:
+            logger.info("StrategyManager: restored DCA timers for %d symbols", len(result))
+        return result
+
+    def _save_dca_timers(self):
+        if self._dca_path is not None:
+            atomic_write_json(
+                self._dca_path,
+                {sym: dt.isoformat() for sym, dt in self._last_dca.items()},
+            )
 
     def set_opt_params(
         self,
@@ -183,6 +213,7 @@ class StrategyManager:
 
     def record_dca(self, symbol: str):
         self._last_dca[symbol] = datetime.utcnow()
+        self._save_dca_timers()
 
     def ichimoku_strategy(self, analysis: MarketAnalysis) -> TradingSignal:
         """Ichimoku Cloud strategy — all-in-one Japanese trend system."""
