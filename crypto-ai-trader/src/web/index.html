@@ -664,6 +664,46 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
     </div>
   </div>
 
+  <!-- Resilience Row (v1.4.0) — Tail Risk · Model Drift · Param Optimizer -->
+  <div class="row g-3 mb-3" id="resilienceRow">
+    <!-- Tail Risk -->
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-activity me-2"></i>Tail Risk <span class="text-muted" style="font-size:0.65rem;font-weight:400">VaR · CVaR · Monte Carlo</span></span>
+          <span id="varCircuitBadge" style="display:none;font-size:0.65rem;font-weight:700;color:#ff4d6d">⚡ VaR HALT</span>
+        </div>
+        <div class="card-body p-2" id="tailRiskPanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+    <!-- Model Drift -->
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-arrow-repeat me-2"></i>Model Drift <span class="text-muted" style="font-size:0.65rem;font-weight:400">PSI per feature</span></span>
+          <span id="driftBadge" style="display:none;font-size:0.65rem;font-weight:700;color:#ffc107">⚠ DRIFT</span>
+        </div>
+        <div class="card-body p-2" id="driftPanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+    <!-- Param Optimizer -->
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-sliders me-2"></i>Param Optimizer <span class="text-muted" style="font-size:0.65rem;font-weight:400">Walk-forward · Champion/Challenger</span></span>
+          <span id="paramChampBadge" style="display:none;font-size:0.65rem;font-weight:700;color:#39d98a">✓ PROMOTED</span>
+        </div>
+        <div class="card-body p-2" id="paramOptPanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Sentiment & On-chain Row -->
   <div class="row g-3 mb-3" id="sentimentRow">
     <div class="col-12">
@@ -2609,6 +2649,19 @@ function renderRiskPanel() {
 
   if (badge) { badge.style.display = rs.circuit_open ? '' : 'none'; }
 
+  // Determine circuit type for colour coding
+  const reason = (rs.circuit_reason || '').toLowerCase();
+  const circuitColor = reason.includes('var') || reason.includes('ruin') ? '#c084fc'
+                     : reason.includes('drawdown') ? '#ff4d6d' : '#ff6b35';
+
+  // VaR inline summary (from tail_risk block)
+  const tr = rs.tail_risk || {};
+  const varPct  = tr.var_pct  != null ? (tr.var_pct  * 100).toFixed(1) : null;
+  const cvarPct = tr.cvar_pct != null ? (tr.cvar_pct * 100).toFixed(1) : null;
+  const limVar  = rs.limits   ? (rs.limits.max_var_pct * 100).toFixed(0) : '5';
+  const varColor = varPct && parseFloat(varPct) > parseFloat(limVar) * 0.8 ? '#ff4d6d'
+                 : varPct && parseFloat(varPct) > parseFloat(limVar) * 0.5 ? '#ffc107' : '#39d98a';
+
   panel.innerHTML = `
     <div class="mb-2">
       <div class="d-flex justify-content-between mb-1">
@@ -2628,7 +2681,11 @@ function renderRiskPanel() {
       <span>HWM: <strong style="color:var(--text-main)">$${(rs.high_water_mark||0).toFixed(0)}</strong></span>
       <span>Daily PnL: <strong style="color:${rs.daily_pnl>=0?'var(--accent-buy)':'var(--accent-red)'}">${rs.daily_pnl>=0?'+':''}${(rs.daily_pnl||0).toFixed(2)}</strong></span>
     </div>
-    ${rs.circuit_open ? `<div class="mt-2 text-center circuit-open" style="font-size:0.72rem">⚡ ${rs.circuit_reason}</div>` : ''}`;
+    ${varPct ? `<div class="mt-2 d-flex justify-content-between" style="font-size:0.7rem;color:var(--text-muted)">
+      <span>95% VaR: <strong style="color:${varColor};font-family:var(--font-mono)">${varPct}%</strong> <span style="color:var(--text-muted)">(lim ${limVar}%)</span></span>
+      ${cvarPct ? `<span>CVaR: <strong style="font-family:var(--font-mono);color:${varColor}">${cvarPct}%</strong></span>` : ''}
+    </div>` : ''}
+    ${rs.circuit_open ? `<div class="mt-2 text-center" style="font-size:0.72rem;font-weight:700;color:${circuitColor};animation:pulse 1.2s infinite">⚡ ${rs.circuit_reason}</div>` : ''}`;
 }
 
 function renderPatternPanel(sym) {
@@ -4314,6 +4371,146 @@ function renderDashboardState(d) {
   if (d.agents) renderAgents(d.agents);
   // Risk state embedded in dashboard update
   if (d.risk) { riskState = d.risk; renderRiskPanel(); }
+  // v1.4.0 Resilience panels
+  if (d.risk && d.risk.tail_risk) renderTailRiskPanel(d.risk.tail_risk, d.risk.limits || {});
+  if (d.trainer_drift)            renderDriftPanel(d.trainer_drift);
+  if (d.param_opt)                renderParamOptPanel(d.param_opt);
+}
+
+// ── v1.4.0 Resilience panels ───────────────────────────────────────────────
+
+function renderTailRiskPanel(tr, limits) {
+  const panel = document.getElementById('tailRiskPanel');
+  const badge = document.getElementById('varCircuitBadge');
+  if (!panel) return;
+
+  const pct = (v, dp=1) => v != null ? (v * 100).toFixed(dp) + '%' : '—';
+  const limVar = limits.max_var_pct || 0.05;
+  const limRuin = limits.max_prob_ruin || 0.40;
+
+  const varPct  = tr.var_pct  || 0;
+  const cvarPct = tr.cvar_pct || 0;
+  const pRuin   = tr.prob_ruin || 0;
+  const p95dd   = tr.p95_maxdd || 0;
+
+  const varRatio  = Math.min(varPct  / limVar,  1.0);
+  const ruinRatio = Math.min(pRuin   / limRuin, 1.0);
+  const varColor  = varRatio  > 0.8 ? '#ff4d6d' : varRatio  > 0.5 ? '#ffc107' : '#39d98a';
+  const ruinColor = ruinRatio > 0.8 ? '#ff4d6d' : ruinRatio > 0.5 ? '#ffc107' : '#39d98a';
+
+  if (badge) badge.style.display = (varRatio >= 1.0 || ruinRatio >= 1.0) ? '' : 'none';
+
+  const n = tr.n_paths || 0;
+  const h = tr.horizon  || 0;
+
+  panel.innerHTML = `
+    <div class="mb-2">
+      <div class="d-flex justify-content-between mb-1">
+        <span class="stat-label" style="margin:0">95% VaR <span style="font-size:0.62rem;color:var(--text-muted)">(lim ${pct(limVar,0)})</span></span>
+        <span style="font-family:var(--font-mono);font-size:0.8rem;color:${varColor}">${pct(varPct)}</span>
+      </div>
+      <div class="heat-bar"><div class="heat-fill" style="width:${(varRatio*100).toFixed(0)}%;background:${varColor}"></div></div>
+    </div>
+    <div class="mb-2">
+      <div class="d-flex justify-content-between mb-1">
+        <span class="stat-label" style="margin:0">CVaR (Expected Shortfall)</span>
+        <span style="font-family:var(--font-mono);font-size:0.8rem;color:${varColor}">${pct(cvarPct)}</span>
+      </div>
+    </div>
+    <div class="mb-2">
+      <div class="d-flex justify-content-between mb-1">
+        <span class="stat-label" style="margin:0">Prob Ruin <span style="font-size:0.62rem;color:var(--text-muted)">(DD>20% in ${h}d, lim ${pct(limRuin,0)})</span></span>
+        <span style="font-family:var(--font-mono);font-size:0.8rem;color:${ruinColor}">${pct(pRuin)}</span>
+      </div>
+      <div class="heat-bar"><div class="heat-fill" style="width:${(ruinRatio*100).toFixed(0)}%;background:${ruinColor}"></div></div>
+    </div>
+    <div class="d-flex justify-content-between" style="font-size:0.7rem;color:var(--text-muted)">
+      <span>P95 Max-DD: <strong style="font-family:var(--font-mono);color:var(--text-main)">${pct(p95dd)}</strong></span>
+      <span style="font-size:0.62rem">${n ? n.toLocaleString()+' paths' : ''}</span>
+    </div>`;
+}
+
+function renderDriftPanel(drift) {
+  const panel = document.getElementById('driftPanel');
+  const badge = document.getElementById('driftBadge');
+  if (!panel) return;
+
+  const hasDrift = drift.drift_count > 0;
+  const maxPsi   = drift.max_psi || 0;
+  const threshold = drift.threshold || 0.20;
+  const features  = drift.per_feature || {};
+  const hasBL     = drift.has_baseline;
+
+  if (badge) badge.style.display = (maxPsi > threshold) ? '' : 'none';
+
+  const psiColor = v => v > threshold ? '#ff4d6d' : v > 0.10 ? '#ffc107' : '#39d98a';
+  const psiLabel = v => v > threshold ? 'significant' : v > 0.10 ? 'minor' : 'stable';
+
+  const featureRows = Object.entries(features)
+    .sort(([,a],[,b]) => b - a)
+    .slice(0, 6)
+    .map(([f, v]) => {
+      const fill = Math.min(v / (threshold * 2), 1.0) * 100;
+      return `<div class="d-flex align-items-center gap-2 py-1" style="border-bottom:1px solid var(--border)">
+        <span style="font-size:0.68rem;font-family:var(--font-mono);flex:0 0 90px;color:var(--text-muted)">${f}</span>
+        <div class="heat-bar flex-fill"><div class="heat-fill" style="width:${fill.toFixed(0)}%;background:${psiColor(v)}"></div></div>
+        <span style="font-size:0.68rem;font-family:var(--font-mono);flex:0 0 42px;text-align:right;color:${psiColor(v)}">${v.toFixed(3)}</span>
+      </div>`;
+    }).join('');
+
+  panel.innerHTML = `
+    <div class="d-flex justify-content-between mb-2" style="font-size:0.75rem">
+      <span>Baseline: <strong style="color:${hasBL?'var(--accent-buy)':'var(--text-muted)'}">${hasBL ? 'recorded' : 'none yet'}</strong></span>
+      <span>Drift events: <strong style="color:${hasDrift?'#ffc107':'var(--text-main)'}">${drift.drift_count || 0}</strong></span>
+    </div>
+    <div class="d-flex justify-content-between mb-2" style="font-size:0.75rem">
+      <span>Max PSI: <strong style="font-family:var(--font-mono);color:${psiColor(maxPsi)}">${maxPsi.toFixed(3)}</strong></span>
+      <span style="font-size:0.68rem;color:${psiColor(maxPsi)}">${psiLabel(maxPsi)}</span>
+    </div>
+    <div style="font-size:0.65rem;color:var(--text-muted);margin-bottom:4px">PSI per feature (threshold ${threshold.toFixed(2)})</div>
+    ${featureRows || '<div class="text-muted text-center small py-1">รอ baseline...</div>'}`;
+}
+
+function renderParamOptPanel(opt) {
+  const panel = document.getElementById('paramOptPanel');
+  const badge = document.getElementById('paramChampBadge');
+  if (!panel) return;
+
+  if (!opt || opt.status === 'not_run') {
+    panel.innerHTML = '<div class="text-muted text-center small py-2">ยังไม่ได้รัน (ต้องการ ≥60 แท่ง)</div>';
+    return;
+  }
+
+  const bp    = opt.best_params || {};
+  const sharpe = opt.best_sharpe;
+  const challS = opt.last_challenger_sharpe;
+  const promoted = challS != null && sharpe != null && challS > sharpe - 0.01;
+  if (badge) badge.style.display = (challS != null && challS > (sharpe || -999) - 0.001) ? '' : 'none';
+
+  const paramRows = [
+    ['RSI Oversold',   bp.rsi_oversold,   ''],
+    ['RSI Overbought', bp.rsi_overbought,  ''],
+    ['ATR SL Mult',    bp.atr_sl_mult,     '×'],
+    ['Min Confidence', bp.min_confidence != null ? (bp.min_confidence * 100).toFixed(0) + '%' : null, ''],
+  ].filter(([,v]) => v != null).map(([label, val, suffix]) =>
+    `<div class="d-flex justify-content-between py-1" style="border-bottom:1px solid var(--border);font-size:0.72rem">
+      <span style="color:var(--text-muted)">${label}</span>
+      <strong style="font-family:var(--font-mono)">${val}${suffix}</strong>
+    </div>`
+  ).join('');
+
+  const sharpeColor = sharpe > 0 ? '#39d98a' : sharpe > -1 ? '#ffc107' : '#ff4d6d';
+  const opt_at = opt.optimized_at ? new Date(opt.optimized_at + 'Z').toLocaleString('th', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+
+  panel.innerHTML = `
+    <div class="d-flex justify-content-between mb-2" style="font-size:0.75rem">
+      <span>Champion Sharpe: <strong style="font-family:var(--font-mono);color:${sharpeColor}">${sharpe != null ? sharpe.toFixed(3) : '—'}</strong></span>
+      ${challS != null ? `<span style="font-size:0.68rem;color:var(--text-muted)">challenger: ${challS.toFixed(3)}</span>` : ''}
+    </div>
+    ${paramRows}
+    <div class="mt-2" style="font-size:0.62rem;color:var(--text-muted);text-align:right">
+      last opt: ${opt_at} · ${opt.n_combos || 0} combos
+    </div>`;
 }
 
 function renderAgents(agents) {

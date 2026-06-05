@@ -209,6 +209,7 @@ class AITrader:
             "model_bandit_stats": self._model_bandit.get_stats(),   # F2.1
             "signal_cache":       self._signal_cache.stats,
             "param_opt":          self._param_opt.summary(),        # F5.1
+            "trainer_drift":      ts.get("drift", {}),              # F3.4
         }
 
     async def _broadcast(self, event: str, data: dict):
