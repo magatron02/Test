@@ -1833,6 +1833,28 @@ body { overflow: hidden; }
   <div class="row g-3">
     <!-- LEFT COLUMN -->
     <div class="col-md-6">
+
+      <!-- Trading Pairs -->
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-currency-exchange me-2"></i>Trading Pairs</div>
+        <div class="card-body">
+          <div id="symbolTagsWrap" class="d-flex flex-wrap gap-2 mb-3" style="min-height:32px"></div>
+          <div class="d-flex gap-2">
+            <input type="text" class="form-control form-control-sm" id="newSymbolInput"
+              placeholder="เช่น TAO/THB, BTC/USDT"
+              style="text-transform:uppercase;font-family:var(--font-mono);font-size:0.8rem"
+              onkeydown="if(event.key==='Enter') addSymbol()">
+            <button class="btn btn-sm" style="background:var(--accent);color:#000;font-weight:700;white-space:nowrap" onclick="addSymbol()">
+              <i class="bi bi-plus-lg me-1"></i>Add
+            </button>
+          </div>
+          <div id="symbolSaveMsg" class="small mt-2" style="display:none"></div>
+          <small class="text-muted d-block mt-2" style="font-size:0.7rem">
+            กด × เพื่อลบ — มีผลทันทีในรอบวิเคราะห์ถัดไป ไม่ต้อง restart
+          </small>
+        </div>
+      </div>
+
       <div class="card mb-3">
         <div class="card-header"><i class="bi bi-toggles me-2"></i>Trading Mode</div>
         <div class="card-body">
@@ -2263,7 +2285,7 @@ function showSection(name, el) {
   if (name === 'portfolio') refreshPortfolio();
   if (name === 'trade-history') refreshHistory();
   if (name === 'analytics') { refreshTraining(); refreshLoopStatus(); refreshHourlyTrainer(); }
-  if (name === 'settings') loadSettings();
+  if (name === 'settings') { loadSettings(); loadSymbols(); }
   if (name === 'trading' && currentSymbol) { loadMTF(); refreshHeatmap(); if (allAnalyses[currentSymbol]) updateMicrostructurePanel(allAnalyses[currentSymbol]); }
   if (name === 'positions') refreshPositions();
   if (name === 'notifications') {
@@ -3723,6 +3745,65 @@ async function testExchanges() {
   } catch(e) {
     resultEl.innerHTML = `<div class="text-danger small">${e.message}</div>`;
   }
+}
+
+// ============================================================
+// Trading Pairs (Symbols) Management
+// ============================================================
+async function loadSymbols() {
+  try {
+    const r = await fetch('/api/symbols');
+    const d = await r.json();
+    renderSymbolTags(d.symbols || []);
+  } catch {}
+}
+
+function renderSymbolTags(syms) {
+  const wrap = document.getElementById('symbolTagsWrap');
+  if (!wrap) return;
+  if (!syms.length) { wrap.innerHTML = '<span class="text-muted small">ยังไม่มี symbol</span>'; return; }
+  wrap.innerHTML = syms.map(s => `
+    <span class="badge d-inline-flex align-items-center gap-1 px-2 py-1"
+      style="background:rgba(168,255,83,0.1);border:1px solid rgba(168,255,83,0.25);color:var(--accent);font-family:var(--font-mono);font-size:0.75rem;border-radius:6px">
+      ${s}
+      <button type="button" onclick="removeSymbol('${s}')"
+        style="background:none;border:none;padding:0;line-height:1;color:var(--text-muted);font-size:0.85rem;cursor:pointer"
+        title="Remove">×</button>
+    </span>`).join('');
+}
+
+async function addSymbol() {
+  const input = document.getElementById('newSymbolInput');
+  const sym = input.value.trim().toUpperCase();
+  if (!sym) return;
+  const msg = document.getElementById('symbolSaveMsg');
+  try {
+    const r = await fetch('/api/symbols', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({add: sym})
+    });
+    const d = await r.json();
+    if (!r.ok) { msg.style.display=''; msg.className='small mt-2 text-danger'; msg.textContent=d.detail||'Error'; return; }
+    input.value = '';
+    renderSymbolTags(d.symbols);
+    msg.style.display=''; msg.className='small mt-2 text-success'; msg.textContent=`เพิ่ม ${sym} แล้ว`;
+    setTimeout(() => msg.style.display='none', 3000);
+  } catch(e) { msg.style.display=''; msg.className='small mt-2 text-danger'; msg.textContent=e.message; }
+}
+
+async function removeSymbol(sym) {
+  const msg = document.getElementById('symbolSaveMsg');
+  try {
+    const r = await fetch('/api/symbols', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({remove: sym})
+    });
+    const d = await r.json();
+    if (!r.ok) { msg.style.display=''; msg.className='small mt-2 text-danger'; msg.textContent=d.detail||'Error'; return; }
+    renderSymbolTags(d.symbols);
+    msg.style.display=''; msg.className='small mt-2 text-muted'; msg.textContent=`ลบ ${sym} แล้ว`;
+    setTimeout(() => msg.style.display='none', 3000);
+  } catch(e) { msg.style.display=''; msg.className='small mt-2 text-danger'; msg.textContent=e.message; }
 }
 
 async function loadSettings() {

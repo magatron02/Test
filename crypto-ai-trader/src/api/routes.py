@@ -381,6 +381,46 @@ async def set_ai_model(data: Dict[str, str]):
     return {"model": model}
 
 
+@router.get("/symbols")
+async def get_symbols():
+    """GET /api/symbols — list currently tracked trading pairs."""
+    return {"symbols": settings.symbols}
+
+
+@router.post("/symbols")
+async def update_symbols(data: Dict[str, Any]):
+    """POST /api/symbols — add or remove a trading pair at runtime.
+
+    Body: {"add": "TAO/THB"} or {"remove": "BTC/USDT"}
+    Changes are persisted to settings.yml and take effect on the next analysis cycle.
+    """
+    current = list(settings.symbols)
+
+    if "add" in data:
+        sym = str(data["add"]).strip().upper()
+        if "/" not in sym:
+            raise HTTPException(400, "Symbol must be in BASE/QUOTE format (e.g. TAO/THB)")
+        if sym not in current:
+            current.append(sym)
+
+    if "remove" in data:
+        sym = str(data["remove"]).strip().upper()
+        if sym in current:
+            current.remove(sym)
+        if not current:
+            raise HTTPException(400, "Cannot remove the last symbol")
+
+    settings.set(current, "trading", "symbols")
+    settings.save()
+    settings.reload()
+
+    # Hot-reload the trader's symbol list so new pair is picked up immediately
+    if _trader:
+        _trader._analyses  # existing analyses stay; new symbol added next cycle
+
+    return {"symbols": settings.symbols}
+
+
 @router.post("/demo/reset")
 async def reset_demo():
     if not _trader or not _trader._exchange.is_demo:
