@@ -5,6 +5,9 @@ import threading
 import webbrowser
 from pathlib import Path
 
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 import sys as _sys
 import uvicorn
 from fastapi import FastAPI, WebSocket
