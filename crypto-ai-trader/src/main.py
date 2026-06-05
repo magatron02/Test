@@ -33,11 +33,11 @@ logger = logging.getLogger(__name__)
 
 WEB_DIR = (Path(_sys._MEIPASS) / "src" / "web") if getattr(_sys, 'frozen', False) else (Path(__file__).parent / "web")
 
-app = FastAPI(title=settings.app_name, version="1.2.0")
-APP_VERSION = "1.2.0"
+app = FastAPI(title=settings.app_name, version="2.0.0")
+APP_VERSION = "2.0.0"
 APP_NAME    = "Aiterra"
 AI_NAME     = "Lunai"
-AI_VERSION  = "1.2.0"
+AI_VERSION  = "2.0.0"
 
 # Attach slowapi rate-limiter state so @limiter.limit decorators work.
 try:
@@ -198,7 +198,7 @@ async def shutdown():
 def main():
     print(f"""
 ╔══════════════════════════════════════════╗
-║    Aiterra v1.2.0  |  Lunai v1.2.0          ║
+║    Aiterra v2.0.0  |  Lunai v2.0.0          ║
 ║  Mode: {settings.trading_mode.upper():<10} Model: {settings.ai_model:<12}║
 ║  Port: {settings.app_port:<10} URL: http://localhost:{settings.app_port} ║
 ╚══════════════════════════════════════════╝

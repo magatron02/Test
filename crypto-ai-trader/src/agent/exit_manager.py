@@ -1,5 +1,5 @@
 """
-Adaptive Dynamic SL/TP — F2.2 (Lunai v1.2.0 "Judgment").
+Adaptive Dynamic SL/TP — F2.2 (Lunai v2.0.0 "Judgment").
 
 Replaces fixed-percentage stops with ATR-scaled exits that adapt to the
 current market regime.  Regime parameters follow the principle:

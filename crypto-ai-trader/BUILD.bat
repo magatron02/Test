@@ -1,9 +1,9 @@
 @echo off
-title Aiterra v1.2.0 - Build Executable
+title Aiterra v2.0.0 - Build Executable
 color 0B
 echo.
 echo  ============================================
-echo    Aiterra v1.2.0 - Building .exe
+echo    Aiterra v2.0.0 - Building .exe
 echo  ============================================
 echo.
 
