@@ -4798,11 +4798,11 @@ async function loadSettings() {
 }
 
 // Load alerts when the alerts section becomes active
-const _origShowSection = showSection;
-function showSection(name, el) {
-  _origShowSection(name, el);
+const _showSectionBase = showSection;
+showSection = function(name, el) {
+  _showSectionBase(name, el);
   if (name === 'alerts') loadAlerts();
-}
+};
 
 // ── Exchange Connection Probe ─────────────────────────────────────────────────
 
