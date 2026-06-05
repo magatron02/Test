@@ -947,18 +947,13 @@ class AITrader:
             self._rl.update_outcome(trade_id, pnl_pct, self._strategy)
             self._model_bandit.update_outcome(trade_id, pnl_pct)  # F2.1
             self._sizer.update_outcome(symbol, pnl_pct)
-            self._risk.deregister_trade(symbol)
-
-            self._daily_pnl += pnl
             holding_h = (datetime.now(timezone.utc) - trade.get("opened_at", datetime.now(timezone.utc))).total_seconds() / 3600
-            del self._open_trades[symbol]
-            self._signal_cache.invalidate(symbol)   # context changed after exit
-
-            # Save outcome to long-term memory (fire-and-forget)
             asyncio.ensure_future(self._memory.add_outcome(
                 symbol, side="buy", pnl_pct=pnl_pct, reason=reason,
                 holding_hours=holding_h, entry=entry, exit_price=order.price,
             ))
+        except Exception as e:
+            logger.warning("Post-close learning failed for %s: %s", symbol, e)
 
         try:
             await self._broadcast("trade_closed", {
