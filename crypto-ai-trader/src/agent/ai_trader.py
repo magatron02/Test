@@ -384,6 +384,11 @@ class AITrader:
             logger.debug("Cointegration scan skipped: %s", e)
             return []
 
+    def _get_pairs_signal(self, symbol: str, primary_sig) -> Optional[object]:
+        """F3.1 — Stat-arb pairs signal stub. Returns None until cointegration
+        signal generation is fully implemented."""
+        return None
+
     # ── Portfolio helpers ─────────────────────────────────────────────────
 
     async def _get_portfolio_summary(self) -> dict:
