@@ -11,7 +11,7 @@ from .market_regime import RegimeResult, detect_regime
 from .narrative import build_narrative
 from .risk_engine import RiskEngine
 from .position_sizer import PositionSizer
-from .rl_trainer import RLTrainer
+from .rl_trainer import RLTrainer, ModelBandit
 from .memory_manager import MemoryManager
 from .signal_cache import SignalCache
 from .strategy_manager import StrategyManager, TradingSignal
@@ -54,7 +54,8 @@ class AITrader:
         sizer_cfg = settings.get("position_sizer", default={}) or {}
         self._risk     = RiskEngine(config=risk_cfg)
         self._sizer    = PositionSizer(config=sizer_cfg)
-        self._rl       = RLTrainer(models_dir=settings.models_dir)
+        self._rl           = RLTrainer(models_dir=settings.models_dir)
+        self._model_bandit = ModelBandit(models_dir=settings.models_dir)
         self._memory   = MemoryManager()   # supermemory: long-term trade recall
         # Fingerprint cache: skip the costly Claude call when the market is unchanged
         self._signal_cache = SignalCache(settings.get("ai", "signal_cache", default={}) or {})
