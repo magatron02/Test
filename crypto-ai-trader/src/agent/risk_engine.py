@@ -56,6 +56,7 @@ class RiskEngine:
         self._max_daily_loss_pct = float(cfg.get("max_daily_loss_pct", 0.05))
         self._max_portfolio_heat = float(cfg.get("max_portfolio_heat", 0.20))
         self._max_position_pct   = float(cfg.get("max_position_pct",   0.10))
+        self._max_var_pct        = float(cfg.get("max_var_pct",        0.02))
         # Correlation guard: block a new BUY if it is too correlated with
         # the symbols already held (avoids fake diversification).
         self._max_correlation    = float(cfg.get("max_correlation",    0.80))
