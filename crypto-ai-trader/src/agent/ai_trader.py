@@ -99,6 +99,12 @@ class AITrader:
             "risk":       {"status": "idle", "detail": "พร้อมทำงาน", "ts": None},
         }
 
+        # Walk-forward optimizer overrides — None until _apply_opt_params() runs
+        self._opt_min_conf:       Optional[float] = None
+        self._opt_rsi_oversold:   Optional[float] = None
+        self._opt_rsi_overbought: Optional[float] = None
+        self._opt_atr_sl_mult:    Optional[float] = None
+
         # Restore open positions + daily PnL from the last snapshot so a restart
         # doesn't reset the daily-loss limit or orphan in-flight trades.
         self._restore_runtime_state()
