@@ -2,13 +2,27 @@
 description: Save and push all changes to GitHub (sync between computers)
 ---
 
-Run these commands to sync everything to GitHub:
+## ขั้นตอน Quicksave
+
+### 1. อัพเดต CONTINUE_HERE.md ก่อน
+
+อัพเดตไฟล์ `CONTINUE_HERE.md` ให้สะท้อนสถานะล่าสุด:
+- วันที่ปัจจุบัน
+- สถานะงานที่เพิ่งทำเสร็จ → ย้ายไป ✅
+- งานที่ค้างอยู่ → อัพเดตให้ตรง
+- ขั้นตอนถัดไปที่ต้องทำต่อ → เขียนให้ชัดเจน ราวกับว่าคนอื่นจะมาอ่านต่อ
+
+### 2. Push ขึ้น GitHub
 
 ```bash
-cd "C:\Users\VRTWINS_Creative\Desktop\AI_Create"
+cd "C:\Users\Lenovo\Desktop\AI\AI_Create"
 git add -A
-git commit -m "quicksave: sync $(date '+%Y-%m-%d %H:%M')" --allow-empty
+git commit -m "quicksave: บันทึกความคืบหน้า $(date '+%Y-%m-%d %H:%M')" --allow-empty
 git push origin main
 ```
 
-After running, confirm with the push result. If there are merge conflicts or the push is rejected (because the other computer pushed first), run `git pull --rebase origin main` first, then push again.
+หลังรันแล้ว แจ้งผลการ push ให้ทราบ ถ้า push ถูก reject (คอมเครื่องอื่น push ไปก่อน) ให้รัน:
+```bash
+git pull --rebase origin main
+git push origin main
+```
