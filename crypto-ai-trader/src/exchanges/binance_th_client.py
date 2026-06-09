@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from urllib.parse import urlencode
 
-import aiohttp
+import httpx
 
 from .base import Balance, BaseExchange, OHLCV, Order, Ticker
 from .retry import with_retry
@@ -14,23 +14,23 @@ from ..core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Binance TH uses /api/v1/ (not v3 like global Binance)
-BINANCE_TH_BASE = "https://api.binance.th"
-API_V1 = f"{BINANCE_TH_BASE}/api/v1"
+BINANCE_TH_BASE  = "https://api.binance.th"
+BINANCE_COM_BASE = "https://api.binance.com"   # price-data fallback
+API_V1  = f"{BINANCE_TH_BASE}/api/v1"
+API_COM = f"{BINANCE_COM_BASE}/api/v3"
 
-# Symbol mapping: our internal format → Binance TH format
-# Binance TH trades against THB (e.g. BTCTHB, ETHTHB)
 SYMBOL_MAP = {
-    "BTC/THB":  "BTCTHB",
-    "ETH/THB":  "ETHTHB",
-    "BNB/THB":  "BNBTHB",
-    "XRP/THB":  "XRPTHB",
-    "SOL/THB":  "SOLTHB",
-    "USDT/THB": "USDTTHB",
-    "ADA/THB":  "ADATHB",
-    "DOGE/THB": "DOGETHB",
-    "MATIC/THB":"MATICTHB",
-    "DOT/THB":  "DOTTHB",
+    "BTC/THB":   "BTCTHB",
+    "ETH/THB":   "ETHTHB",
+    "BNB/THB":   "BNBTHB",
+    "XRP/THB":   "XRPTHB",
+    "SOL/THB":   "SOLTHB",
+    "USDT/THB":  "USDTTHB",
+    "ADA/THB":   "ADATHB",
+    "DOGE/THB":  "DOGETHB",
+    "MATIC/THB": "MATICTHB",
+    "DOT/THB":   "DOTTHB",
+    "TAO/THB":   "TAOTHB",
 }
 
 TIMEFRAME_MAP = {
@@ -41,32 +41,44 @@ TIMEFRAME_MAP = {
 
 
 def _to_th_symbol(symbol: str) -> str:
-    """Convert 'BTC/THB' → 'BTCTHB'."""
-    if symbol in SYMBOL_MAP:
-        return SYMBOL_MAP[symbol]
-    # Fallback: strip slash
-    return symbol.replace("/", "")
+    return SYMBOL_MAP.get(symbol, symbol.replace("/", ""))
+
+
+def _to_usdt_symbol(symbol: str) -> str:
+    """BTC/THB → BTCUSDT  (for Binance global fallback)."""
+    base = symbol.split("/")[0]
+    return f"{base}USDT"
 
 
 class BinanceTHExchange(BaseExchange):
-    """Binance TH (Thailand) exchange — trades THB pairs via /api/v1/ endpoints."""
+    """Binance TH — price data via Binance global fallback, orders via api.binance.th."""
 
     name = "binance_th"
     quote_currency = "THB"
 
     def __init__(self):
         cfg = settings.get("exchanges", "binance_th") or {}
-        self._api_key = cfg.get("api_key", "")
+        self._api_key    = cfg.get("api_key", "")
         self._api_secret = cfg.get("api_secret", "")
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._client:     Optional[httpx.AsyncClient] = None
+        self._pub_client: Optional[httpx.AsyncClient] = None  # public/no-auth
 
-    async def _get_session(self) -> aiohttp.ClientSession:
-        if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession(
+    def _auth_client(self) -> httpx.AsyncClient:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(
                 headers={"X-MBX-APIKEY": self._api_key},
-                timeout=aiohttp.ClientTimeout(total=10),
+                timeout=httpx.Timeout(15.0),
+                follow_redirects=True,
             )
-        return self._session
+        return self._client
+
+    def _pub(self) -> httpx.AsyncClient:
+        if self._pub_client is None or self._pub_client.is_closed:
+            self._pub_client = httpx.AsyncClient(
+                timeout=httpx.Timeout(10.0),
+                follow_redirects=True,
+            )
+        return self._pub_client
 
     def _sign(self, params: dict) -> str:
         query = urlencode(params)
@@ -77,68 +89,121 @@ class BinanceTHExchange(BaseExchange):
         ).hexdigest()
 
     async def close(self):
-        if self._session and not self._session.closed:
-            await self._session.close()
+        for c in (self._client, self._pub_client):
+            if c and not c.is_closed:
+                await c.aclose()
+
+    # ------------------------------------------------------------------ #
+    # Price helpers — try api.binance.th, fall back to api.binance.com    #
+    # ------------------------------------------------------------------ #
+
+    async def _thb_rate(self) -> float:
+        """USDT/THB rate from Binance global, cached 30 s."""
+        now = time.time()
+        if hasattr(self, "_rate_cache") and now - self._rate_cache[1] < 30:
+            return self._rate_cache[0]
+        rate = 34.0
+        try:
+            r = await self._pub().get(f"{API_COM}/ticker/price", params={"symbol": "USDTTHB"})
+            if r.status_code == 200:
+                rate = float(r.json().get("price", 34.0))
+        except Exception:
+            pass
+        self._rate_cache = (rate, now)
+        return rate
 
     @with_retry()
     async def get_ticker(self, symbol: str) -> Ticker:
         th_sym = _to_th_symbol(symbol)
-        session = await self._get_session()
-        async with session.get(
-            f"{API_V1}/ticker/24hr",
-            params={"symbol": th_sym},
-        ) as r:
-            data = await r.json()
+        # Try direct first
+        try:
+            r = await self._pub().get(f"{API_V1}/ticker/24hr", params={"symbol": th_sym}, timeout=5.0)
+            if r.status_code == 200:
+                data = r.json()
+                if isinstance(data, dict) and "lastPrice" in data:
+                    return Ticker(
+                        symbol=symbol,
+                        price=float(data["lastPrice"]),
+                        change_24h=float(data["priceChangePercent"]),
+                        volume_24h=float(data["volume"]),
+                        high_24h=float(data["highPrice"]),
+                        low_24h=float(data["lowPrice"]),
+                    )
+        except Exception as e:
+            logger.debug(f"BinanceTH direct ticker failed ({e}), using Binance global fallback")
 
-        if isinstance(data, dict) and "code" in data:
-            raise ValueError(f"Binance TH ticker error: {data}")
-
+        # Fallback: Binance global USDT price × THB rate
+        usdt_sym = _to_usdt_symbol(symbol)
+        rate = await self._thb_rate()
+        r = await self._pub().get(f"{API_COM}/ticker/24hr", params={"symbol": usdt_sym})
+        r.raise_for_status()
+        data = r.json()
         return Ticker(
             symbol=symbol,
-            price=float(data["lastPrice"]),
+            price=float(data["lastPrice"]) * rate,
             change_24h=float(data["priceChangePercent"]),
             volume_24h=float(data["volume"]),
-            high_24h=float(data["highPrice"]),
-            low_24h=float(data["lowPrice"]),
+            high_24h=float(data["highPrice"]) * rate,
+            low_24h=float(data["lowPrice"]) * rate,
         )
 
     @with_retry()
     async def get_ohlcv(self, symbol: str, timeframe: str = "5m", limit: int = 100) -> List[OHLCV]:
         th_sym = _to_th_symbol(symbol)
         tf = TIMEFRAME_MAP.get(timeframe, "5m")
-        session = await self._get_session()
-        async with session.get(
-            f"{API_V1}/klines",
-            params={"symbol": th_sym, "interval": tf, "limit": limit},
-        ) as r:
-            data = await r.json()
+        # Try direct
+        try:
+            r = await self._pub().get(
+                f"{API_V1}/klines",
+                params={"symbol": th_sym, "interval": tf, "limit": limit},
+                timeout=5.0,
+            )
+            if r.status_code == 200:
+                data = r.json()
+                if isinstance(data, list):
+                    return [
+                        OHLCV(
+                            timestamp=datetime.fromtimestamp(row[0] / 1000),
+                            open=float(row[1]), high=float(row[2]),
+                            low=float(row[3]),  close=float(row[4]),
+                            volume=float(row[5]),
+                        )
+                        for row in data
+                    ]
+        except Exception as e:
+            logger.debug(f"BinanceTH direct ohlcv failed ({e}), using Binance global fallback")
 
-        if isinstance(data, dict) and "code" in data:
-            raise ValueError(f"Binance TH klines error: {data}")
-
+        # Fallback
+        usdt_sym = _to_usdt_symbol(symbol)
+        rate = await self._thb_rate()
+        r = await self._pub().get(
+            f"{API_COM}/klines",
+            params={"symbol": usdt_sym, "interval": tf, "limit": limit},
+        )
+        r.raise_for_status()
+        data = r.json()
         return [
             OHLCV(
                 timestamp=datetime.fromtimestamp(row[0] / 1000),
-                open=float(row[1]),
-                high=float(row[2]),
-                low=float(row[3]),
-                close=float(row[4]),
+                open=float(row[1]) * rate,  high=float(row[2]) * rate,
+                low=float(row[3]) * rate,   close=float(row[4]) * rate,
                 volume=float(row[5]),
             )
             for row in data
         ]
 
-    @with_retry()
+    # ------------------------------------------------------------------ #
+    # Account / orders — must use api.binance.th (no fallback)            #
+    # ------------------------------------------------------------------ #
+
     async def get_balance(self) -> Dict[str, Balance]:
         params = {"timestamp": int(time.time() * 1000)}
         params["signature"] = self._sign(params)
-        session = await self._get_session()
-        async with session.get(f"{API_V1}/account", params=params) as r:
-            data = await r.json()
-
+        r = await self._auth_client().get(f"{API_V1}/account", params=params)
+        r.raise_for_status()
+        data = r.json()
         if "code" in data:
             raise ValueError(f"Binance TH account error: {data.get('msg', data)}")
-
         return {
             b["asset"]: Balance(
                 b["asset"],
@@ -156,20 +221,18 @@ class BinanceTHExchange(BaseExchange):
     ) -> Order:
         th_sym = _to_th_symbol(symbol)
         params = {
-            "symbol": th_sym,
-            "side": side.upper(),
-            "type": "MARKET",
-            "quantity": amount,
+            "symbol":    th_sym,
+            "side":      side.upper(),
+            "type":      "MARKET",
+            "quantity":  amount,
             "timestamp": int(time.time() * 1000),
         }
         params["signature"] = self._sign(params)
-        session = await self._get_session()
-        async with session.post(f"{API_V1}/order", params=params) as r:
-            data = await r.json()
-
+        r = await self._auth_client().post(f"{API_V1}/order", params=params)
+        r.raise_for_status()
+        data = r.json()
         if "code" in data and int(data["code"]) < 0:
             raise ValueError(f"Binance TH order error: {data.get('msg', data)}")
-
         fills = data.get("fills", [])
         exec_price = float(fills[0]["price"]) if fills else 0.0
         return Order(

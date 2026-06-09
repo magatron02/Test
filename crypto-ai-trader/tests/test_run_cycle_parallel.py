@@ -21,7 +21,7 @@ class _Regime:
     adx = 20.0
 
 
-@pytest.mark.anyio
+@pytest.mark.asyncio
 async def test_run_cycle_analyzes_symbols_concurrently_and_survives_failures(monkeypatch):
     trader = AITrader(_FakeExchange())
 

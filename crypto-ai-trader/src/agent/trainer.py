@@ -33,6 +33,8 @@ GBM_FEATURE_KEYS = [
     "ichimoku_bull", "supertrend_buy", "rsi_div_bull", "rsi_div_bear",
     "kalman_velocity", "kalman_dev_pct", "garch_vol_ratio",
     "wq_alpha101", "wq_mom_5", "wq_mom_10", "wq_vol_zscore", "wq_close_to_high",
+    # Microstructure features (F-MICRO)
+    "book_imbalance", "whale_bid", "whale_ask", "twap_detected", "twap_score",
 ]
 
 
@@ -205,56 +207,20 @@ class AITrainer:
                     for r in records if r.features and r.label is not None
                 ])
                 yg = y_arr
-                res = self._gbm.fit_challenger(Xg, yg, GBM_FEATURE_KEYS)
-                auc_oos = res.get("auc_oos")
-                self._last_challenger_auc = auc_oos
-
-                if auc_oos is None:
-                    logger.warning("GBM challenger eval failed (%s); falling back to RandomForest",
-                                   res.get("error"))
-                else:
-                    challenger_wins = auc_oos > self._champion_auc + _MIN_AUC_IMPROVEMENT
-                    if challenger_wins:
-                        self._gbm.save()
-                        now = datetime.now(timezone.utc).isoformat()
-                        self._save_champion_meta({
-                            "auc_oos":       auc_oos,
-                            "accuracy":      res.get("accuracy"),
-                            "n_total":       res.get("n_total"),
-                            "promoted_at":   now,
-                        })
-                        prev_auc = self._champion_auc
-                        self._champion_auc = auc_oos
-                        self._trades_since_train = 0
-                        self._stats.update({
-                            "last_trained":        now,
-                            "accuracy":            res.get("accuracy"),
-                            "training_trades":     len(records),
-                            "model_type":          "lightgbm",
-                            "champion_auc":        round(auc_oos, 4),
-                            "challenger_auc":      round(auc_oos, 4),
-                            "challenger_promoted": True,
-                        })
-                        logger.info(
-                            "LightGBM challenger PROMOTED: AUC %.4f → %.4f (+%.4f > threshold %.2f)",
-                            prev_auc, auc_oos, auc_oos - prev_auc, _MIN_AUC_IMPROVEMENT,
-                        )
-                        self._record_drift_baseline(records, use_gbm=True)
-                        return True
-                    else:
-                        # Reject challenger — reload saved champion from disk
-                        self._gbm.load()
-                        self._trades_since_train = 0
-                        self._stats.update({
-                            "challenger_auc":      round(auc_oos, 4),
-                            "challenger_promoted": False,
-                            "champion_auc":        round(self._champion_auc, 4),
-                        })
-                        logger.info(
-                            "LightGBM challenger REJECTED: AUC %.4f ≤ champion %.4f + %.2f",
-                            auc_oos, self._champion_auc, _MIN_AUC_IMPROVEMENT,
-                        )
-                        return False
+                res = self._gbm.fit(Xg, yg, GBM_FEATURE_KEYS)
+                if res.get("accuracy") is not None:
+                    self._trades_since_train = 0
+                    self._stats.update({
+                        "last_trained":    datetime.now(timezone.utc).isoformat(),
+                        "accuracy":        round(res["accuracy"], 3),
+                        "training_trades": len(records),
+                        "model_type":      "lightgbm",
+                    })
+                    logger.info("LightGBM trained on %d samples, CV acc=%.3f",
+                                len(records), res["accuracy"])
+                    return True
+                logger.warning("GBM fit failed (%s); falling back to RandomForest",
+                               res.get("error"))
             except Exception as e:
                 logger.warning("GBM training error, using RandomForest: %s", e)
 

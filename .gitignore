@@ -15,5 +15,5 @@ crypto-ai-trader/data/
 crypto-ai-trader/models/
 crypto-ai-trader/config/settings.yml
 
-# Release zips
+# Release zips — build locally, distribute via GitHub Releases
 *.zip

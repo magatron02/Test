@@ -114,12 +114,14 @@ async def get_portfolio():
                     "pnl_pct": (analysis.price - entry) / entry * 100 if entry > 0 else 0,
                 })
 
+        ex = _trader._exchange
         return {
             "cash_usdt": cash,        # kept for UI back-compat; holds `quote` balance
             "quote_currency": quote,
             "total_value": total_value,
             "positions": positions,
-            "is_demo": _trader._exchange.is_demo,
+            "is_demo": ex.is_demo,
+            "initial_balance": getattr(ex, "_initial_cash", None),
         }
     except Exception as e:
         # In live mode a transient API/auth error shouldn't blank the dashboard.
@@ -433,6 +435,46 @@ async def set_ai_model(data: Dict[str, str]):
     return {"model": model}
 
 
+@router.get("/symbols")
+async def get_symbols():
+    """GET /api/symbols — list currently tracked trading pairs."""
+    return {"symbols": settings.symbols}
+
+
+@router.post("/symbols")
+async def update_symbols(data: Dict[str, Any]):
+    """POST /api/symbols — add or remove a trading pair at runtime.
+
+    Body: {"add": "TAO/THB"} or {"remove": "BTC/USDT"}
+    Changes are persisted to settings.yml and take effect on the next analysis cycle.
+    """
+    current = list(settings.symbols)
+
+    if "add" in data:
+        sym = str(data["add"]).strip().upper()
+        if "/" not in sym:
+            raise HTTPException(400, "Symbol must be in BASE/QUOTE format (e.g. TAO/THB)")
+        if sym not in current:
+            current.append(sym)
+
+    if "remove" in data:
+        sym = str(data["remove"]).strip().upper()
+        if sym in current:
+            current.remove(sym)
+        if not current:
+            raise HTTPException(400, "Cannot remove the last symbol")
+
+    settings.set(current, "trading", "symbols")
+    settings.save()
+    settings.reload()
+
+    # Hot-reload the trader's symbol list so new pair is picked up immediately
+    if _trader:
+        _trader._analyses  # existing analyses stay; new symbol added next cycle
+
+    return {"symbols": settings.symbols}
+
+
 @router.post("/demo/reset")
 async def reset_demo():
     if not _trader or not _trader._exchange.is_demo:
@@ -441,85 +483,6 @@ async def reset_demo():
     _trader._open_trades.clear()
     return {"success": True}
 
-
-# ─── Thai Market Routes ────────────────────────────────────────
-
-@router.get("/thai/stocks")
-async def get_thai_stocks(symbols: str = ""):
-    """GET /api/thai/stocks — SET stock quotes + technical signals."""
-    from ..thai.set_client import set_client, SET_STOCKS
-    from ..thai.thai_analyzer import analyze_set
-
-    target_syms = [s.strip() for s in symbols.split(",") if s.strip()] or None
-    quotes = set_client.get_all_quotes(target_syms)
-    result = []
-    for q in quotes:
-        history = set_client.get_history(q["symbol"], days=100)
-        if len(history) < 30:
-            analysis = None
-        else:
-            a = analyze_set(q, history)
-            analysis = {
-                "signal":      a.signal,
-                "confidence":  a.confidence,
-                "reasoning":   a.reasoning,
-                "rsi":         a.rsi,
-                "rsi_signal":  a.rsi_signal,
-                "macd_trend":  a.macd_trend,
-                "ema_trend":   a.ema_trend,
-                "bb_signal":   a.bb_signal,
-                "bb_position": a.bb_position,
-                "volatility":  a.volatility,
-                "support":     a.support,
-                "resistance":  a.resistance,
-            }
-        result.append({**q, "analysis": analysis})
-    return result
-
-
-@router.get("/thai/stocks/{symbol}/history")
-async def get_set_history(symbol: str, days: int = 100):
-    """GET /api/thai/stocks/{symbol}/history — daily OHLCV for chart."""
-    from ..thai.set_client import set_client
-    history = set_client.get_history(symbol, days=days)
-    return history
-
-
-@router.get("/thai/funds")
-async def get_thai_funds():
-    """GET /api/thai/funds — NAV + returns for popular Thai mutual funds."""
-    from ..thai.fund_client import fund_client
-    funds = await fund_client.get_all_funds()
-    # Remove full history from response (keep last 30 points for chart)
-    return funds
-
-
-@router.get("/thai/funds/{code}/history")
-async def get_fund_history(code: str):
-    """GET /api/thai/funds/{code}/history — NAV history for sparkline."""
-    from ..thai.fund_client import fund_client, POPULAR_FUNDS
-    fund = next((f for f in POPULAR_FUNDS if f["code"] == code), None)
-    if not fund:
-        raise HTTPException(404, f"Fund {code} not found")
-    data = await fund_client.get_fund_data(fund, days=365)
-    return data.get("history", [])
-
-
-@router.get("/thai/settings")
-async def get_thai_settings():
-    return {
-        "sec_api_key_set": bool(settings.get("thai", "sec_api_key", default="")),
-        "watch_stocks": settings.get("thai", "watch_stocks", default=[]),
-        "watch_funds":  settings.get("thai", "watch_funds",  default=[]),
-    }
-
-
-@router.post("/thai/settings")
-async def save_thai_settings(data: Dict[str, Any]):
-    for k, v in data.items():
-        settings.set(v, "thai", k)
-    settings.save()
-    return {"success": True}
 
 
 @router.get("/trades/export")
@@ -1796,3 +1759,41 @@ async def set_dry_run(enabled: bool = True):
         "message": f"Dry-run {'enabled' if enabled else 'disabled'}",
     }
 
+
+
+
+@router.get("/orderbook/heatmap")
+async def get_orderbook_heatmap(symbol: str = "BTC/USDT"):
+    """GET /api/orderbook/heatmap?symbol=BTC/USDT
+    Returns the rolling order book snapshot history for the heatmap canvas.
+    """
+    if not _trader:
+        raise HTTPException(503, "Trader not initialised")
+    hist = _trader._ob_history.get(symbol, [])
+    return {
+        "symbol": symbol,
+        "snapshots": list(hist),
+        "count": len(hist),
+    }
+
+
+@router.get("/microstructure")
+async def get_microstructure(symbol: str = "BTC/USDT"):
+    """GET /api/microstructure?symbol=BTC/USDT
+    Returns current microstructure metrics for a symbol.
+    """
+    if not _trader:
+        raise HTTPException(503, "Trader not initialised")
+    analysis = _trader.analyses.get(symbol)
+    if not analysis:
+        raise HTTPException(404, "No analysis for symbol")
+    return {
+        "symbol":          symbol,
+        "book_imbalance":  round(analysis.book_imbalance, 4),
+        "whale_bid_price": analysis.whale_bid_price,
+        "whale_bid_size":  analysis.whale_bid_size,
+        "whale_ask_price": analysis.whale_ask_price,
+        "whale_ask_size":  analysis.whale_ask_size,
+        "twap_detected":   analysis.twap_detected,
+        "twap_score":      round(analysis.twap_score, 2),
+    }

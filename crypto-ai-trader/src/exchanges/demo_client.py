@@ -10,20 +10,28 @@ from .base import OrderbookTop
 
 import aiohttp
 
-from .base import Balance, BaseExchange, OHLCV, Order, Ticker
+from .base import Balance, BaseExchange, OHLCV, Order, OrderBook, Ticker
 from ..core.config import settings
 
 logger = logging.getLogger(__name__)
 
 BINANCE_BASE = "https://api.binance.com"
 
-# Realistic seed prices for simulation fallback
+# Realistic seed prices for simulation fallback (USDT and THB pairs)
 _SEED_PRICES = {
     "BTC/USDT": 105000.0,
-    "ETH/USDT": 3800.0,
-    "BNB/USDT": 680.0,
-    "SOL/USDT": 175.0,
-    "XRP/USDT": 2.30,
+    "ETH/USDT":   3800.0,
+    "BNB/USDT":    680.0,
+    "SOL/USDT":    175.0,
+    "XRP/USDT":      2.30,
+    # THB pairs — approximate THB equivalent (1 USD ≈ 34 THB)
+    "BTC/THB": 3_570_000.0,
+    "ETH/THB":   129_000.0,
+    "BNB/THB":    23_000.0,
+    "SOL/THB":     5_950.0,
+    "XRP/THB":        78.0,
+    "USDT/THB":       34.0,
+    "TAO/THB":    15_300.0,
 }
 
 # Per-symbol simulated state (price walk)
@@ -84,7 +92,14 @@ class DemoExchange(BaseExchange):
 
     def __init__(self):
         cfg = settings.get("exchanges", "demo") or {}
-        self._cash = float(cfg.get("virtual_balance_usdt", 10000.0))
+        base_currency = settings.get("trading", "base_currency") or "USDT"
+        if base_currency == "THB":
+            self._cash = float(cfg.get("virtual_balance_thb", 350000.0))
+            self._currency = "THB"
+        else:
+            self._cash = float(cfg.get("virtual_balance_usdt", 10000.0))
+            self._currency = "USDT"
+        self.quote_currency = self._currency  # sync with base class field
         self._initial_cash = self._cash
         self._positions: Dict[str, dict] = {}  # symbol -> {amount, avg_price}
         self._orders: List[Order] = []
@@ -93,8 +108,11 @@ class DemoExchange(BaseExchange):
 
     async def _get_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
+            # ThreadedResolver uses Python socket (system DNS) — avoids aiodns issues on Windows
+            connector = aiohttp.TCPConnector(resolver=aiohttp.ThreadedResolver())
             self._session = aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=10)
+                connector=connector,
+                timeout=aiohttp.ClientTimeout(total=10),
             )
         return self._session
 
@@ -102,10 +120,34 @@ class DemoExchange(BaseExchange):
         if self._session and not self._session.closed:
             await self._session.close()
 
+    def _to_usdt_symbol(self, symbol: str):
+        """Return (usdt_symbol, thb_rate) for THB pairs so demo can use api.binance.com."""
+        if symbol.endswith("/THB"):
+            base = symbol.split("/")[0]
+            return f"{base}/USDT", 34.0  # approximate THB/USDT; refreshed below
+        return symbol, 1.0
+
+    async def _get_thb_rate(self, session) -> float:
+        """Fetch USDT/THB rate from Binance (approx 34 THB per USDT)."""
+        try:
+            async with session.get(
+                f"{BINANCE_BASE}/api/v3/ticker/price",
+                params={"symbol": "USDTTHB"},
+            ) as resp:
+                if resp.status == 200:
+                    d = await resp.json()
+                    return float(d.get("price", 34.0))
+        except Exception:
+            pass
+        return 34.0
+
     async def get_ticker(self, symbol: str) -> Ticker:
-        ccxt_sym = symbol.replace("/", "")
+        usdt_sym, _ = self._to_usdt_symbol(symbol)
+        ccxt_sym = usdt_sym.replace("/", "")
         session = await self._get_session()
         try:
+            # Fetch THB rate if needed
+            rate = await self._get_thb_rate(session) if symbol.endswith("/THB") else 1.0
             async with session.get(
                 f"{BINANCE_BASE}/api/v3/ticker/24hr",
                 params={"symbol": ccxt_sym},
@@ -117,20 +159,22 @@ class DemoExchange(BaseExchange):
                 raise ValueError("unexpected response format")
             return Ticker(
                 symbol=symbol,
-                price=float(data["lastPrice"]),
+                price=float(data["lastPrice"]) * rate,
                 change_24h=float(data["priceChangePercent"]),
                 volume_24h=float(data["volume"]),
-                high_24h=float(data["highPrice"]),
-                low_24h=float(data["lowPrice"]),
+                high_24h=float(data["highPrice"]) * rate,
+                low_24h=float(data["lowPrice"]) * rate,
             )
         except Exception as e:
             logger.info(f"Binance unreachable ({e}), using simulated price for {symbol}")
             return _mock_ticker(symbol)
 
     async def get_ohlcv(self, symbol: str, timeframe: str = "5m", limit: int = 100) -> List[OHLCV]:
-        ccxt_sym = symbol.replace("/", "")
+        usdt_sym, _ = self._to_usdt_symbol(symbol)
+        ccxt_sym = usdt_sym.replace("/", "")
         session = await self._get_session()
         try:
+            rate = await self._get_thb_rate(session) if symbol.endswith("/THB") else 1.0
             async with session.get(
                 f"{BINANCE_BASE}/api/v3/klines",
                 params={"symbol": ccxt_sym, "interval": timeframe, "limit": limit},
@@ -143,10 +187,10 @@ class DemoExchange(BaseExchange):
             return [
                 OHLCV(
                     timestamp=datetime.fromtimestamp(row[0] / 1000),
-                    open=float(row[1]),
-                    high=float(row[2]),
-                    low=float(row[3]),
-                    close=float(row[4]),
+                    open=float(row[1]) * rate,
+                    high=float(row[2]) * rate,
+                    low=float(row[3]) * rate,
+                    close=float(row[4]) * rate,
                     volume=float(row[5]),
                 )
                 for row in data
@@ -157,7 +201,7 @@ class DemoExchange(BaseExchange):
 
     async def get_balance(self) -> Dict[str, Balance]:
         balances = {
-            "USDT": Balance("USDT", self._cash, 0.0, self._cash)
+            self._currency: Balance(self._currency, self._cash, 0.0, self._cash)
         }
         for sym, pos in self._positions.items():
             base = sym.split("/")[0]
@@ -171,7 +215,7 @@ class DemoExchange(BaseExchange):
 
         if side == "buy":
             if cost > self._cash:
-                raise ValueError(f"Insufficient balance: need {cost:.2f} USDT, have {self._cash:.2f}")
+                raise ValueError(f"Insufficient balance: need {cost:.2f} {self._currency}, have {self._cash:.2f}")
             self._cash -= cost
             base = symbol.split("/")[0]
             if base not in self._positions:
@@ -214,35 +258,30 @@ class DemoExchange(BaseExchange):
 
     def get_portfolio_state(self) -> dict:
         return {
-            "cash_usdt": self._cash,
+            "cash_usdt": self._cash,  # may be THB when base_currency=THB
             "initial_cash": self._initial_cash,
             "positions": dict(self._positions),
             "total_orders": len(self._orders),
         }
 
-    async def get_orderbook_top(self, symbol: str) -> Optional[OrderbookTop]:
-        """Simulated orderbook: real price ± 0.03% spread."""
+    async def get_order_book(self, symbol: str, limit: int = 20) -> Optional[OrderBook]:
+        usdt_sym, rate = self._to_usdt_symbol(symbol)
+        ccxt_sym = usdt_sym.replace("/", "")
+        session = await self._get_session()
         try:
-            ticker = await self.get_ticker(symbol)
-            spread_half = ticker.price * 0.0003
-            return OrderbookTop(
-                symbol,
-                ticker.price - spread_half,
-                ticker.price + spread_half,
-                round(spread_half / ticker.price * 200, 6),
-            )
-        except Exception:
+            async with session.get(
+                f"{BINANCE_BASE}/api/v3/depth",
+                params={"symbol": ccxt_sym, "limit": max(limit, 20)},
+            ) as resp:
+                if resp.status != 200:
+                    return None
+                data = await resp.json()
+            bids = [(float(p) * rate, float(q)) for p, q in data.get("bids", [])]
+            asks = [(float(p) * rate, float(q)) for p, q in data.get("asks", [])]
+            return OrderBook(symbol=symbol, bids=bids[:limit], asks=asks[:limit])
+        except Exception as e:
+            logger.debug("get_order_book failed for %s: %s", symbol, e)
             return None
-
-    async def get_funding_rate(self, symbol: str) -> Optional[dict]:
-        """Simulated funding rate — small positive bias reflecting bull-market norm."""
-        base = symbol.split("/")[0]
-        rng  = random.Random(hash(base) ^ int(_time.time() / 28800))  # changes every 8h
-        rate = rng.gauss(0.0001, 0.00025)    # avg 0.01%/8h, σ 0.025%
-        next_ms = int(
-            (datetime.utcnow() + timedelta(hours=rng.uniform(0.5, 7.5))).timestamp() * 1000
-        )
-        return {"fundingRate": rate, "fundingDatetime": str(next_ms)}
 
     def reset(self):
         self._cash = self._initial_cash

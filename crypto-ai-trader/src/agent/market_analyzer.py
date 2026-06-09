@@ -43,6 +43,7 @@ class MarketAnalysis:
 
     volume_ratio: float = 1.0
     volume_signal: str = "NORMAL"
+    volume_spike: bool = False    # True when volume ≥ 3× 20-candle average
 
     overall_signal: str = "HOLD"
     signal_strength: float = 0.0
@@ -75,6 +76,15 @@ class MarketAnalysis:
     garch_regime_hint: str = "STABLE"    # RISING_VOL | FALLING_VOL | STABLE
     alphas: Dict = field(default_factory=dict)   # WorldQuant formulaic alpha values
 
+    # Microstructure features (from order book L2)
+    book_imbalance: float = 0.5          # bid_vol / (bid_vol+ask_vol), 0.5=balanced
+    whale_bid_price: float = 0.0         # price of largest bid wall (0 = none detected)
+    whale_bid_size: float = 0.0          # qty of largest bid wall
+    whale_ask_price: float = 0.0         # price of largest ask wall
+    whale_ask_size: float = 0.0          # qty of largest ask wall
+    twap_detected: bool = False          # True when periodic volume pattern found
+    twap_score: float = 0.0             # how many σ above noise (0–3)
+
 
 def _ema(series: np.ndarray, period: int) -> np.ndarray:
     k = 2 / (period + 1)
@@ -94,7 +104,8 @@ def _rsi(closes: np.ndarray, period: int = 14) -> float:
     avg_gain = gains.mean()
     avg_loss = losses.mean()
     if avg_loss == 0:
-        return 100.0
+        # Flat market (no gains and no losses) is neutral, not overbought.
+        return 50.0 if avg_gain == 0 else 100.0
     rs = avg_gain / avg_loss
     return 100 - (100 / (1 + rs))
 
@@ -140,6 +151,73 @@ def _ohlcv_to_arrays(candles: List[OHLCV]):
     return opens, highs, lows, closes, vols
 
 
+def analyze_order_book(analysis: "MarketAnalysis", bids: List, asks: List) -> None:
+    """Populate microstructure fields on an existing MarketAnalysis in-place.
+
+    bids/asks are lists of (price, qty) tuples sorted descending/ascending.
+    Only considers levels within ±3 % of the current mid-price.
+    """
+    price = analysis.price
+    if not price or not bids or not asks:
+        return
+
+    near = 0.03  # 3 % window around mid
+    bids_near = [(p, q) for p, q in bids if abs(p - price) / price <= near]
+    asks_near = [(p, q) for p, q in asks if abs(p - price) / price <= near]
+
+    # ── Book imbalance ────────────────────────────────────────────────
+    bid_vol = sum(q for _, q in bids_near[:10])
+    ask_vol = sum(q for _, q in asks_near[:10])
+    total = bid_vol + ask_vol
+    analysis.book_imbalance = bid_vol / total if total > 0 else 0.5
+
+    # ── Whale wall detection (qty > 3× average in near window) ───────
+    if bids_near:
+        bid_qtys = [q for _, q in bids_near]
+        avg_bid = float(np.mean(bid_qtys))
+        best_bid = max(bids_near, key=lambda x: x[1])
+        if avg_bid > 0 and best_bid[1] > avg_bid * 3:
+            analysis.whale_bid_price = best_bid[0]
+            analysis.whale_bid_size  = best_bid[1]
+
+    if asks_near:
+        ask_qtys = [q for _, q in asks_near]
+        avg_ask = float(np.mean(ask_qtys))
+        best_ask = max(asks_near, key=lambda x: x[1])
+        if avg_ask > 0 and best_ask[1] > avg_ask * 3:
+            analysis.whale_ask_price = best_ask[0]
+            analysis.whale_ask_size  = best_ask[1]
+
+
+def _twap_detect(vols: np.ndarray, n_bars: int = 64) -> dict:
+    """Detect periodic volume bursts (TWAP execution) via FFT on volume series."""
+    if len(vols) < n_bars:
+        return {"detected": False, "score": 0.0}
+
+    series = vols[-n_bars:].astype(float)
+    series -= series.mean()
+
+    fft_mag = np.abs(np.fft.rfft(series))
+    fft_mag[0] = 0  # remove DC
+
+    noise = fft_mag[1:]
+    if noise.std() == 0:
+        return {"detected": False, "score": 0.0}
+
+    threshold = noise.mean() + 3 * noise.std()
+    peaks = np.where(noise > threshold)[0]
+
+    if len(peaks) == 0:
+        return {"detected": False, "score": 0.0}
+
+    best = int(peaks[np.argmax(noise[peaks])])
+    score = float(noise[best] / threshold - 1.0)
+
+    period_bars = n_bars // (best + 1) if (best + 1) > 0 else 0
+    detected = score > 0.5 and period_bars >= 2
+    return {"detected": detected, "score": min(score, 3.0)}
+
+
 def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
             rsi_period: int = 14, bb_period: int = 20, atr_period: int = 14,
             rsi_oversold: float = 30.0, rsi_overbought: float = 70.0) -> MarketAnalysis:
@@ -171,7 +249,9 @@ def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
     # EMA
     result.ema_9  = float(_ema(closes, 9)[-1])
     result.ema_21 = float(_ema(closes, 21)[-1])
-    result.ema_50 = float(_ema(closes, min(50, len(closes) - 1))[-1])
+    # Only treat ema_50 as a true 50-period EMA when there is enough data;
+    # otherwise fall back to ema_21 so the stack comparison stays consistent.
+    result.ema_50 = float(_ema(closes, 50)[-1]) if len(closes) >= 51 else result.ema_21
     if result.ema_9 > result.ema_21 > result.ema_50:
         result.ema_trend = "BULLISH"
     elif result.ema_9 < result.ema_21 < result.ema_50:
@@ -195,9 +275,24 @@ def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
     elif result.atr_pct > 3.0:
         result.volatility = "HIGH"
 
-    # VWAP (cumulative)
+    # VWAP — anchored to the current session (UTC day). A cumulative VWAP over
+    # the whole 100-candle window is too slow-moving to be a meaningful
+    # intraday reference, so we reset it at each day boundary.
     typical = (highs + lows + closes) / 3
-    vwap_series = np.cumsum(typical * vols) / np.cumsum(vols)
+    try:
+        last_day = candles[-1].timestamp.date()
+        start = 0
+        for i in range(len(candles) - 1, -1, -1):
+            if candles[i].timestamp.date() != last_day:
+                start = i + 1
+                break
+        if len(candles) - start < 10:    # too few candles → use a rolling window
+            start = max(0, len(candles) - 32)
+    except Exception:
+        start = max(0, len(candles) - 32)
+    seg_typ, seg_vol = typical[start:], vols[start:]
+    cum_vol = np.cumsum(seg_vol)
+    vwap_series = np.cumsum(seg_typ * seg_vol) / np.where(cum_vol == 0, 1.0, cum_vol)
     result.vwap = float(vwap_series[-1])
     result.price_vs_vwap = "ABOVE" if price > result.vwap else "BELOW"
 
@@ -209,6 +304,7 @@ def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
         result.volume_signal = "LOW"
     elif result.volume_ratio > 2.0:
         result.volume_signal = "HIGH"
+    result.volume_spike = result.volume_ratio >= 3.0
 
     # Composite signal
     buy_score = 0.0
@@ -319,6 +415,16 @@ def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
     except Exception as e:
         logger.debug("SMC detection skipped: %s", e)
 
+    # ── TWAP detection via FFT on volume series ───────────────────────────────
+    try:
+        twap = _twap_detect(vols)
+        result.twap_detected = twap["detected"]
+        result.twap_score    = twap["score"]
+        if result.twap_detected:
+            logger.debug("TWAP pattern detected for %s (score=%.2f)", symbol, result.twap_score)
+    except Exception as e:
+        logger.debug("TWAP detection skipped: %s", e)
+
     # ── Quant features: Kalman trend, GARCH vol forecast, WorldQuant alphas ──
     try:
         from .quant_features import kalman_trend, garch_volatility, worldquant_alphas
@@ -381,5 +487,12 @@ def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
     # Merge WorldQuant alphas (prefixed) into the feature vector
     for name, val in (result.alphas or {}).items():
         result.features[f"wq_{name}"] = val
+
+    # Microstructure features (populated later by analyze_order_book; zero until then)
+    result.features["book_imbalance"] = result.book_imbalance
+    result.features["whale_bid"]      = 1 if result.whale_bid_size > 0 else 0
+    result.features["whale_ask"]      = 1 if result.whale_ask_size > 0 else 0
+    result.features["twap_detected"]  = 1 if result.twap_detected else 0
+    result.features["twap_score"]     = result.twap_score
 
     return result

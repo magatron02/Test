@@ -3,18 +3,18 @@ import logging
 from datetime import datetime, date, timezone
 from typing import Dict, List, Optional, Tuple
 
+from collections import deque
+
 from .claude_analyzer import ClaudeAnalyzer
-from .exit_manager import ExitManager
-from .market_analyzer import MarketAnalysis, analyze
+from .market_analyzer import MarketAnalysis, analyze, analyze_order_book
 from .market_regime import RegimeResult, detect_regime
 from .narrative import build_narrative
-from .param_optimizer import ParamOptimizer
 from .risk_engine import RiskEngine
 from .position_sizer import PositionSizer
-from .rl_trainer import ModelBandit, RLTrainer
+from .rl_trainer import RLTrainer
+from .memory_manager import MemoryManager
 from .signal_cache import SignalCache
 from .strategy_manager import StrategyManager, TradingSignal
-from .arbitrage import ArbitrageEngine
 from .trade_journal import TradeJournal
 from .trainer import AITrainer
 from ..core.config import settings
@@ -52,31 +52,10 @@ class AITrader:
         # ── New autotrade components ──────────────────────────────────────
         risk_cfg = settings.get("risk", default={}) or {}
         sizer_cfg = settings.get("position_sizer", default={}) or {}
-        self._risk        = RiskEngine(config=risk_cfg)
-        self._sizer       = PositionSizer(config=sizer_cfg, models_dir=settings.models_dir)
-        self._rl          = RLTrainer(models_dir=settings.models_dir)
-        self._model_bandit = ModelBandit(models_dir=settings.models_dir)  # F2.1
-        self._exit_mgr    = ExitManager()                                   # F2.2
-        # F5.1 — walk-forward optimized params (loaded from best_params.json)
-        self._param_opt   = ParamOptimizer(models_dir=settings.models_dir)
-        self._apply_opt_params()
-        # Arbitrage engine: triangular + funding-rate scanner
-        arb_cfg = settings.get("arbitrage", default={}) or {}
-        self._arb = ArbitrageEngine(
-            exchange,
-            config   = arb_cfg,
-            dry_run  = bool(settings.get("trading", "dry_run", default=False)),
-        )
-
-        # F2.3 — trade memory: learns win-rate/expectancy per setup signature
-        jrn_cfg = settings.get("trade_journal", default={}) or {}
-        self._journal = TradeJournal(
-            min_samples=int(jrn_cfg.get("min_samples", 5)),
-        )
-        try:
-            self._journal.load_from_db(SessionLocal, Trade)
-        except Exception as exc:   # never let memory hydration block startup
-            logger.warning("TradeJournal hydration skipped: %s", exc)
+        self._risk     = RiskEngine(config=risk_cfg)
+        self._sizer    = PositionSizer(config=sizer_cfg)
+        self._rl       = RLTrainer(models_dir=settings.models_dir)
+        self._memory   = MemoryManager()   # supermemory: long-term trade recall
         # Fingerprint cache: skip the costly Claude call when the market is unchanged
         self._signal_cache = SignalCache(settings.get("ai", "signal_cache", default={}) or {})
 
@@ -87,6 +66,8 @@ class AITrader:
         self._open_trades: Dict[str, dict] = {}
         self._price_history: Dict[str, list] = {}   # symbol → recent closes (HRP/pairs)
         self._hrp_weights:   Dict[str, float] = {}  # symbol → correlation-aware weight
+        # Microstructure: rolling order book snapshots for heatmap (last 60 × 30 s = 30 min)
+        self._ob_history: Dict[str, deque] = {}     # symbol → deque of (bids, asks) snapshots
         self._broadcast_fn = None
         self._daily_pnl: float = 0.0
         self._daily_reset_date: str = ""
@@ -282,25 +263,12 @@ class AITrader:
                 "floating": round(floating, 2),
                 "total":    round(self._daily_pnl + floating, 2),
             },
-            "agents":             self._agent_activity,
-            "last_signal":        self._last_signal_info,
-            "open_positions":     len(self._open_trades),
-            "risk":               self._risk.summary(),
-            "rl_stats":           self._rl.stats,
-            "model_bandit_stats": self._model_bandit.get_stats(),   # F2.1
-            "signal_cache":       self._signal_cache.stats,
-            "param_opt":          self._param_opt.summary(),        # F5.1
-            "trainer_drift":      ts.get("drift", {}),              # F3.4
-            "trade_journal":      self._journal.summary(),          # F2.3
-            "arbitrage":          self._arb.last_result,            # Arb engine
-            "ml_champion": {                                        # F5.3
-                "champion_auc":       ts.get("champion_auc"),
-                "challenger_auc":     ts.get("challenger_auc"),
-                "challenger_promoted": ts.get("challenger_promoted"),
-                "accuracy":           ts.get("accuracy"),
-                "model_type":         ts.get("model_type"),
-                "last_trained":       ts.get("last_trained"),
-            },
+            "agents":        self._agent_activity,
+            "last_signal":   self._last_signal_info,
+            "open_positions": len(self._open_trades),
+            "risk":          self._risk.summary(),
+            "rl_stats":      self._rl.stats,
+            "signal_cache":  self._signal_cache.stats,
         }
 
     async def _broadcast(self, event: str, data: dict):
@@ -329,6 +297,22 @@ class AITrader:
             # Maintain a rolling close-price history for HRP allocation & pairs
             closes = [c.close for c in candles]
             self._price_history[symbol] = closes[-200:]
+
+            # ── Microstructure: order book L2 ─────────────────────────────────
+            try:
+                ob = await self._exchange.get_order_book(symbol, limit=20)
+                if ob:
+                    analyze_order_book(analysis, ob.bids, ob.asks)
+                    # Update feature dict with fresh microstructure values
+                    analysis.features["book_imbalance"] = analysis.book_imbalance
+                    analysis.features["whale_bid"]      = 1 if analysis.whale_bid_size > 0 else 0
+                    analysis.features["whale_ask"]      = 1 if analysis.whale_ask_size > 0 else 0
+                    # Rolling snapshot for heatmap broadcast
+                    hist = self._ob_history.setdefault(symbol, deque(maxlen=60))
+                    hist.append({"bids": ob.bids[:20], "asks": ob.asks[:20],
+                                 "ts": ob.timestamp.isoformat()})
+            except Exception as e:
+                logger.debug("Order book fetch skipped for %s: %s", symbol, e)
 
             # Detect market regime for this symbol
             regime = detect_regime(candles, analysis)
@@ -459,7 +443,7 @@ class AITrader:
         ]
 
     def _check_correlation_guard(self, symbol: str) -> Tuple[bool, str]:
-        """Block a BUY too correlated with currently-held symbols (F3.2)."""
+        """Block a BUY too correlated with currently-held symbols."""
         held = [s for s in self._open_trades if s != symbol]
         if not held:
             return True, ""
@@ -471,7 +455,7 @@ class AITrader:
             rets = self._returns_for(s)
             if len(rets) >= 5:
                 portfolio_returns[s] = rets
-        allowed, reason, avg_corr = self._risk.check_correlation(candidate, portfolio_returns)
+        allowed, reason, _ = self._risk.check_correlation(candidate, portfolio_returns)
         if not allowed:
             self._set_agent("risk", "active", f"Block {symbol}: {reason}")
         return allowed, reason
@@ -511,61 +495,6 @@ class AITrader:
         self._signal_cache.put(analysis.symbol, analysis, regime, sig)
         return sig
 
-    def _get_pairs_signal(
-        self,
-        symbol: str,
-        primary_sig: TradingSignal,
-    ) -> Optional[TradingSignal]:
-        """
-        F3.1 — Stat-arb pairs signal for ``symbol``.
-
-        Checks if ``symbol`` participates in any confirmed cointegrated pair
-        (from ``self._price_history``), computes the spread z-score, and returns
-        a TradingSignal whose action / confidence reflect the mean-reversion
-        direction.  Returns None when no confirmed pair exists, history is
-        insufficient (< 50 bars), or an exception occurs.
-
-        The returned signal is an *advisory* — callers blend its confidence into
-        the primary signal but do not treat it as a standalone trade trigger.
-        """
-        try:
-            from .cointegration import pairs_signal as _pairs_signal
-            hist = self._price_history
-            if symbol not in hist or len(hist[symbol]) < 50:
-                return None
-            prices_a = hist[symbol]
-
-            best: Optional[TradingSignal] = None
-            best_abs_z = 0.0
-            entry_z = float(settings.get("cointegration", "entry_z", default=2.0))
-            for partner, prices_b_list in hist.items():
-                if partner == symbol or len(prices_b_list) < 50:
-                    continue
-                n = min(len(prices_a), len(prices_b_list))
-                ps = _pairs_signal(
-                    list(prices_a[-n:]),
-                    list(prices_b_list[-n:]),
-                    entry_z=entry_z,
-                )
-                action = ps.get("action_a", "HOLD")
-                z = float(ps.get("zscore", 0.0))
-                conf = float(ps.get("confidence", 0.0))
-                if action == "HOLD" or abs(z) < entry_z or abs(z) <= best_abs_z:
-                    continue
-                best_abs_z = abs(z)
-                best = TradingSignal(
-                    action   = action,
-                    confidence = conf,
-                    strategy = "pairs",
-                    reasoning = f"{z:+.2f}",   # z-score stored as reasoning for attribution
-                    stop_loss_pct   = primary_sig.stop_loss_pct,
-                    take_profit_pct = primary_sig.take_profit_pct,
-                )
-            return best
-        except Exception as exc:
-            logger.debug("Pairs signal skipped for %s: %s", symbol, exc)
-            return None
-
     async def _get_final_signal(
         self,
         analysis: MarketAnalysis,
@@ -599,8 +528,6 @@ class AITrader:
         chosen = ai_model
         if ai_model == "claude":
             sig = await self._claude_signal_cached(analysis, portfolio, regime)
-            _capture("claude", sig)
-            chosen = "claude"
         elif ai_model == "rule_based":
             sig = self._strategy.get_signal(analysis)
             _capture("rule", sig, strategy=sig.strategy)
@@ -626,8 +553,7 @@ class AITrader:
             if bandit_model == "claude" and settings.claude_api_key:
                 try:
                     claude_sig = await self._claude_signal_cached(analysis, portfolio, regime)
-                    _capture("claude", claude_sig)
-                    sig, chosen = claude_sig, "claude"
+                    sig = claude_sig if claude_sig.confidence > rule_sig.confidence else rule_sig
                 except Exception:
                     sig, chosen = rule_sig, f"rule:{rl_strategy}"
             elif bandit_model == "ml" and ml_signal:
@@ -704,37 +630,37 @@ class AITrader:
                 sig.stop_loss_pct, sig.take_profit_pct,
             )
 
-        bandit_model_used = locals().get("bandit_model")  # only set in hybrid path
-        self._signal_attribution = {
-            "mode":         ai_model,
-            "chosen":       chosen,
-            "rl_strategy":  rl_strategy,
-            "bandit_model": bandit_model_used,  # F2.1 — which model bandit picked
-            "regime":       regime.regime,
-            "min_conf":     round(min_conf, 2),
-            "gated":        gated,
-            "mem_veto":     mem_veto,                # F2.3 — memory blocked it
-            "mem_bias":     round(mem.get("bias", 0.0), 3),
-            "mem_n":        mem.get("n", 0),
-            "components":   components,
-            "final":        {"action": final_sig.action,
-                             "confidence": round(final_sig.confidence, 3)},
-        }
-        return final_sig
+        # Save analysis to long-term memory (fire-and-forget)
+        if sig.action in ("BUY", "SELL"):
+            asyncio.ensure_future(self._memory.add_analysis(
+                symbol=analysis.symbol, signal=sig.action,
+                confidence=sig.confidence, reasoning=sig.reasoning or "",
+                price=analysis.price,
+            ))
 
-    @staticmethod
-    def _attribution_summary(attr: Optional[dict]) -> str:
-        """Compact one-line attribution for persisting alongside a trade."""
-        if not attr:
-            return ""
-        parts = []
-        for name, c in (attr.get("components") or {}).items():
-            if c:
-                parts.append(f"{name}={c['action']}@{c['confidence']:.2f}")
-        tag = " GATED" if attr.get("gated") else ""
-        return (f"[attr chosen={attr.get('chosen')} "
-                f"{' '.join(parts)} rl={attr.get('rl_strategy')} "
-                f"{attr.get('regime')}{tag}]")
+        # F3.1 — Pairs signal: blend stat-arb z-score into the decision when
+        # this symbol participates in a confirmed cointegrated pair.
+        pairs_sig = self._get_pairs_signal(analysis.symbol, sig)
+        if pairs_sig is not None:
+            _capture("pairs", pairs_sig)
+            # Align: pairs signal agrees with primary → small confidence boost
+            # Diverge: pairs signal disagrees → slight confidence penalty
+            if pairs_sig.action == sig.action and sig.action != "HOLD":
+                sig = TradingSignal(
+                    sig.action,
+                    min(1.0, sig.confidence + 0.05 * pairs_sig.confidence),
+                    sig.strategy,
+                    sig.reasoning + f" | pairs z={pairs_sig.reasoning}",
+                    sig.stop_loss_pct, sig.take_profit_pct,
+                )
+            elif pairs_sig.action not in ("HOLD", sig.action) and sig.action != "HOLD":
+                sig = TradingSignal(
+                    sig.action,
+                    max(0.0, sig.confidence - 0.05 * pairs_sig.confidence),
+                    sig.strategy,
+                    sig.reasoning,
+                    sig.stop_loss_pct, sig.take_profit_pct,
+                )
 
     # ── Trade execution ───────────────────────────────────────────────────
 
@@ -938,6 +864,9 @@ class AITrader:
             # Position state changed → drop cached decision so next cycle is fresh
             self._signal_cache.invalidate(symbol)
 
+            # Position state changed → drop cached decision so next cycle is fresh
+            self._signal_cache.invalidate(symbol)
+
             await self._broadcast("trade_executed", {
                 "symbol":      symbol,
                 "side":        signal.action,
@@ -1040,15 +969,13 @@ class AITrader:
             self._rl.update_outcome(trade_id, pnl_pct, self._strategy)
             self._model_bandit.update_outcome(trade_id, pnl_pct)  # F2.1
             self._sizer.update_outcome(symbol, pnl_pct)
-            self._journal.record(   # F2.3 — fold outcome into trade memory
-                regime     = regime,
-                strategy   = trade.get("strategy", "UNKNOWN"),
-                confidence = float(trade.get("confidence", 0.0)),
-                rsi_signal = trade.get("rsi_signal", "NEUTRAL"),
-                pnl_pct    = pnl_pct,
-            )
+            holding_h = (datetime.now(timezone.utc) - trade.get("opened_at", datetime.now(timezone.utc))).total_seconds() / 3600
+            asyncio.ensure_future(self._memory.add_outcome(
+                symbol, side="buy", pnl_pct=pnl_pct, reason=reason,
+                holding_hours=holding_h, entry=entry, exit_price=order.price,
+            ))
         except Exception as e:
-            logger.warning("Post-close bookkeeping failed for %s: %s", symbol, e)
+            logger.warning("Post-close learning failed for %s: %s", symbol, e)
 
         try:
             await self._broadcast("trade_closed", {
@@ -1077,7 +1004,6 @@ class AITrader:
         price  = analysis.price
         entry  = trade["price"]
         opened = trade.get("opened_at", datetime.now(timezone.utc))
-        regime = trade.get("regime", "RANGING")
 
         # ── 1. ATR-based SL / trailing / TP  (F2.2) ──────────────────────
         # When trade was opened with atr_pct, ExitManager handles all three
@@ -1167,17 +1093,6 @@ class AITrader:
                 analyses[sym] = res
         self._set_agent("analyzer", "idle", f"วิเคราะห์ครบ {len(analyses)}/{len(symbols)} เหรียญ")
 
-        # ── Arbitrage scan (between Phase A and B) ────────────────────────────
-        # Runs concurrently-safe: reads exchange prices, never touches _open_trades.
-        try:
-            portfolio_for_arb = await self._get_portfolio_summary()
-            await self._arb.run_cycle(
-                symbols      = symbols,
-                available_usdt = portfolio_for_arb.get("available_usdt", 0.0),
-            )
-        except Exception as _arb_exc:
-            logger.debug("Arbitrage scan error: %s", _arb_exc)
-
         # ── Phase B: decide + execute sequentially ───────────────────────────
         # Kept sequential because each step mutates shared state (portfolio cash,
         # open trades, risk engine) — parallelising here would race on capital.
@@ -1204,12 +1119,11 @@ class AITrader:
                 f"{symbol}: {signal.action} ({signal.confidence:.0%}) [{regime.regime}]",
             )
             self._last_signal_info = {
-                "symbol":      symbol,
-                "action":      signal.action,
-                "confidence":  round(signal.confidence, 2),
-                "regime":      regime.regime,
-                "ts":          datetime.now(timezone.utc).isoformat(),
-                "attribution": self._signal_attribution,
+                "symbol":     symbol,
+                "action":     signal.action,
+                "confidence": round(signal.confidence, 2),
+                "regime":     regime.regime,
+                "ts":         datetime.now(timezone.utc).isoformat(),
             }
 
             # Plain-language market narrative (rule-based, zero-cost)
@@ -1217,21 +1131,29 @@ class AITrader:
             self._narratives[symbol] = narrative
 
             await self._broadcast("analysis_update", {
-                "symbol":      symbol,
-                "price":       analysis.price,
-                "change_24h":  analysis.change_24h,
-                "signal":      signal.action,
-                "confidence":  signal.confidence,
-                "reasoning":   signal.reasoning,
-                "narrative":   narrative,
-                "rsi":         analysis.rsi,
-                "macd_hist":   analysis.macd_hist,
-                "bb_position": analysis.bb_position,
-                "ema_trend":   analysis.ema_trend,
-                "volatility":  analysis.volatility,
-                "regime":      regime.regime,
-                "regime_conf": round(regime.confidence, 2),
-                "adx":         round(regime.adx, 1),
+                "symbol":          symbol,
+                "price":           analysis.price,
+                "change_24h":      analysis.change_24h,
+                "signal":          signal.action,
+                "confidence":      signal.confidence,
+                "reasoning":       signal.reasoning,
+                "narrative":       narrative,
+                "rsi":             analysis.rsi,
+                "macd_hist":       analysis.macd_hist,
+                "bb_position":     analysis.bb_position,
+                "ema_trend":       analysis.ema_trend,
+                "volatility":      analysis.volatility,
+                "regime":          regime.regime,
+                "regime_conf":     round(regime.confidence, 2),
+                "adx":             round(regime.adx, 1),
+                # Microstructure
+                "book_imbalance":  round(analysis.book_imbalance, 3),
+                "whale_bid_price": analysis.whale_bid_price,
+                "whale_bid_size":  analysis.whale_bid_size,
+                "whale_ask_price": analysis.whale_ask_price,
+                "whale_ask_size":  analysis.whale_ask_size,
+                "twap_detected":   analysis.twap_detected,
+                "twap_score":      round(analysis.twap_score, 2),
             })
 
             if signal.action != "HOLD":

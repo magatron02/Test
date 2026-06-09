@@ -142,9 +142,6 @@ class HourlyTrainer:
                 logger.info("HourlyTrainer: no new samples, skipping retrain")
                 accuracy = self._trainer.stats.get("accuracy")
 
-            # F5.1 — walk-forward param optimization on the rolling bar buffer
-            self._maybe_optimize_params()
-
             now = datetime.now(timezone.utc).isoformat(timespec="seconds")
             self.status.update({
                 "running":        False,

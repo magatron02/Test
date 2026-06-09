@@ -13,6 +13,7 @@ import logging
 from typing import Optional
 
 from .market_analyzer import MarketAnalysis, analyze
+from .memory_manager import MemoryManager
 from .strategy_manager import TradingSignal
 from ..core.config import settings
 from ..core.database import SessionLocal, Trade
@@ -98,11 +99,12 @@ SYSTEM_PROMPT = """You are an expert crypto trading analyst operating an automat
  YOUR TOOLS — use in this order each cycle
 ═══════════════════════════════════════════════════════
 
-1. get_multi_timeframe → full indicator picture across all timeframes (includes Ichimoku, SuperTrend, SMC signals, StochRSI, Williams %R, CCI, RSI divergence)
-2. get_market_sentiment → Fear & Greed Index + funding rate + open interest. Use as a CONTRARIAN overlay: Extreme Greed warns against new longs, Extreme Fear favours accumulation; crowded funding signals squeeze risk.
-3. get_recent_trades → learn from outcomes; avoid repeating setups that lost
-4. get_portfolio_state → check cash and risk capacity before any BUY
-5. submit_trading_decision → final call (exactly once)
+1. get_ai_memory → recall past trade outcomes & reasoning from long-term memory. Call FIRST — if a similar setup previously won or lost, weight that heavily.
+2. get_multi_timeframe → full indicator picture across all timeframes (includes Ichimoku, SuperTrend, SMC signals, StochRSI, Williams %R, CCI, RSI divergence)
+3. get_market_sentiment → Fear & Greed Index + funding rate + open interest. Use as a CONTRARIAN overlay: Extreme Greed warns against new longs, Extreme Fear favours accumulation; crowded funding signals squeeze risk.
+4. get_recent_trades → learn from outcomes; avoid repeating setups that lost
+5. get_portfolio_state → check cash and risk capacity before any BUY
+6. submit_trading_decision → final call (exactly once)
 
 SENTIMENT INTEGRATION RULE:
   • Never open a new LONG when Fear & Greed > 75 (Extreme Greed) unless structure shows a fresh BOS with strong volume — fade euphoria.
@@ -154,6 +156,20 @@ confidence reflects your TRUE belief. Do not set > 0.80 unless all confluences a
 Capital preservation > profit maximisation. One bad trade can erase 10 good ones."""
 
 TOOLS = [
+    {
+        "name": "get_ai_memory",
+        "description": "Recall past trade outcomes and AI analysis reasoning stored in long-term memory for this symbol. Call this FIRST to learn from historical patterns — what setups won, what lost — before forming your own view.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "context": {
+                    "type": "string",
+                    "description": "Current market context to focus the memory search (e.g. 'RSI oversold, MACD bullish crossover, near demand zone').",
+                }
+            },
+            "required": [],
+        },
+    },
     {
         "name": "get_multi_timeframe",
         "description": "Get full technical indicators for the symbol across multiple timeframes (5m, 15m, 1h, 4h). Includes: RSI, MACD, EMA trend, Bollinger position, ATR, VWAP, Ichimoku signal, SuperTrend, StochRSI, Williams %R, CCI, RSI divergence, SMC (Smart Money Concepts) summary with buy/sell scores, and detected market regime. Use to confirm multi-timeframe confluence before deciding.",
@@ -215,6 +231,7 @@ class ClaudeAnalyzer:
     def __init__(self, exchange=None):
         self._client = None
         self._exchange = exchange  # injected by AITrader for tool execution
+        self._memory = MemoryManager()
 
     def set_exchange(self, exchange):
         self._exchange = exchange
@@ -231,6 +248,8 @@ class ClaudeAnalyzer:
     # ── tool execution ───────────────────────────────────────────────────
     async def _exec_tool(self, name: str, tool_input: dict, analysis: MarketAnalysis) -> str:
         try:
+            if name == "get_ai_memory":
+                return await self._tool_ai_memory(analysis.symbol, tool_input.get("context", ""))
             if name == "get_multi_timeframe":
                 return await self._tool_multi_timeframe(analysis, tool_input.get("timeframes"))
             if name == "get_recent_trades":
@@ -335,6 +354,12 @@ class ClaudeAnalyzer:
             "cash_usdt": round(float(cash.free), 2) if cash else 0.0,  # back-compat
             "holdings": holdings,
         })
+
+    async def _tool_ai_memory(self, symbol: str, context: str) -> str:
+        memories = await self._memory.recall(symbol, context=context)
+        if not memories:
+            return json.dumps({"status": "no_memory", "message": "No past records found for this symbol yet."})
+        return json.dumps({"status": "ok", "count": len(memories), "memories": memories})
 
     async def _tool_market_sentiment(self, symbol: str, mark_price: Optional[float] = None) -> str:
         from ..data.sentiment import get_fear_greed, get_funding_rate, get_open_interest

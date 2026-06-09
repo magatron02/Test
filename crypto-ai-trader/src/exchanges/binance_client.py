@@ -5,7 +5,7 @@ from typing import Dict, List, Optional
 import aiohttp
 import ccxt.async_support as ccxt
 
-from .base import Balance, BaseExchange, OHLCV, Order, OrderbookTop, Ticker
+from .base import Balance, BaseExchange, OHLCV, Order, OrderBook, Ticker
 from .retry import with_retry
 from ..core.config import settings
 
@@ -62,38 +62,11 @@ class BinanceExchange(BaseExchange):
         }
 
     @with_retry()
-    async def get_orderbook_top(self, symbol: str) -> Optional[OrderbookTop]:
-        ob = await self._client.fetch_order_book(symbol, limit=5)
-        bids, asks = ob.get("bids", []), ob.get("asks", [])
-        if not bids or not asks:
-            return None
-        bid = float(bids[0][0])
-        ask = float(asks[0][0])
-        spread = (ask - bid) / bid * 100 if bid else 0.0
-        return OrderbookTop(symbol, bid, ask, round(spread, 6))
-
-    async def get_funding_rate(self, symbol: str) -> Optional[dict]:
-        """Fetch perpetual funding rate from Binance Futures public endpoint (no auth needed)."""
-        base = symbol.split("/")[0]
-        perp_sym = f"{base}USDT"
-        try:
-            async with aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=5)
-            ) as session:
-                async with session.get(
-                    "https://fapi.binance.com/fapi/v1/premiumIndex",
-                    params={"symbol": perp_sym},
-                ) as resp:
-                    if resp.status != 200:
-                        return None
-                    data = await resp.json()
-                    return {
-                        "fundingRate":     float(data.get("lastFundingRate", 0)),
-                        "fundingDatetime": data.get("nextFundingTime"),
-                    }
-        except Exception as exc:
-            logger.debug("Binance funding rate fetch failed for %s: %s", symbol, exc)
-            return None
+    async def get_order_book(self, symbol: str, limit: int = 20) -> Optional[OrderBook]:
+        data = await self._client.fetch_order_book(symbol, limit=limit)
+        bids = [(float(p), float(q)) for p, q in data.get("bids", [])]
+        asks = [(float(p), float(q)) for p, q in data.get("asks", [])]
+        return OrderBook(symbol=symbol, bids=bids, asks=asks)
 
     @with_retry(max_attempts=2)
     async def create_order(self, symbol: str, side: str, amount: float, price: Optional[float] = None) -> Order:

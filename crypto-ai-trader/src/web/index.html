@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Aiterra v1.2.0</title>
+<title>Aiterra v2.0.0</title>
 <link href="/static/css/bootstrap.min.css" rel="stylesheet">
 <link href="/static/css/bootstrap-icons.min.css" rel="stylesheet">
 <script src="/static/js/apexcharts.min.js"></script>
@@ -505,57 +505,161 @@ ol.small, ul.small, .small.text-muted,
 
 /* ── Correlation cell upgrade ── */
 .corr-cell { padding: 6px 8px; border-radius: 4px; text-align: center; font-family: var(--font-mono); font-size: 0.65rem; font-weight: 600; cursor: default; }
+
+/* ══════════════════════════════════════════
+   SIDEBAR LAYOUT  (replaces topnav)
+═══════════════════════════════════════════ */
+body { overflow: hidden; }
+
+.app { display: grid; grid-template-columns: 238px 1fr; height: 100vh; }
+
+.sidebar {
+  background: linear-gradient(180deg, #0a0a0a 0%, #000 100%);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  padding: 18px 13px; overflow-y: auto; overflow-x: hidden;
+}
+.sidebar::-webkit-scrollbar { width: 3px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border2); }
+
+.sb-brand { display: flex; align-items: center; gap: 11px; padding: 4px 6px 20px; text-decoration: none; }
+.sb-logo {
+  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-buy) 100%);
+  display: grid; place-items: center;
+  font-weight: 800; font-size: 12px; color: #000; font-family: var(--font-mono);
+  box-shadow: 0 4px 16px -4px rgba(168,255,83,0.55);
+}
+.sb-title { font-family: var(--font-headline); font-weight: 700; font-size: 14px; color: var(--text-main); }
+.sb-sub   { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px; }
+
+.snav { display: flex; flex-direction: column; gap: 2px; }
+.snav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 7px;
+  color: var(--text-muted); cursor: pointer;
+  font-size: 13px; font-weight: 500; font-family: var(--font-headline);
+  transition: background 0.15s, color 0.15s;
+  position: relative; user-select: none;
+}
+.snav-item svg { width: 15px; height: 15px; flex: none; opacity: 0.75; }
+.snav-item:hover { background: rgba(255,255,255,0.04); color: var(--text-main); }
+.snav-item.active { background: rgba(168,255,83,0.07); color: var(--accent); }
+.snav-item.active svg { opacity: 1; }
+.snav-item.active::before {
+  content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 18px; border-radius: 0 3px 3px 0;
+  background: var(--accent); box-shadow: 0 0 10px rgba(168,255,83,0.55);
+}
+.snav-sep { height: 1px; background: var(--border); margin: 8px 6px; }
+
+.sb-footer {
+  margin-top: auto; padding-top: 14px;
+  background: var(--bg-card2); border: 1px solid var(--border);
+  border-radius: 9px; padding: 12px; font-size: 10.5px;
+}
+.sb-footer .sf-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
+.sf-k { color: var(--text-muted); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.5px; font-family: var(--font-mono); }
+.sf-v { font-family: var(--font-mono); font-size: 10.5px; font-weight: 600; }
+.sf-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 4px; vertical-align: middle; }
+.sf-dot.on { background: var(--accent-buy); box-shadow: 0 0 6px var(--accent-buy); animation: pulse 2s infinite; }
+
+.main { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+.topbar-slim {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 22px; border-bottom: 1px solid var(--border);
+  flex: none; font-size: 11.5px; background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(20px);
+}
+.topbar-slim .ts-sep { width: 1px; height: 13px; background: var(--border2); }
+.topbar-slim .ts-stat { display: flex; align-items: center; gap: 7px; color: var(--text-muted); }
+.topbar-slim .ml-auto { margin-left: auto; }
+.topbar-slim select.form-select { font-size: 0.7rem; padding: 3px 8px; height: auto; }
+
+.content-scroll { flex: 1; overflow-y: auto; }
+.main-content { padding: 26px 30px; min-height: 0; }
+
+/* hide old topnav */
+.topnav, .mobile-menu, .topnav-hamburger { display: none !important; }
+
 </style>
 </head>
 <body>
 
-<!-- Mobile Nav Drawer (hidden on desktop) -->
-<div id="mobileMenu" class="mobile-menu"></div>
+<div class="app">
 
-<!-- Top Nav -->
-<nav class="topnav">
-  <button class="topnav-hamburger" id="hamburgerBtn" onclick="toggleMobileMenu()" aria-label="Menu">
-    <i class="bi bi-list"></i>
-  </button>
-  <a class="brand-wrap" href="#">
-    <div class="brand-icon">AT</div>
-    <span class="brand-name">Aiterra <small>v1.2.0</small></span>
+<!-- ── Sidebar ── -->
+<aside class="sidebar">
+  <a class="sb-brand" href="#">
+    <div class="sb-logo">AT</div>
+    <div><div class="sb-title">Aiterra</div><div class="sb-sub">Lunai v2.0.0</div></div>
   </a>
 
-  <div class="topnav-pills">
-    <a class="pill-link nav-link active" onclick="showSection('dashboard',this)">Dashboard</a>
-    <a class="pill-link nav-link" onclick="showSection('trading',this)">Trading</a>
-    <a class="pill-link nav-link" onclick="showSection('portfolio',this)">Portfolio</a>
-    <a class="pill-link nav-link" onclick="showSection('analytics',this)">Analytics</a>
-    <a class="pill-link nav-link" onclick="showSection('trade-history',this)">History</a>
-    <a class="pill-link nav-link" onclick="showSection('positions',this)">Positions</a>
-    <a class="pill-link nav-link" onclick="showSection('alerts',this)" id="navAlerts">Alerts</a>
-    <a class="pill-link nav-link" onclick="showSection('notifications',this)" id="navNotifications">Notifications</a>
-    <a class="pill-link nav-link" onclick="showSection('settings',this)">Settings</a>
-  </div>
+  <nav class="snav" id="sideNav">
+    <div class="snav-item active" data-section="dashboard" onclick="showSection('dashboard',null)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Dashboard
+    </div>
+    <div class="snav-item" data-section="trading" onclick="showSection('trading',null)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>Trading
+    </div>
+    <div class="snav-item" data-section="portfolio" onclick="showSection('portfolio',null)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>Portfolio
+    </div>
+    <div class="snav-item" data-section="analytics" onclick="showSection('analytics',null)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>Analytics
+    </div>
+    <div class="snav-sep"></div>
+    <div class="snav-item" data-section="trade-history" onclick="showSection('trade-history',null)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>History
+    </div>
+    <div class="snav-item" data-section="positions" onclick="showSection('positions',null)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Positions
+    </div>
+    <div class="snav-item" data-section="alerts" onclick="showSection('alerts',null)" id="navAlerts">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>Alerts
+    </div>
+    <div class="snav-item" data-section="notifications" onclick="showSection('notifications',null)" id="navNotifications">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>Notifications
+    </div>
+    <div class="snav-sep"></div>
+    <div class="snav-item" data-section="settings" onclick="showSection('settings',null)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Settings
+    </div>
+  </nav>
 
-  <div class="topnav-right">
-    <span class="text-muted" style="font-size:0.72rem" id="lastUpdate">--</span>
-    <span class="ws-dot ws-disconnected" id="wsDot" title="WebSocket"></span>
-    <button class="btn btn-link p-0" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark" style="color:var(--text-muted);font-size:1rem;line-height:1;text-decoration:none"><i class="bi bi-sun-fill" id="themeIcon"></i></button>
+  <div class="sb-footer">
+    <div class="sf-row"><span class="sf-k">Engine</span><span class="sf-v"><span class="sf-dot on"></span><span id="sbEngStatus">Online</span></span></div>
+    <div class="sf-row"><span class="sf-k">Mode</span><span class="sf-v" id="sbMode">Demo</span></div>
+    <div class="sf-row"><span class="sf-k">WS</span><span class="sf-v"><span class="ws-dot ws-disconnected" id="wsDot" title="WebSocket"></span></span></div>
+  </div>
+</aside>
+
+<!-- ── Main ── -->
+<div class="main">
+  <div class="topbar-slim">
+    <span class="ts-stat"><span id="lastUpdate" class="text-muted">--</span></span>
+    <span class="ts-sep"></span>
     <span class="mode-badge mode-demo" id="modeTag">DEMO</span>
-    <select class="form-select form-select-sm" style="width:auto;font-size:0.72rem" id="aiModelSelect">
+    <select class="form-select form-select-sm" style="width:auto" id="aiModelSelect">
       <option value="hybrid">Hybrid AI</option>
       <option value="rule_based">Rule-based</option>
       <option value="ml">ML</option>
       <option value="claude">Claude API</option>
-      <option value="multi_model">Multi-Model Consensus</option>
+      <option value="multi_model">Multi-Model</option>
     </select>
-    <select class="form-select form-select-sm" style="width:auto;font-size:0.72rem" id="strategySelect">
+    <select class="form-select form-select-sm" style="width:auto" id="strategySelect">
       <option value="hybrid">Hybrid</option>
       <option value="dca">DCA</option>
       <option value="trend">Trend</option>
       <option value="mean_reversion">MeanRev</option>
     </select>
+    <span class="ml-auto d-flex align-items-center gap-2">
+      <button class="btn btn-link p-0" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark" style="color:var(--text-muted);font-size:0.95rem;line-height:1;text-decoration:none"><i class="bi bi-sun-fill" id="themeIcon"></i></button>
+    </span>
   </div>
-</nav>
 
-<!-- Main -->
+  <div class="content-scroll">
 <main class="main-content">
 
 <!-- DASHBOARD -->
@@ -571,10 +675,10 @@ ol.small, ul.small, .small.text-muted,
       </div>
       <div class="text-muted mt-1" style="font-size:0.85rem;font-family:var(--font-body)">Available: <strong id="cashValue" style="color:var(--text-main)">$0.00</strong>&nbsp;&nbsp;|&nbsp;&nbsp;<span id="positionCount">0 positions</span></div>
       <div class="d-flex gap-2 mt-3">
-        <button class="btn btn-sm px-3" style="background:var(--accent);color:#000;font-weight:700;border:none;border-radius:100px" onclick="showSection('trading',document.querySelector('.pill-link:nth-child(2)'))">
+        <button class="btn btn-sm px-3" style="background:var(--accent);color:#000;font-weight:700;border:none;border-radius:100px" onclick="showSection('trading',null)">
           Buy / Sell ↑
         </button>
-        <button class="btn btn-sm px-3" style="background:var(--bg-card);color:var(--text-main);border:1px solid var(--border);border-radius:100px" onclick="showSection('portfolio',document.querySelector('.pill-link:nth-child(3)'))">
+        <button class="btn btn-sm px-3" style="background:var(--bg-card);color:var(--text-main);border:1px solid var(--border);border-radius:100px" onclick="showSection('portfolio',null)">
           Portfolio →
         </button>
       </div>
@@ -711,97 +815,6 @@ ol.small, ul.small, .small.text-muted,
       </div>
     </div>
   </div>
-
-  <!-- Resilience Row (v1.4.0/v2.0.0) — Tail Risk · Model Drift · Param Opt · ML Champion -->
-  <div class="row g-3 mb-3" id="resilienceRow">
-    <!-- Tail Risk -->
-    <div class="col-md-3">
-      <div class="card h-100">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-activity me-2"></i>Tail Risk <span class="text-muted" style="font-size:0.65rem;font-weight:400">VaR · CVaR · MC</span></span>
-          <span id="varCircuitBadge" style="display:none;font-size:0.65rem;font-weight:700;color:#ff4d6d">⚡ VaR HALT</span>
-        </div>
-        <div class="card-body p-2" id="tailRiskPanel">
-          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
-        </div>
-      </div>
-    </div>
-    <!-- Model Drift -->
-    <div class="col-md-3">
-      <div class="card h-100">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-arrow-repeat me-2"></i>Model Drift <span class="text-muted" style="font-size:0.65rem;font-weight:400">PSI</span></span>
-          <span id="driftBadge" style="display:none;font-size:0.65rem;font-weight:700;color:#ffc107">⚠ DRIFT</span>
-        </div>
-        <div class="card-body p-2" id="driftPanel">
-          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
-        </div>
-      </div>
-    </div>
-    <!-- Param Optimizer -->
-    <div class="col-md-3">
-      <div class="card h-100">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-sliders me-2"></i>Param Opt <span class="text-muted" style="font-size:0.65rem;font-weight:400">Walk-forward</span></span>
-          <span id="paramChampBadge" style="display:none;font-size:0.65rem;font-weight:700;color:#39d98a">✓ NEW</span>
-        </div>
-        <div class="card-body p-2" id="paramOptPanel">
-          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
-        </div>
-      </div>
-    </div>
-    <!-- ML Champion/Challenger -->
-    <div class="col-md-3">
-      <div class="card h-100">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-trophy me-2"></i>ML Model <span class="text-muted" style="font-size:0.65rem;font-weight:400">Champion/Challenger</span></span>
-          <span id="mlChampBadge" style="display:none;font-size:0.65rem;font-weight:700;color:#39d98a">↑ PROMOTED</span>
-        </div>
-        <div class="card-body p-2" id="mlChampPanel">
-          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Trade Memory Row (v2.0.0 F2.3) — learned setup performance -->
-  <div class="row g-3 mb-3" id="memoryRow">
-    <div class="col-12">
-      <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-journal-bookmark me-2"></i>Trade Memory <span class="text-muted" style="font-size:0.65rem;font-weight:400">เรียนรู้จากผลเทรดจริง · regime × strategy × confidence × RSI</span></span>
-          <span id="memoryStatBadge" class="text-muted" style="font-size:0.65rem;font-weight:600"></span>
-        </div>
-        <div class="card-body p-2" id="tradeJournalPanel">
-          <div class="text-muted text-center small py-2">ยังไม่มีประวัติเทรดที่ปิดแล้ว</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Arbitrage Row -->
-  <div class="row g-3 mb-3" id="arbitrageRow">
-    <div class="col-12">
-      <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-arrow-left-right me-2"></i>Arbitrage
-            <span class="text-muted" style="font-size:0.65rem;font-weight:400">
-              Triangular &amp; Funding Rate · สแกนทุก cycle
-            </span>
-          </span>
-          <div class="d-flex gap-2 align-items-center">
-            <span id="arbStatBadge" class="text-muted" style="font-size:0.65rem;font-weight:600"></span>
-            <button class="btn btn-outline-secondary btn-sm" style="padding:1px 8px;font-size:0.7rem"
-                    onclick="triggerArbScan()">↻ Scan</button>
-          </div>
-        </div>
-        <div class="card-body p-2" id="arbitragePanel">
-          <div class="text-muted text-center small py-2">รอผลสแกน...</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
 
   <!-- Sentiment & On-chain Row -->
   <div class="row g-3 mb-3" id="sentimentRow">
@@ -991,6 +1004,22 @@ ol.small, ul.small, .small.text-muted,
           <div class="text-muted text-center small py-2">เลือก symbol เพื่อดู indicators</div>
         </div>
       </div>
+      <!-- Order Book Heatmap -->
+      <div class="card mt-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-grid-3x3 me-2"></i>Order Book Heatmap <span class="badge bg-secondary ms-1" style="font-size:0.6rem">30 min</span></span>
+          <button class="btn btn-outline-secondary btn-sm" onclick="refreshHeatmap()"><i class="bi bi-arrow-clockwise"></i></button>
+        </div>
+        <div class="card-body p-2">
+          <canvas id="obHeatmapCanvas" style="width:100%;height:160px;display:block;border-radius:4px;background:#0a0a0a"></canvas>
+          <div class="d-flex justify-content-between mt-1" style="font-size:0.65rem;color:var(--text-muted)">
+            <span>-30 min</span>
+            <span style="color:#3ad98a">■ Bid</span>
+            <span style="color:#ff6b35">■ Ask</span>
+            <span>Now</span>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="col-md-4">
       <div class="card mb-3">
@@ -1000,6 +1029,40 @@ ol.small, ul.small, .small.text-muted,
         </div>
         <div class="card-body" id="aiAnalysisPanel">
           <div class="text-muted text-center small py-2">รอการวิเคราะห์...</div>
+        </div>
+      </div>
+      <!-- Microstructure Panel -->
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-radar me-2"></i>Microstructure</div>
+        <div class="card-body p-2" id="microstructurePanel">
+          <!-- Book Imbalance Bar -->
+          <div class="mb-2">
+            <div class="d-flex justify-content-between" style="font-size:0.7rem;color:var(--text-muted)">
+              <span>Book Imbalance</span>
+              <span id="msImbalanceVal">—</span>
+            </div>
+            <div style="height:6px;background:#1a1a1a;border-radius:3px;overflow:hidden;margin-top:3px">
+              <div id="msImbalanceBar" style="height:100%;width:50%;background:linear-gradient(90deg,#3ad98a,#a8ff53);transition:width 0.4s"></div>
+            </div>
+            <div class="d-flex justify-content-between" style="font-size:0.6rem;color:#444;margin-top:1px"><span>Sell</span><span>Buy</span></div>
+          </div>
+          <!-- Whale Walls -->
+          <div class="mb-2" id="msWhaleSection">
+            <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:4px">Whale Walls</div>
+            <div id="msWhaleBid" class="d-none" style="background:rgba(58,217,138,0.08);border:1px solid rgba(58,217,138,0.2);border-radius:5px;padding:4px 8px;font-size:0.7rem;margin-bottom:3px">
+              <span style="color:#3ad98a">▲ BID</span> <span id="msWhaleBidPrice" class="ms-1" style="font-family:var(--font-mono)">—</span> <span class="text-muted ms-1">×</span> <span id="msWhaleBidSize" style="font-family:var(--font-mono)">—</span>
+            </div>
+            <div id="msWhaleAsk" class="d-none" style="background:rgba(255,107,53,0.08);border:1px solid rgba(255,107,53,0.2);border-radius:5px;padding:4px 8px;font-size:0.7rem;margin-bottom:3px">
+              <span style="color:#ff6b35">▼ ASK</span> <span id="msWhaleAskPrice" class="ms-1" style="font-family:var(--font-mono)">—</span> <span class="text-muted ms-1">×</span> <span id="msWhaleAskSize" style="font-family:var(--font-mono)">—</span>
+            </div>
+            <div id="msNoWhale" style="font-size:0.7rem;color:#555">ไม่พบ whale wall</div>
+          </div>
+          <!-- TWAP Alert -->
+          <div id="msTwapAlert" class="d-none" style="background:rgba(255,193,7,0.08);border:1px solid rgba(255,193,7,0.2);border-radius:5px;padding:5px 8px;font-size:0.7rem">
+            <i class="bi bi-robot me-1" style="color:#ffc107"></i><span style="color:#ffc107">TWAP Detected</span>
+            <span class="text-muted ms-1">— algo bot กำลัง execute</span>
+            <div class="text-muted" style="font-size:0.65rem">score: <span id="msTwapScore">—</span>σ</div>
+          </div>
         </div>
       </div>
       <div class="card mb-3">
@@ -1770,6 +1833,28 @@ ol.small, ul.small, .small.text-muted,
   <div class="row g-3">
     <!-- LEFT COLUMN -->
     <div class="col-md-6">
+
+      <!-- Trading Pairs -->
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-currency-exchange me-2"></i>Trading Pairs</div>
+        <div class="card-body">
+          <div id="symbolTagsWrap" class="d-flex flex-wrap gap-2 mb-3" style="min-height:32px"></div>
+          <div class="d-flex gap-2">
+            <input type="text" class="form-control form-control-sm" id="newSymbolInput"
+              placeholder="เช่น TAO/THB, BTC/USDT"
+              style="text-transform:uppercase;font-family:var(--font-mono);font-size:0.8rem"
+              onkeydown="if(event.key==='Enter') addSymbol()">
+            <button class="btn btn-sm" style="background:var(--accent);color:#000;font-weight:700;white-space:nowrap" onclick="addSymbol()">
+              <i class="bi bi-plus-lg me-1"></i>Add
+            </button>
+          </div>
+          <div id="symbolSaveMsg" class="small mt-2" style="display:none"></div>
+          <small class="text-muted d-block mt-2" style="font-size:0.7rem">
+            กด × เพื่อลบ — มีผลทันทีในรอบวิเคราะห์ถัดไป ไม่ต้อง restart
+          </small>
+        </div>
+      </div>
+
       <div class="card mb-3">
         <div class="card-header"><i class="bi bi-toggles me-2"></i>Trading Mode</div>
         <div class="card-body">
@@ -2089,6 +2174,9 @@ ol.small, ul.small, .small.text-muted,
 </section>
 
 </main>
+  </div><!-- /.content-scroll -->
+</div><!-- /.main -->
+</div><!-- /.app -->
 
 <!-- Notification Toast Container -->
 <div id="toastContainer" class="notification"></div>
@@ -2187,24 +2275,18 @@ function connectWS() {
 // Navigation
 // ============================================================
 function showSection(name, el) {
-  closeMobileMenu();
-  _syncMobileMenuActive(name);
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
   const target = document.getElementById('sec-' + name);
   if (target) target.classList.add('active');
-  // also handle pill links that may not have el passed
-  if (el) el.classList.add('active');
-  else {
-    document.querySelectorAll('.pill-link').forEach(l => {
-      if (l.getAttribute('onclick') && l.getAttribute('onclick').includes("'" + name + "'")) l.classList.add('active');
-    });
-  }
+  // sync sidebar nav active state
+  document.querySelectorAll('.snav-item').forEach(n => {
+    n.classList.toggle('active', n.dataset.section === name);
+  });
   if (name === 'portfolio') refreshPortfolio();
   if (name === 'trade-history') refreshHistory();
   if (name === 'analytics') { refreshTraining(); refreshLoopStatus(); refreshHourlyTrainer(); }
-  if (name === 'settings') loadSettings();
-  if (name === 'trading' && currentSymbol) loadMTF();
+  if (name === 'settings') { loadSettings(); loadSymbols(); }
+  if (name === 'trading' && currentSymbol) { loadMTF(); refreshHeatmap(); if (allAnalyses[currentSymbol]) updateMicrostructurePanel(allAnalyses[currentSymbol]); }
   if (name === 'positions') refreshPositions();
   if (name === 'notifications') {
     _notifUnread = 0;
@@ -2906,7 +2988,11 @@ function selectSymbol(sym) {
   updateIndicatorPanel(sym);
   updateAIPanel(sym);
   fetchTradingChart(sym);
-  if (document.getElementById('sec-trading').classList.contains('active')) loadMTF();
+  if (document.getElementById('sec-trading').classList.contains('active')) {
+    loadMTF();
+    refreshHeatmap();
+    if (allAnalyses[sym]) updateMicrostructurePanel(allAnalyses[sym]);
+  }
 }
 
 async function fetchTradingChart(sym) {
@@ -3074,7 +3160,143 @@ function handleAnalysisUpdate(d) {
     addActivity(d.signal === 'BUY' ? '▲' : '▼', `${d.symbol} ${d.signal} (conf: ${(d.confidence*100).toFixed(0)}%)`, c);
   }
   if (document.getElementById('sec-dashboard').classList.contains('active')) renderPriceCards();
-  if (currentSymbol === d.symbol) { updateIndicatorPanel(d.symbol); updateAIPanel(d.symbol); }
+  if (currentSymbol === d.symbol) {
+    updateIndicatorPanel(d.symbol);
+    updateAIPanel(d.symbol);
+    updateMicrostructurePanel(d);
+    refreshHeatmap();
+  }
+}
+
+// ============================================================
+// Microstructure Panel
+// ============================================================
+function updateMicrostructurePanel(d) {
+  if (!d) return;
+  // Book imbalance bar (0=all sell, 1=all buy, 0.5=balanced)
+  const imb = d.book_imbalance != null ? d.book_imbalance : 0.5;
+  const pct = (imb * 100).toFixed(1);
+  document.getElementById('msImbalanceVal').textContent = imb >= 0.5
+    ? `Buy ${pct}%` : `Sell ${(100-pct).toFixed(1)}%`;
+  const bar = document.getElementById('msImbalanceBar');
+  bar.style.width = pct + '%';
+  bar.style.background = imb >= 0.6 ? 'linear-gradient(90deg,#3ad98a,#a8ff53)'
+    : imb <= 0.4 ? 'linear-gradient(90deg,#ff6b35,#ff4444)'
+    : 'linear-gradient(90deg,#666,#888)';
+
+  // Whale walls
+  const hasBid = d.whale_bid_size > 0;
+  const hasAsk = d.whale_ask_size > 0;
+  document.getElementById('msTwapAlert').classList.toggle('d-none', !d.twap_detected);
+  document.getElementById('msNoWhale').style.display = (hasBid || hasAsk) ? 'none' : '';
+  const bidEl = document.getElementById('msWhaleBid');
+  const askEl = document.getElementById('msWhaleAsk');
+  bidEl.classList.toggle('d-none', !hasBid);
+  askEl.classList.toggle('d-none', !hasAsk);
+  if (hasBid) {
+    document.getElementById('msWhaleBidPrice').textContent = formatPrice(d.whale_bid_price);
+    document.getElementById('msWhaleBidSize').textContent = d.whale_bid_size.toFixed(2);
+  }
+  if (hasAsk) {
+    document.getElementById('msWhaleAskPrice').textContent = formatPrice(d.whale_ask_price);
+    document.getElementById('msWhaleAskSize').textContent = d.whale_ask_size.toFixed(2);
+  }
+  if (d.twap_detected) {
+    document.getElementById('msTwapScore').textContent = d.twap_score != null ? d.twap_score.toFixed(1) : '—';
+  }
+}
+
+// ============================================================
+// Order Book Heatmap Canvas
+// ============================================================
+async function refreshHeatmap() {
+  const canvas = document.getElementById('obHeatmapCanvas');
+  if (!canvas || !currentSymbol) return;
+  const ctx = canvas.getContext('2d');
+  try {
+    const r = await fetch(`/api/orderbook/heatmap?symbol=${encodeURIComponent(currentSymbol)}`);
+    if (!r.ok) return;
+    const data = await r.json();
+    const snaps = data.snapshots;
+    if (!snaps || snaps.length < 2) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#333';
+      ctx.font = '11px monospace';
+      ctx.fillText('Accumulating data…', 10, canvas.height / 2);
+      return;
+    }
+    renderHeatmap(ctx, canvas, snaps);
+  } catch (e) { console.debug('heatmap fetch failed', e); }
+}
+
+function renderHeatmap(ctx, canvas, snaps) {
+  // Collect all price levels across all snapshots
+  const W = canvas.offsetWidth || 640;
+  const H = canvas.offsetHeight || 160;
+  canvas.width  = W;
+  canvas.height = H;
+  ctx.clearRect(0, 0, W, H);
+
+  // Find global price range
+  let minP = Infinity, maxP = -Infinity;
+  for (const s of snaps) {
+    for (const [p] of (s.bids || [])) { if (p < minP) minP=p; if (p > maxP) maxP=p; }
+    for (const [p] of (s.asks || [])) { if (p < minP) minP=p; if (p > maxP) maxP=p; }
+  }
+  if (minP === Infinity) return;
+
+  // Price bins
+  const N_PRICE = 40;
+  const priceStep = (maxP - minP) / N_PRICE || 1;
+
+  // Find max qty for normalization
+  let maxQty = 0;
+  for (const s of snaps) {
+    for (const [, q] of [...(s.bids||[]), ...(s.asks||[])]) if (q > maxQty) maxQty = q;
+  }
+  if (maxQty === 0) maxQty = 1;
+
+  const colW = W / snaps.length;
+  const rowH = H / N_PRICE;
+
+  for (let si = 0; si < snaps.length; si++) {
+    const s = snaps[si];
+    const x = si * colW;
+    // Bids (green)
+    for (const [p, q] of (s.bids || [])) {
+      const bin = Math.floor((p - minP) / priceStep);
+      if (bin < 0 || bin >= N_PRICE) continue;
+      const y = H - (bin + 1) * rowH;
+      const alpha = Math.min(q / maxQty, 1);
+      ctx.fillStyle = `rgba(58,217,138,${(0.15 + alpha * 0.85).toFixed(2)})`;
+      ctx.fillRect(Math.floor(x), Math.floor(y), Math.ceil(colW) + 1, Math.ceil(rowH) + 1);
+    }
+    // Asks (red)
+    for (const [p, q] of (s.asks || [])) {
+      const bin = Math.floor((p - minP) / priceStep);
+      if (bin < 0 || bin >= N_PRICE) continue;
+      const y = H - (bin + 1) * rowH;
+      const alpha = Math.min(q / maxQty, 1);
+      ctx.fillStyle = `rgba(255,107,53,${(0.15 + alpha * 0.85).toFixed(2)})`;
+      ctx.fillRect(Math.floor(x), Math.floor(y), Math.ceil(colW) + 1, Math.ceil(rowH) + 1);
+    }
+  }
+
+  // Mid-price line (latest snapshot)
+  const last = snaps[snaps.length - 1];
+  if (last && last.bids && last.bids.length && last.asks && last.asks.length) {
+    const mid = (last.bids[0][0] + last.asks[0][0]) / 2;
+    const bin = (mid - minP) / priceStep;
+    const y = H - (bin + 0.5) * rowH;
+    ctx.strokeStyle = 'rgba(168,255,83,0.7)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
 }
 
 function handleTradeExecuted(d) {
@@ -3429,6 +3651,8 @@ async function _doModeSwap(mode, budgetUsdt) {
 function _updateModeBadge(mode) {
   const tag = document.getElementById('modeTag');
   if (tag) { tag.textContent = mode.toUpperCase(); tag.className = 'mode-badge mode-' + mode; }
+  const sbMode = document.getElementById('sbMode');
+  if (sbMode) sbMode.textContent = mode.charAt(0).toUpperCase() + mode.slice(1);
   const btnDemo = document.getElementById('btnDemo');
   const btnLive = document.getElementById('btnLive');
   if (btnDemo) btnDemo.className = mode === 'demo' ? 'btn btn-success btn-sm' : 'btn btn-outline-success btn-sm';
@@ -3521,6 +3745,65 @@ async function testExchanges() {
   } catch(e) {
     resultEl.innerHTML = `<div class="text-danger small">${e.message}</div>`;
   }
+}
+
+// ============================================================
+// Trading Pairs (Symbols) Management
+// ============================================================
+async function loadSymbols() {
+  try {
+    const r = await fetch('/api/symbols');
+    const d = await r.json();
+    renderSymbolTags(d.symbols || []);
+  } catch {}
+}
+
+function renderSymbolTags(syms) {
+  const wrap = document.getElementById('symbolTagsWrap');
+  if (!wrap) return;
+  if (!syms.length) { wrap.innerHTML = '<span class="text-muted small">ยังไม่มี symbol</span>'; return; }
+  wrap.innerHTML = syms.map(s => `
+    <span class="badge d-inline-flex align-items-center gap-1 px-2 py-1"
+      style="background:rgba(168,255,83,0.1);border:1px solid rgba(168,255,83,0.25);color:var(--accent);font-family:var(--font-mono);font-size:0.75rem;border-radius:6px">
+      ${s}
+      <button type="button" onclick="removeSymbol('${s}')"
+        style="background:none;border:none;padding:0;line-height:1;color:var(--text-muted);font-size:0.85rem;cursor:pointer"
+        title="Remove">×</button>
+    </span>`).join('');
+}
+
+async function addSymbol() {
+  const input = document.getElementById('newSymbolInput');
+  const sym = input.value.trim().toUpperCase();
+  if (!sym) return;
+  const msg = document.getElementById('symbolSaveMsg');
+  try {
+    const r = await fetch('/api/symbols', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({add: sym})
+    });
+    const d = await r.json();
+    if (!r.ok) { msg.style.display=''; msg.className='small mt-2 text-danger'; msg.textContent=d.detail||'Error'; return; }
+    input.value = '';
+    renderSymbolTags(d.symbols);
+    msg.style.display=''; msg.className='small mt-2 text-success'; msg.textContent=`เพิ่ม ${sym} แล้ว`;
+    setTimeout(() => msg.style.display='none', 3000);
+  } catch(e) { msg.style.display=''; msg.className='small mt-2 text-danger'; msg.textContent=e.message; }
+}
+
+async function removeSymbol(sym) {
+  const msg = document.getElementById('symbolSaveMsg');
+  try {
+    const r = await fetch('/api/symbols', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({remove: sym})
+    });
+    const d = await r.json();
+    if (!r.ok) { msg.style.display=''; msg.className='small mt-2 text-danger'; msg.textContent=d.detail||'Error'; return; }
+    renderSymbolTags(d.symbols);
+    msg.style.display=''; msg.className='small mt-2 text-muted'; msg.textContent=`ลบ ${sym} แล้ว`;
+    setTimeout(() => msg.style.display='none', 3000);
+  } catch(e) { msg.style.display=''; msg.className='small mt-2 text-danger'; msg.textContent=e.message; }
 }
 
 async function loadSettings() {
@@ -4188,328 +4471,6 @@ function renderDashboardState(d) {
   if (d.agents) renderAgents(d.agents);
   // Risk state embedded in dashboard update
   if (d.risk) { riskState = d.risk; renderRiskPanel(); }
-  // v1.4.0 Resilience panels
-  if (d.risk && d.risk.tail_risk) renderTailRiskPanel(d.risk.tail_risk, d.risk.limits || {});
-  if (d.trainer_drift)            renderDriftPanel(d.trainer_drift);
-  if (d.param_opt)                renderParamOptPanel(d.param_opt);
-  if (d.ml_champion != null)      renderMlChampPanel(d.ml_champion);
-  if (d.trade_journal)            renderTradeJournalPanel(d.trade_journal);
-  if (d.arbitrage != null)        renderArbitragePanel(d.arbitrage);
-}
-
-// ── v1.4.0 Resilience panels ───────────────────────────────────────────────
-
-function renderTailRiskPanel(tr, limits) {
-  const panel = document.getElementById('tailRiskPanel');
-  const badge = document.getElementById('varCircuitBadge');
-  if (!panel) return;
-
-  const pct = (v, dp=1) => v != null ? (v * 100).toFixed(dp) + '%' : '—';
-  const limVar = limits.max_var_pct || 0.05;
-  const limRuin = limits.max_prob_ruin || 0.40;
-
-  const varPct  = tr.var_pct  || 0;
-  const cvarPct = tr.cvar_pct || 0;
-  const pRuin   = tr.prob_ruin || 0;
-  const p95dd   = tr.p95_maxdd || 0;
-
-  const varRatio  = Math.min(varPct  / limVar,  1.0);
-  const ruinRatio = Math.min(pRuin   / limRuin, 1.0);
-  const varColor  = varRatio  > 0.8 ? '#ff4d6d' : varRatio  > 0.5 ? '#ffc107' : '#39d98a';
-  const ruinColor = ruinRatio > 0.8 ? '#ff4d6d' : ruinRatio > 0.5 ? '#ffc107' : '#39d98a';
-
-  if (badge) badge.style.display = (varRatio >= 1.0 || ruinRatio >= 1.0) ? '' : 'none';
-
-  const n = tr.n_paths || 0;
-  const h = tr.horizon  || 0;
-
-  panel.innerHTML = `
-    <div class="mb-2">
-      <div class="d-flex justify-content-between mb-1">
-        <span class="stat-label" style="margin:0">95% VaR <span style="font-size:0.62rem;color:var(--text-muted)">(lim ${pct(limVar,0)})</span></span>
-        <span style="font-family:var(--font-mono);font-size:0.8rem;color:${varColor}">${pct(varPct)}</span>
-      </div>
-      <div class="heat-bar"><div class="heat-fill" style="width:${(varRatio*100).toFixed(0)}%;background:${varColor}"></div></div>
-    </div>
-    <div class="mb-2">
-      <div class="d-flex justify-content-between mb-1">
-        <span class="stat-label" style="margin:0">CVaR (Expected Shortfall)</span>
-        <span style="font-family:var(--font-mono);font-size:0.8rem;color:${varColor}">${pct(cvarPct)}</span>
-      </div>
-    </div>
-    <div class="mb-2">
-      <div class="d-flex justify-content-between mb-1">
-        <span class="stat-label" style="margin:0">Prob Ruin <span style="font-size:0.62rem;color:var(--text-muted)">(DD>20% in ${h}d, lim ${pct(limRuin,0)})</span></span>
-        <span style="font-family:var(--font-mono);font-size:0.8rem;color:${ruinColor}">${pct(pRuin)}</span>
-      </div>
-      <div class="heat-bar"><div class="heat-fill" style="width:${(ruinRatio*100).toFixed(0)}%;background:${ruinColor}"></div></div>
-    </div>
-    <div class="d-flex justify-content-between" style="font-size:0.7rem;color:var(--text-muted)">
-      <span>P95 Max-DD: <strong style="font-family:var(--font-mono);color:var(--text-main)">${pct(p95dd)}</strong></span>
-      <span style="font-size:0.62rem">${n ? n.toLocaleString()+' paths' : ''}</span>
-    </div>`;
-}
-
-function renderDriftPanel(drift) {
-  const panel = document.getElementById('driftPanel');
-  const badge = document.getElementById('driftBadge');
-  if (!panel) return;
-
-  const hasDrift = drift.drift_count > 0;
-  const maxPsi   = drift.max_psi || 0;
-  const threshold = drift.threshold || 0.20;
-  const features  = drift.per_feature || {};
-  const hasBL     = drift.has_baseline;
-
-  if (badge) badge.style.display = (maxPsi > threshold) ? '' : 'none';
-
-  const psiColor = v => v > threshold ? '#ff4d6d' : v > 0.10 ? '#ffc107' : '#39d98a';
-  const psiLabel = v => v > threshold ? 'significant' : v > 0.10 ? 'minor' : 'stable';
-
-  const featureRows = Object.entries(features)
-    .sort(([,a],[,b]) => b - a)
-    .slice(0, 6)
-    .map(([f, v]) => {
-      const fill = Math.min(v / (threshold * 2), 1.0) * 100;
-      return `<div class="d-flex align-items-center gap-2 py-1" style="border-bottom:1px solid var(--border)">
-        <span style="font-size:0.68rem;font-family:var(--font-mono);flex:0 0 90px;color:var(--text-muted)">${f}</span>
-        <div class="heat-bar flex-fill"><div class="heat-fill" style="width:${fill.toFixed(0)}%;background:${psiColor(v)}"></div></div>
-        <span style="font-size:0.68rem;font-family:var(--font-mono);flex:0 0 42px;text-align:right;color:${psiColor(v)}">${v.toFixed(3)}</span>
-      </div>`;
-    }).join('');
-
-  panel.innerHTML = `
-    <div class="d-flex justify-content-between mb-2" style="font-size:0.75rem">
-      <span>Baseline: <strong style="color:${hasBL?'var(--accent-buy)':'var(--text-muted)'}">${hasBL ? 'recorded' : 'none yet'}</strong></span>
-      <span>Drift events: <strong style="color:${hasDrift?'#ffc107':'var(--text-main)'}">${drift.drift_count || 0}</strong></span>
-    </div>
-    <div class="d-flex justify-content-between mb-2" style="font-size:0.75rem">
-      <span>Max PSI: <strong style="font-family:var(--font-mono);color:${psiColor(maxPsi)}">${maxPsi.toFixed(3)}</strong></span>
-      <span style="font-size:0.68rem;color:${psiColor(maxPsi)}">${psiLabel(maxPsi)}</span>
-    </div>
-    <div style="font-size:0.65rem;color:var(--text-muted);margin-bottom:4px">PSI per feature (threshold ${threshold.toFixed(2)})</div>
-    ${featureRows || '<div class="text-muted text-center small py-1">รอ baseline...</div>'}`;
-}
-
-function renderParamOptPanel(opt) {
-  const panel = document.getElementById('paramOptPanel');
-  const badge = document.getElementById('paramChampBadge');
-  if (!panel) return;
-
-  if (!opt || opt.status === 'not_run') {
-    panel.innerHTML = '<div class="text-muted text-center small py-2">ยังไม่ได้รัน (ต้องการ ≥60 แท่ง)</div>';
-    return;
-  }
-
-  const bp    = opt.best_params || {};
-  const sharpe = opt.best_sharpe;
-  const challS = opt.last_challenger_sharpe;
-  const promoted = challS != null && sharpe != null && challS > sharpe - 0.01;
-  if (badge) badge.style.display = (challS != null && challS > (sharpe || -999) - 0.001) ? '' : 'none';
-
-  const paramRows = [
-    ['RSI Oversold',   bp.rsi_oversold,   ''],
-    ['RSI Overbought', bp.rsi_overbought,  ''],
-    ['ATR SL Mult',    bp.atr_sl_mult,     '×'],
-    ['Min Confidence', bp.min_confidence != null ? (bp.min_confidence * 100).toFixed(0) + '%' : null, ''],
-  ].filter(([,v]) => v != null).map(([label, val, suffix]) =>
-    `<div class="d-flex justify-content-between py-1" style="border-bottom:1px solid var(--border);font-size:0.72rem">
-      <span style="color:var(--text-muted)">${label}</span>
-      <strong style="font-family:var(--font-mono)">${val}${suffix}</strong>
-    </div>`
-  ).join('');
-
-  const sharpeColor = sharpe > 0 ? '#39d98a' : sharpe > -1 ? '#ffc107' : '#ff4d6d';
-  const opt_at = opt.optimized_at ? new Date(opt.optimized_at + 'Z').toLocaleString('th', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
-
-  panel.innerHTML = `
-    <div class="d-flex justify-content-between mb-2" style="font-size:0.75rem">
-      <span>Champion Sharpe: <strong style="font-family:var(--font-mono);color:${sharpeColor}">${sharpe != null ? sharpe.toFixed(3) : '—'}</strong></span>
-      ${challS != null ? `<span style="font-size:0.68rem;color:var(--text-muted)">challenger: ${challS.toFixed(3)}</span>` : ''}
-    </div>
-    ${paramRows}
-    <div class="mt-2" style="font-size:0.62rem;color:var(--text-muted);text-align:right">
-      last opt: ${opt_at} · ${opt.n_combos || 0} combos
-    </div>`;
-}
-
-function renderMlChampPanel(mc) {
-  const panel = document.getElementById('mlChampPanel');
-  const badge = document.getElementById('mlChampBadge');
-  if (!panel) return;
-  if (!mc || mc.model_type === 'none' || mc.model_type == null) {
-    panel.innerHTML = '<div class="text-muted text-center small py-2">ยังไม่มีโมเดล</div>';
-    if (badge) badge.style.display = 'none';
-    return;
-  }
-  const champAuc = mc.champion_auc;
-  const challAuc = mc.challenger_auc;
-  const promoted = mc.challenger_promoted === true;
-  const rejected  = mc.challenger_promoted === false;
-  if (badge) {
-    badge.style.display = promoted ? '' : 'none';
-  }
-  const aucColor = (v) => v == null ? 'var(--text-muted)' : v >= 0.60 ? '#39d98a' : v >= 0.52 ? '#ffc107' : '#ff4d6d';
-  const fmtAuc = (v) => v != null ? v.toFixed(4) : '—';
-  const acc = mc.accuracy != null ? (mc.accuracy * 100).toFixed(1) + '%' : '—';
-  const lastT = mc.last_trained
-    ? new Date(mc.last_trained + (mc.last_trained.includes('Z') ? '' : 'Z'))
-        .toLocaleString('th', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
-    : '—';
-  const typeLabel = mc.model_type === 'lightgbm' ? 'LightGBM' : mc.model_type === 'random_forest' ? 'RandomForest' : mc.model_type || '—';
-
-  const challRow = challAuc != null ? `
-    <div class="d-flex justify-content-between py-1" style="border-bottom:1px solid var(--border);font-size:0.72rem">
-      <span style="color:var(--text-muted)">Challenger AUC</span>
-      <strong style="font-family:var(--font-mono);color:${aucColor(challAuc)}">${fmtAuc(challAuc)}
-        ${promoted ? '<span style="color:#39d98a;font-size:0.65rem">↑ promoted</span>' : rejected ? '<span style="color:#ff4d6d;font-size:0.65rem">✕ rejected</span>' : ''}
-      </strong>
-    </div>` : '';
-
-  panel.innerHTML = `
-    <div class="d-flex justify-content-between py-1" style="border-bottom:1px solid var(--border);font-size:0.72rem">
-      <span style="color:var(--text-muted)">Champion AUC</span>
-      <strong style="font-family:var(--font-mono);color:${aucColor(champAuc)}">${fmtAuc(champAuc)}</strong>
-    </div>
-    ${challRow}
-    <div class="d-flex justify-content-between py-1" style="border-bottom:1px solid var(--border);font-size:0.72rem">
-      <span style="color:var(--text-muted)">CV Accuracy</span>
-      <strong style="font-family:var(--font-mono)">${acc}</strong>
-    </div>
-    <div class="mt-2" style="font-size:0.62rem;color:var(--text-muted);text-align:right">
-      ${typeLabel} · ${lastT}
-    </div>`;
-}
-
-function renderTradeJournalPanel(mem) {
-  const panel = document.getElementById('tradeJournalPanel');
-  const badge = document.getElementById('memoryStatBadge');
-  if (!panel) return;
-
-  if (!mem || !mem.total_trades) {
-    panel.innerHTML = '<div class="text-muted text-center small py-2">ยังไม่มีประวัติเทรดที่ปิดแล้ว</div>';
-    if (badge) badge.textContent = '';
-    return;
-  }
-
-  const wr = (mem.overall_win_rate != null) ? (mem.overall_win_rate * 100).toFixed(0) + '%' : '—';
-  const wrColor = mem.overall_win_rate >= 0.5 ? '#39d98a' : '#ff4d6d';
-  if (badge) badge.textContent =
-    `${mem.total_trades} เทรด · ${mem.distinct_setups} setups · ${mem.confident_setups} ยืนยันแล้ว`;
-
-  const sigLabel = (s) => {
-    const [reg, strat, band, rsi] = String(s).split('|');
-    return `${reg} · ${strat} · ${band} · ${rsi}`;
-  };
-  const row = (d, good) => {
-    const exp = (d.expectancy >= 0 ? '+' : '') + d.expectancy.toFixed(2) + '%';
-    const c = good ? '#39d98a' : '#ff4d6d';
-    return `<div class="d-flex justify-content-between py-1" style="border-bottom:1px solid var(--border);font-size:0.68rem">
-        <span style="color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%">${sigLabel(d.signature)}</span>
-        <span style="font-family:var(--font-mono)"><strong style="color:${c}">${exp}</strong> <span style="color:var(--text-muted)">${(d.win_rate*100).toFixed(0)}% · n=${d.n}</span></span>
-      </div>`;
-  };
-  const best  = (mem.best  || []).map(d => row(d, true)).join('')  || '<div class="text-muted small py-1">—</div>';
-  const worst = (mem.worst || []).map(d => row(d, false)).join('') || '<div class="text-muted small py-1">—</div>';
-
-  panel.innerHTML = `
-    <div class="d-flex justify-content-between mb-2" style="font-size:0.75rem">
-      <span>Overall win-rate: <strong style="font-family:var(--font-mono);color:${wrColor}">${wr}</strong></span>
-      <span style="font-size:0.66rem;color:var(--text-muted)">veto กันเซ็ตอัพที่ขาดทุนซ้ำ (≥${mem.min_samples} ตัวอย่าง)</span>
-    </div>
-    <div class="row g-2">
-      <div class="col-md-6">
-        <div style="font-size:0.66rem;color:#39d98a;font-weight:700;margin-bottom:2px">✓ เซ็ตอัพที่ดีที่สุด</div>
-        ${best}
-      </div>
-      <div class="col-md-6">
-        <div style="font-size:0.66rem;color:#ff4d6d;font-weight:700;margin-bottom:2px">✗ เซ็ตอัพที่ควรเลี่ยง / veto</div>
-        ${worst}
-      </div>
-    </div>`;
-}
-
-// ── Arbitrage Panel ───────────────────────────────────────────────────────────
-
-async function triggerArbScan() {
-  const panel = document.getElementById('arbitragePanel');
-  if (panel) panel.innerHTML = '<div class="text-muted text-center small py-2">กำลังสแกน...</div>';
-  try {
-    const r = await fetch('/api/arbitrage/scan', {method:'POST'});
-    const data = await r.json();
-    renderArbitragePanel(data);
-  } catch(e) {
-    if (panel) panel.innerHTML = '<div class="text-danger small py-2">สแกนไม่สำเร็จ</div>';
-  }
-}
-
-function renderArbitragePanel(data) {
-  const panel = document.getElementById('arbitragePanel');
-  const badge = document.getElementById('arbStatBadge');
-  if (!panel) return;
-  if (!data) { panel.innerHTML = '<div class="text-muted text-center small py-2">รอผลสแกน...</div>'; return; }
-
-  const tri  = data.tri_opportunities  || [];
-  const fund = data.funding_rates      || [];
-  const exec = data.executed           || [];
-
-  if (badge) {
-    const viableFund = fund.filter(f => f.viable).length;
-    badge.textContent = `tri: ${tri.length} · funding viable: ${viableFund}`;
-  }
-
-  // ── Triangular Arb ──────────────────────────────────────────────────────────
-  const triRows = tri.slice(0, 5).map(o => {
-    const c = o.net_profit_pct >= 0 ? '#39d98a' : '#ff4d6d';
-    const sign = o.net_profit_pct >= 0 ? '+' : '';
-    return `<div class="d-flex justify-content-between py-1"
-               style="border-bottom:1px solid var(--border);font-size:0.68rem">
-      <span style="color:var(--text-muted)">${o.cycle}</span>
-      <span style="font-family:var(--font-mono)">
-        <strong style="color:${c}">${sign}${o.net_profit_pct.toFixed(3)}%</strong>
-        <span style="color:var(--text-muted);font-size:0.62rem"> · $${o.amount_usdt}</span>
-      </span>
-    </div>`;
-  }).join('') || '<div class="text-muted small py-1">ไม่พบ opportunity ที่ผ่าน threshold</div>';
-
-  const execBadge = exec.length
-    ? exec.map(e => `<span class="badge bg-success me-1">${e.cycle}${e.dry_run ? ' (dry)' : ''} +$${(e.profit_usdt||0).toFixed(4)}</span>`).join('')
-    : '';
-
-  // ── Funding Rate ────────────────────────────────────────────────────────────
-  const fundRows = fund.slice(0, 8).map(f => {
-    const c = f.viable ? '#39d98a' : 'var(--text-muted)';
-    const arrow = f.direction === 'LONG_SPOT_SHORT_PERP' ? '↑' : '↓';
-    const dir = f.direction === 'LONG_SPOT_SHORT_PERP' ? 'Long spot + Short perp' : 'Short spot + Long perp';
-    return `<div class="d-flex justify-content-between py-1"
-               style="border-bottom:1px solid var(--border);font-size:0.68rem">
-      <span><span style="font-weight:600">${f.symbol.split('/')[0]}</span>
-        <span style="color:var(--text-muted);font-size:0.62rem"> ${arrow} ${dir}</span>
-      </span>
-      <span style="font-family:var(--font-mono)">
-        <strong style="color:${c}">${f.annualized_pct.toFixed(1)}%/yr</strong>
-        <span style="color:var(--text-muted);font-size:0.62rem"> (${(f.rate_pct_8h>=0?'+':'')}${f.rate_pct_8h.toFixed(4)}%/8h)</span>
-      </span>
-    </div>`;
-  }).join('') || '<div class="text-muted small py-1">ไม่มีข้อมูล funding rate</div>';
-
-  panel.innerHTML = `
-    <div class="row g-2">
-      <div class="col-md-6">
-        <div style="font-size:0.66rem;color:var(--accent);font-weight:700;margin-bottom:4px">
-          <i class="bi bi-triangle me-1"></i>Triangular Arbitrage
-          ${execBadge ? `<span style="font-size:0.60rem;font-weight:400;margin-left:6px">${execBadge}</span>` : ''}
-        </div>
-        ${triRows}
-      </div>
-      <div class="col-md-6">
-        <div style="font-size:0.66rem;color:#6ea8fe;font-weight:700;margin-bottom:4px">
-          <i class="bi bi-currency-exchange me-1"></i>Funding Rate Carry Trade
-          <span style="font-size:0.60rem;color:var(--text-muted);font-weight:400"> (advisory)</span>
-        </div>
-        ${fundRows}
-      </div>
-    </div>`;
 }
 
 function renderAgents(agents) {
@@ -4754,36 +4715,9 @@ function _addNotifBadge() {
 // ============================================================
 let _mobileMenuOpen = false;
 
-function toggleMobileMenu() {
-  _mobileMenuOpen = !_mobileMenuOpen;
-  const menu = document.getElementById('mobileMenu');
-  const btn  = document.getElementById('hamburgerBtn');
-  if (_mobileMenuOpen) {
-    // Build the mobile menu from the desktop pills
-    const pills = document.querySelectorAll('.topnav-pills .pill-link');
-    menu.innerHTML = [...pills].map(p =>
-      `<a class="pill-link ${p.classList.contains('active') ? 'active' : ''}"
-          onclick="${p.getAttribute('onclick')};closeMobileMenu()">${p.textContent.trim()}</a>`
-    ).join('');
-    menu.classList.add('open');
-    btn.innerHTML = '<i class="bi bi-x-lg"></i>';
-  } else {
-    closeMobileMenu();
-  }
-}
-
-function closeMobileMenu() {
-  _mobileMenuOpen = false;
-  document.getElementById('mobileMenu').classList.remove('open');
-  const btn = document.getElementById('hamburgerBtn');
-  if (btn) btn.innerHTML = '<i class="bi bi-list"></i>';
-}
-
-// Keep mobile menu active state in sync when navigating
+function toggleMobileMenu() {}
+function closeMobileMenu() {}
 function _syncMobileMenuActive(name) {
-  document.querySelectorAll('#mobileMenu .pill-link').forEach(l => {
-    l.classList.toggle('active', (l.getAttribute('onclick') || '').includes("'" + name + "'"));
-  });
 }
 
 // ============================================================

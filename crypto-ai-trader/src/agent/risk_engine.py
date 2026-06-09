@@ -56,11 +56,6 @@ class RiskEngine:
         self._max_daily_loss_pct = float(cfg.get("max_daily_loss_pct", 0.05))
         self._max_portfolio_heat = float(cfg.get("max_portfolio_heat", 0.20))
         self._max_position_pct   = float(cfg.get("max_position_pct",   0.10))
-        # F3.3 — VaR/CVaR circuit-breaker limits (proactive tail-risk halt)
-        # Halt when 95% VaR of daily returns exceeds this fraction of equity.
-        self._max_var_pct        = float(cfg.get("max_var_pct",        0.05))
-        # Halt when Monte-Carlo prob_ruin (max-DD > 20% in 30 days) exceeds this.
-        self._max_prob_ruin      = float(cfg.get("max_prob_ruin",       0.40))
         # Correlation guard: block a new BUY if it is too correlated with
         # the symbols already held (avoids fake diversification).
         self._max_correlation    = float(cfg.get("max_correlation",    0.80))

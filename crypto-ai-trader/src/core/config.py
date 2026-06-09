@@ -1,4 +1,5 @@
 import os
+import secrets
 import shutil
 import sys as _sys
 import yaml
@@ -103,6 +104,18 @@ class Settings:
     @property
     def models_dir(self) -> Path:
         return MODELS_DIR
+
+    @property
+    def api_token(self) -> str:
+        """Persistent auth token for mutating API endpoints.
+        Auto-generated on first access and saved to settings.yml.
+        """
+        token = self.get("app", "api_token", default="")
+        if not token:
+            token = secrets.token_urlsafe(32)
+            self.set(token, "app", "api_token")
+            self.save()
+        return token
 
 
 settings = Settings()

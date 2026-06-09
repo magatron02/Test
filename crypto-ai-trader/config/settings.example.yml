@@ -1,5 +1,5 @@
 app:
-  name: "Aiterra v1.2.0"
+  name: "Aiterra v2.0.0"
   port: 8888
   host: "127.0.0.1"    # localhost only by default; set "0.0.0.0" to expose over LAN
   open_browser: true
@@ -15,6 +15,9 @@ ai:
     api_key: ""             # GPT-4 key สำหรับ multi-model consensus (ไม่ใส่ก็ได้)
   gemini:
     api_key: ""             # Gemini key สำหรับ multi-model consensus (ไม่ใส่ก็ได้)
+  supermemory:
+    api_key: ""             # https://supermemory.ai — เปิด AI long-term memory (ไม่ใส่ก็ได้)
+    enabled: false
   rule_based:
     enabled: true
   ml:
@@ -78,6 +81,7 @@ trading:
   # - "BNB/THB"
   # - "XRP/THB"
   # - "SOL/THB"
+  # - "TAO/THB"
   base_currency: "USDT"
   max_position_pct: 0.15    # สูงสุด 15% ของพอร์ตต่อ trade
   stop_loss_pct: 0.03       # Stop loss 3%
@@ -104,6 +108,8 @@ trading:
 
 strategy:
   primary: "hybrid"         # dca | trend | mean_reversion | hybrid
+  atr_sl_mult: 2.0          # ATR multiplier สำหรับ dynamic stop-loss
+  atr_tp_mult: 3.0          # ATR multiplier สำหรับ dynamic take-profit
   dca:
     interval_hours: 24
     amount_usdt: 50.0
@@ -142,7 +148,7 @@ risk:
   max_daily_loss_pct: 0.05   # หยุดเทรดถ้าขาดทุนเกิน 5% ต่อวัน
   max_portfolio_heat: 0.20   # สูงสุด 20% ของ portfolio เป็น open risk
   max_position_pct:   0.10   # สูงสุด 10% ของ portfolio ต่อ 1 position
-  # Correlation guard (F3.2): บล็อก BUY ที่สัมพันธ์กับ position ที่ถืออยู่สูงเกินไป
+  # Correlation guard — บล็อก BUY ที่สัมพันธ์กับ position ที่ถืออยู่สูงเกินไป (กัน diversify ปลอม)
   max_correlation:    0.80   # บล็อกถ้า avg correlation กับ positions ที่ถือ > ค่านี้
   correlation_guard_enabled: true
 
@@ -175,15 +181,6 @@ position_sizer:
 #   risk_per_trade_pct: 0.05   # ยอมเสี่ยง 5% = 25 THB ต่อ trade
 #   max_daily_loss_pct: 0.10   # หยุดถ้าขาดทุน 50 THB/วัน
 #   live_max_budget_usdt: 500  # budget cap (หน่วย THB เมื่อใช้ binance_th)
-
-thai:
-  sec_api_key: ""           # ลงทะเบียนฟรีที่ api-portal.sec.or.th
-  # watch_stocks:           # หุ้นที่ติดตาม (default = SET50 ทั้งหมด)
-  #   - "PTT.BK"
-  #   - "KBANK.BK"
-  # watch_funds:            # กองทุนที่ติดตาม
-  #   - "KFSDIV"
-  #   - "KT-PRECIOUS"
 
 notifications:
   line:

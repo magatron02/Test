@@ -1,7 +1,6 @@
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from typing import Dict, Optional
 
 from .market_analyzer import MarketAnalysis
@@ -213,7 +212,6 @@ class StrategyManager:
 
     def record_dca(self, symbol: str):
         self._last_dca[symbol] = datetime.now(timezone.utc)
-        self._save_dca_timers()
 
     def ichimoku_strategy(self, analysis: MarketAnalysis) -> TradingSignal:
         """Ichimoku Cloud strategy — all-in-one Japanese trend system."""

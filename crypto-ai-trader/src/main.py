@@ -33,11 +33,7 @@ logger = logging.getLogger(__name__)
 
 WEB_DIR = (Path(_sys._MEIPASS) / "src" / "web") if getattr(_sys, 'frozen', False) else (Path(__file__).parent / "web")
 
-app = FastAPI(title=settings.app_name, version="1.2.0")
-APP_VERSION = "1.2.0"
-APP_NAME    = "Aiterra"
-AI_NAME     = "Lunai"
-AI_VERSION  = "1.2.0"
+app = FastAPI(title=settings.app_name, version="2.0.0")
 
 # Attach slowapi rate-limiter state so @limiter.limit decorators work.
 try:
@@ -73,6 +69,7 @@ if (WEB_DIR / "static").exists():
 @app.get("/", response_class=FileResponse)
 async def index():
     return FileResponse(WEB_DIR / "index.html")
+
 
 
 @app.websocket("/ws")
@@ -176,19 +173,7 @@ async def shutdown():
     if _trader:
         _trader.stop()   # signals the event — unlocks the inter-cycle sleep
     if _trader_task:
-        # Give the current cycle up to 30 s to finish cleanly, then force-cancel.
-        try:
-            await asyncio.wait_for(asyncio.shield(_trader_task), timeout=30)
-        except (asyncio.TimeoutError, asyncio.CancelledError, Exception):
-            _trader_task.cancel()
-    # Close exchange HTTP sessions to avoid ResourceWarning on exit
-    try:
-        if _trader and hasattr(_trader._exchange, "close"):
-            await _trader._exchange.close()
-    except Exception:
-        pass
-    if _hourly_trainer_inst:
-        _hourly_trainer_inst.stop()
+        _trader_task.cancel()
     if _alert_monitor_inst:
         _alert_monitor_inst.stop()
     if _alert_task:
@@ -198,7 +183,7 @@ async def shutdown():
 def main():
     print(f"""
 ╔══════════════════════════════════════════╗
-║    Aiterra v1.2.0  |  Lunai v1.2.0          ║
+║          Aiterra v2.0.0 - Starting...    ║
 ║  Mode: {settings.trading_mode.upper():<10} Model: {settings.ai_model:<12}║
 ║  Port: {settings.app_port:<10} URL: http://localhost:{settings.app_port} ║
 ╚══════════════════════════════════════════╝
