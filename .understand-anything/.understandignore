@@ -1,0 +1,26 @@
+# .understandignore
+# Syntax: same as .gitignore
+#
+# Built-in defaults (always excluded):
+#   node_modules/, .git/, dist/, build/, *.lock, *.min.js, etc.
+#
+# --- From .gitignore (uncomment to exclude) ---
+
+# *.pyc
+# *.pyo
+# *.pyd
+# .Python
+# *.egg-info/
+# .env
+# crypto-ai-trader/data/
+# crypto-ai-trader/models/
+# crypto-ai-trader/config/settings.yml
+
+# --- Test file patterns (uncomment to exclude) ---
+
+# *.test.*
+# *.spec.*
+# *.snap
+
+# --- Static/web assets (already excluded by defaults) ---
+# crypto-ai-trader/src/web/static/

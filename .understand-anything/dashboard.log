@@ -1,0 +1,30 @@
+
+  🔑  Dashboard URL: http://127.0.0.1:5173/?token=c3d54cff5e9e9950fe294b67f55974a1
+
+
+  [32m[1mVITE[22m v6.4.3[39m  [2mready in [0m[1m815[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m5173[22m/[39m
+[2m[32m  ➜[39m[22m[2m  press [22m[1mh + enter[22m[2m to show help[22m
+[understand-anything] Failed to sanitise graph file: SyntaxError: Unexpected token '﻿', "﻿{
+    "l"... is not valid JSON
+    at JSON.parse (<anonymous>)
+    at file:///C:/Users/VRTWINS_Creative/.claude/plugins/cache/understand-anything/understand-anything/2.7.6/packages/dashboard/node_modules/.vite-temp/vite.config.ts.timestamp-1781011302873-ddc36dd98353f8.mjs:228:32
+    at call (file:///C:/Users/VRTWINS_Creative/.claude/plugins/cache/understand-anything/understand-anything/2.7.6/node_modules/.pnpm/vite@6.4.3_@types+node@25.5_e6c083be69e09ef5042ed0d0624a71a6/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:19166:7)
+    at next (file:///C:/Users/VRTWINS_Creative/.claude/plugins/cache/understand-anything/understand-anything/2.7.6/node_modules/.pnpm/vite@6.4.3_@types+node@25.5_e6c083be69e09ef5042ed0d0624a71a6/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:19110:5)
+    at app.handle (file:///C:/Users/VRTWINS_Creative/.claude/plugins/cache/understand-anything/understand-anything/2.7.6/node_modules/.pnpm/vite@6.4.3_@types+node@25.5_e6c083be69e09ef5042ed0d0624a71a6/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:19113:3)
+    at Server.app (file:///C:/Users/VRTWINS_Creative/.claude/plugins/cache/understand-anything/understand-anything/2.7.6/node_modules/.pnpm/vite@6.4.3_@types+node@25.5_e6c083be69e09ef5042ed0d0624a71a6/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:18978:37)
+    at Server.emit (node:events:508:20)
+    at parserOnIncoming (node:_http_server:1216:12)
+    at HTTPParser.parserOnHeadersComplete (node:_http_common:125:17)
+[understand-anything] Failed to sanitise graph file: SyntaxError: Unexpected token '﻿', "﻿{
+    "l"... is not valid JSON
+    at JSON.parse (<anonymous>)
+    at file:///C:/Users/VRTWINS_Creative/.claude/plugins/cache/understand-anything/understand-anything/2.7.6/packages/dashboard/node_modules/.vite-temp/vite.config.ts.timestamp-1781011302873-ddc36dd98353f8.mjs:228:32
+    at call (file:///C:/Users/VRTWINS_Creative/.claude/plugins/cache/understand-anything/understand-anything/2.7.6/node_modules/.pnpm/vite@6.4.3_@types+node@25.5_e6c083be69e09ef5042ed0d0624a71a6/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:19166:7)
+    at next (file:///C:/Users/VRTWINS_Creative/.claude/plugins/cache/understand-anything/understand-anything/2.7.6/node_modules/.pnpm/vite@6.4.3_@types+node@25.5_e6c083be69e09ef5042ed0d0624a71a6/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:19110:5)
+    at app.handle (file:///C:/Users/VRTWINS_Creative/.claude/plugins/cache/understand-anything/understand-anything/2.7.6/node_modules/.pnpm/vite@6.4.3_@types+node@25.5_e6c083be69e09ef5042ed0d0624a71a6/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:19113:3)
+    at Server.app (file:///C:/Users/VRTWINS_Creative/.claude/plugins/cache/understand-anything/understand-anything/2.7.6/node_modules/.pnpm/vite@6.4.3_@types+node@25.5_e6c083be69e09ef5042ed0d0624a71a6/node_modules/vite/dist/node/chunks/dep-Dm0c1Wj2.js:18978:37)
+    at Server.emit (node:events:508:20)
+    at parserOnIncoming (node:_http_server:1216:12)
+    at HTTPParser.parserOnHeadersComplete (node:_http_common:125:17)
