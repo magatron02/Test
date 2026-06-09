@@ -638,7 +638,29 @@ class AITrader:
                 price=analysis.price,
             ))
 
-        return sig
+        # F3.1 — Pairs signal: blend stat-arb z-score into the decision when
+        # this symbol participates in a confirmed cointegrated pair.
+        pairs_sig = self._get_pairs_signal(analysis.symbol, sig)
+        if pairs_sig is not None:
+            _capture("pairs", pairs_sig)
+            # Align: pairs signal agrees with primary → small confidence boost
+            # Diverge: pairs signal disagrees → slight confidence penalty
+            if pairs_sig.action == sig.action and sig.action != "HOLD":
+                sig = TradingSignal(
+                    sig.action,
+                    min(1.0, sig.confidence + 0.05 * pairs_sig.confidence),
+                    sig.strategy,
+                    sig.reasoning + f" | pairs z={pairs_sig.reasoning}",
+                    sig.stop_loss_pct, sig.take_profit_pct,
+                )
+            elif pairs_sig.action not in ("HOLD", sig.action) and sig.action != "HOLD":
+                sig = TradingSignal(
+                    sig.action,
+                    max(0.0, sig.confidence - 0.05 * pairs_sig.confidence),
+                    sig.strategy,
+                    sig.reasoning,
+                    sig.stop_loss_pct, sig.take_profit_pct,
+                )
 
     # ── Trade execution ───────────────────────────────────────────────────
 

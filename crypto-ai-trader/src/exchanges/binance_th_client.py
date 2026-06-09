@@ -9,6 +9,7 @@ from urllib.parse import urlencode
 import httpx
 
 from .base import Balance, BaseExchange, OHLCV, Order, Ticker
+from .retry import with_retry
 from ..core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -111,6 +112,7 @@ class BinanceTHExchange(BaseExchange):
         self._rate_cache = (rate, now)
         return rate
 
+    @with_retry()
     async def get_ticker(self, symbol: str) -> Ticker:
         th_sym = _to_th_symbol(symbol)
         # Try direct first
@@ -145,6 +147,7 @@ class BinanceTHExchange(BaseExchange):
             low_24h=float(data["lowPrice"]) * rate,
         )
 
+    @with_retry()
     async def get_ohlcv(self, symbol: str, timeframe: str = "5m", limit: int = 100) -> List[OHLCV]:
         th_sym = _to_th_symbol(symbol)
         tf = TIMEFRAME_MAP.get(timeframe, "5m")
@@ -212,6 +215,7 @@ class BinanceTHExchange(BaseExchange):
             if float(b["free"]) + float(b["locked"]) > 0
         }
 
+    @with_retry(max_attempts=2)
     async def create_order(
         self, symbol: str, side: str, amount: float, price: Optional[float] = None
     ) -> Order:

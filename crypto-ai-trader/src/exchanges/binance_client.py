@@ -2,6 +2,7 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Optional
 
+import aiohttp
 import ccxt.async_support as ccxt
 
 from .base import Balance, BaseExchange, OHLCV, Order, OrderBook, Ticker

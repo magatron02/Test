@@ -951,6 +951,41 @@ async def stop_training_loop():
     return {"stopped": True}
 
 
+# ─── Arbitrage ────────────────────────────────────────────────────────────────
+
+@router.get("/arbitrage/scan")
+async def get_arbitrage_scan():
+    """GET /api/arbitrage/scan — latest tri-arb opportunities + funding rates."""
+    if not _trader:
+        return {"tri_opportunities": [], "funding_rates": [], "executed": []}
+    return _trader._arb.last_result
+
+
+@router.post("/arbitrage/scan")
+@(_limiter.limit("12/minute") if _limiter else lambda f: f)
+async def trigger_arbitrage_scan(request: Request):
+    """POST /api/arbitrage/scan — immediately run a fresh arb + funding-rate scan."""
+    if not _trader:
+        raise HTTPException(503, "Trader not running")
+    try:
+        portfolio = await _trader._get_portfolio_summary()
+        result = await _trader._arb.run_cycle(
+            symbols       = list(settings.symbols),
+            available_usdt = portfolio.get("available_usdt", 0.0),
+        )
+        return result
+    except Exception as exc:
+        raise HTTPException(500, str(exc))
+
+
+@router.get("/arbitrage/stats")
+async def get_arbitrage_stats():
+    """GET /api/arbitrage/stats — cumulative execution stats."""
+    if not _trader:
+        return {"triangular": {}, "funding": {}}
+    return _trader._arb.full_stats()
+
+
 @router.get("/training/hourly/status")
 async def hourly_train_status():
     """GET /api/training/hourly/status — hourly real-data trainer status."""

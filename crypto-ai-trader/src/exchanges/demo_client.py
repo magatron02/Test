@@ -6,6 +6,8 @@ import time as _time
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
+from .base import OrderbookTop
+
 import aiohttp
 
 from .base import Balance, BaseExchange, OHLCV, Order, OrderBook, Ticker
