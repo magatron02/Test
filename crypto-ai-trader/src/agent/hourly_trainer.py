@@ -10,9 +10,8 @@ Every hour:
   6. Broadcast status via WebSocket
 """
 import asyncio
-import hashlib
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 import aiohttp
@@ -229,22 +228,23 @@ class HourlyTrainer:
         added = 0
         db = SessionLocal()
         try:
-            # build set of existing candle hashes to skip duplicates
+            # build set of existing timestamps — bounded to the fetch window
+            # to avoid an unbounded full-table scan as records accumulate.
+            cutoff = datetime.now(timezone.utc) - timedelta(hours=LIMIT + 10)
             existing = {
-                r.features.get("_ts_hash")
+                r.features.get("_ts_key")
                 for r in db.query(TrainingRecord.features)
                           .filter(TrainingRecord.symbol == symbol,
-                                  TrainingRecord.action == _SOURCE_TAG)
+                                  TrainingRecord.action == _SOURCE_TAG,
+                                  TrainingRecord.recorded_at >= cutoff)
                           .all()
-                if r.features and r.features.get("_ts_hash")
+                if r.features and r.features.get("_ts_key")
             }
 
             labelable = candles[:-LOOKAHEAD]   # exclude last N (no future yet)
             for i, candle in enumerate(labelable):
-                ts_hash = hashlib.md5(
-                    f"{symbol}_{candle.timestamp.isoformat()}".encode()
-                ).hexdigest()
-                if ts_hash in existing:
+                ts_key = f"{symbol}_{candle.timestamp.isoformat()}"
+                if ts_key in existing:
                     continue
 
                 # use all candles up to i+1 for indicator calculation
@@ -279,7 +279,7 @@ class HourlyTrainer:
                     continue   # inside dead-zone — skip ambiguous candle
 
                 features = dict(analysis.features)
-                features["_ts_hash"] = ts_hash   # dedup key
+                features["_ts_key"] = ts_key   # dedup key
 
                 record = TrainingRecord(
                     symbol=symbol,
@@ -290,7 +290,7 @@ class HourlyTrainer:
                     trade_id=None,
                 )
                 db.add(record)
-                existing.add(ts_hash)
+                existing.add(ts_key)
                 added += 1
 
             db.commit()

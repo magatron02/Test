@@ -65,7 +65,7 @@ class AITrader:
         self._journal      = TradeJournal()
         self._param_opt    = ParamOptimizer()
         self._exit_mgr     = ExitManager()
-        self._arb          = ArbitrageEngine(exchange=exchange, dry_run=bool(settings.get("trading", "dry_run", default=False)))
+        self._arb          = ArbitrageEngine(exchange=exchange, config=settings.get("arbitrage", default={}) or {}, dry_run=bool(settings.get("trading", "dry_run", default=False)))
 
         self._running     = False
         self._analyses:   Dict[str, MarketAnalysis] = {}
@@ -614,6 +614,7 @@ class AITrader:
         chosen = ai_model
         if ai_model == "claude":
             sig = await self._claude_signal_cached(analysis, portfolio, regime)
+            _capture("claude", sig)
         elif ai_model == "rule_based":
             sig = self._strategy.get_signal(analysis)
             _capture("rule", sig, strategy=sig.strategy)
@@ -1081,7 +1082,7 @@ class AITrader:
         # When trade was opened with atr_pct, ExitManager handles all three
         # exit types in one call (SL, trailing, TP).
         atr_pct = getattr(analysis, "atr_pct", None) or 0.0
-        regime = (self._regimes.get(symbol) or RegimeResult("RANGING", 0.5)).regime
+        regime = (self._regimes.get(symbol) or RegimeResult("RANGING", 0.5, 20.0, 2.0, 0.0, "default")).regime
         if atr_pct > 0:
             exit_reason = self._exit_mgr.check_exit(trade, price, atr_pct, regime)
             if exit_reason:
