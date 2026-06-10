@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 BINANCE_KLINES = "https://api.binance.com/api/v3/klines"
 INTERVAL       = "1h"
-LIMIT          = 1000  # candles per symbol per run (Binance public API max)
+LIMIT          = 500   # candles per symbol per run (~20 days backfill)
 LOOKAHEAD      = 3     # candles ahead for label
 THRESHOLD      = 0.004 # 0.4% move → meaningful signal
 
