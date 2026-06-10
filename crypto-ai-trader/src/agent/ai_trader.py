@@ -388,9 +388,65 @@ class AITrader:
             return []
 
     def _get_pairs_signal(self, symbol: str, primary_sig) -> Optional[object]:
-        """F3.1 — Stat-arb pairs signal stub. Returns None until cointegration
-        signal generation is fully implemented."""
-        return None
+        """F3.1 — Stat-arb pairs signal. Blends mean-reversion z-score when
+        this symbol belongs to a confirmed cointegrated pair.
+
+        Cointegration scan is expensive (O(n²) statsmodels), so results are
+        cached and refreshed every 288 cycles (≈ daily on 5-min intervals).
+        Returns a TradingSignal-compatible object or None.
+        """
+        # Lazy init
+        if not hasattr(self, "_coint_cache"):
+            self._coint_cache: dict = {}
+            self._coint_cycle: int = 0
+
+        self._coint_cycle += 1
+        if self._coint_cycle % 288 == 1:
+            # Refresh cointegration map
+            self._coint_cache = {}
+            try:
+                from .cointegration import find_cointegrated_pairs
+                prices = {s: list(c) for s, c in self._price_history.items() if len(c) >= 50}
+                if len(prices) >= 2:
+                    for p in find_cointegrated_pairs(prices):
+                        for s in p["pair"]:
+                            if s not in self._coint_cache:
+                                self._coint_cache[s] = p
+                logger.debug("Cointegration cache: %d symbols in %d pairs",
+                             len(self._coint_cache), len(self._coint_cache) // 2)
+            except Exception as exc:
+                logger.debug("Cointegration scan failed: %s", exc)
+
+        pair_info = self._coint_cache.get(symbol)
+        if not pair_info:
+            return None
+
+        pair_syms = pair_info["pair"]
+        partner = pair_syms[1] if pair_syms[0] == symbol else pair_syms[0]
+        prices_a = list(self._price_history.get(symbol, []))
+        prices_b = list(self._price_history.get(partner, []))
+        if len(prices_a) < 50 or len(prices_b) < 50:
+            return None
+
+        try:
+            import numpy as np
+            from .cointegration import pairs_signal as _ps
+            result = _ps(np.array(prices_a), np.array(prices_b))
+            action = result.get("action_a", "HOLD")
+            if action == "HOLD":
+                return None
+            z = result.get("zscore", 0.0)
+            return TradingSignal(
+                action=action,
+                confidence=float(result.get("confidence", 0.0)),
+                strategy="pairs",
+                reasoning=f"{partner} z={z:.2f} hl={pair_info.get('half_life', '?')}",
+                stop_loss_pct=0.025,
+                take_profit_pct=0.035,
+            )
+        except Exception as exc:
+            logger.debug("pairs_signal error for %s: %s", symbol, exc)
+            return None
 
     # ── Portfolio helpers ─────────────────────────────────────────────────
 

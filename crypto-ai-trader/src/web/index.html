@@ -383,9 +383,10 @@ ol.small, ul.small, .small.text-muted,
 #chatInput {
   flex:1; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1);
   border-radius:10px; padding:8px 12px; color:var(--text-main);
-  font-family:var(--font-body); font-size:0.85rem; outline:none;
-  transition:border-color 0.15s;
+  font-family:var(--font-body); font-size:0.85rem; outline:2px solid transparent;
+  transition:border-color 0.15s, outline-color 0.15s;
 }
+#chatInput:focus { outline-color: var(--accent); }
 #chatInput:focus { border-color:rgba(168,255,83,0.5); }
 [data-theme="light"] #chatInput { background:#fff; border-color:var(--border); color:#0d0d0d; }
 
@@ -3154,7 +3155,7 @@ function renderPriceCards() {
     const card = document.createElement('div');
     card.className = 'col-6 col-md-4 col-lg-2';
     card.innerHTML = `
-      <div class="price-card ${currentSymbol===sym?'active':''}" onclick="selectSymbol('${sym}')">
+      <div class="price-card ${currentSymbol===sym?'active':''}" role="button" tabindex="0" aria-label="${sym}" onclick="selectSymbol('${sym}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectSymbol('${sym}')}">
         <div class="d-flex justify-content-between align-items-start">
           <strong class="small">${sym.split('/')[0]}</strong>
           <span class="badge-signal ${d.signal==='BUY'?'signal-buy':d.signal==='SELL'?'signal-sell':'signal-hold'}">${d.signal}</span>
@@ -5381,10 +5382,21 @@ showSection = function(name, el) {
     el.appendChild(badge);
     el.setAttribute('aria-keyshortcuts', 'Alt+' + (idx + 1));
     el.setAttribute('tabindex', '0');
+    el.setAttribute('role', 'button');
+    el.setAttribute('aria-current', el.classList.contains('active') ? 'page' : 'false');
     el.addEventListener('keydown', e => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showSection(el.dataset.section, el); }
     });
   });
+
+  // Keep aria-current in sync when sections switch
+  const _origShowSection = showSection;
+  showSection = function(name, el) {
+    _origShowSection(name, el);
+    document.querySelectorAll('#sideNav .snav-item[data-section]').forEach(item => {
+      item.setAttribute('aria-current', item.dataset.section === name ? 'page' : 'false');
+    });
+  };
 
   // Global Alt+1…8 listener
   document.addEventListener('keydown', e => {
