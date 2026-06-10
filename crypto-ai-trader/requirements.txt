@@ -23,3 +23,6 @@ schedule>=1.2.2
 aiofiles>=23.2.1
 python-multipart>=0.0.9
 yfinance>=0.2.40
+finta>=0.3.6
+optuna>=3.6.0
+pyarrow>=14.0.0

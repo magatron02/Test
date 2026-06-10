@@ -82,6 +82,16 @@ def _simulate_ohlcv(days: int, base_price: float, tf_minutes: int = 60) -> List[
 
 
 async def _fetch_real_ohlcv(symbol: str, days: int, tf_minutes: int = 60) -> List[dict]:
+    """Fetch klines via parquet cache (fast) or Binance API (fallback)."""
+    try:
+        from .kline_cache import KlineCache
+        candles = await KlineCache().get_or_fetch(symbol, days=days, tf_minutes=tf_minutes)
+        if candles:
+            return candles
+    except Exception as exc:
+        logger.debug("kline_cache unavailable (%s); fetching direct from Binance", exc)
+
+    # Direct Binance fetch (original path, no cache)
     import aiohttp
     needed = days * 24 * 60 // tf_minutes
     binance_sym = symbol.replace("/", "")
@@ -211,6 +221,7 @@ def _ai_signal(
     ohlcv_window,
     use_patterns: bool = True,
     use_regime: bool = True,
+    strategy_override: Optional[str] = None,
 ) -> Tuple[str, float, str, str, str]:
     """
     Returns (action, confidence, strategy, regime_name, patterns_summary).
@@ -232,12 +243,13 @@ def _ai_signal(
     regime_name = regime.regime if regime else "RANGING"
 
     sm = StrategyManager()
-    # Pick the strategy that fits the regime (the policy the RL bandit converges
-    # to). Blending all strategies lets trend & mean-reversion cancel to HOLD.
-    if use_regime and regime:
+    # strategy_override forces a specific strategy (used by ChampionChallenger).
+    # Without override, pick the strategy that fits the regime.
+    if strategy_override:
+        signal = sm.signal_for_strategy(strategy_override, analysis)
+    elif use_regime and regime:
         strat = _REGIME_STRATEGY.get(regime.regime, "trend")
         signal = sm.signal_for_strategy(strat, analysis)
-        # Fallback: if primary strategy has no conviction, try trend-following
         if signal.action == "HOLD" and signal.confidence < 0.20 and strat not in ("trend", "mean_reversion"):
             signal = sm.signal_for_strategy("trend", analysis)
     else:
@@ -282,6 +294,7 @@ def _run_loop(
     trailing_activate_pct: float = 0.01,
     fee_pct: float = 0.001,
     slippage_pct: float = 0.0005,
+    strategy_override: Optional[str] = None,
 ) -> Tuple[dict, list, list, list]:
     """
     Core simulation loop shared by all modes.
@@ -457,6 +470,7 @@ def _run_loop(
                 symbol, ohlcv_win,
                 use_patterns=(mode == "autotrade"),
                 use_regime=(mode in ("hybrid", "autotrade")),
+                strategy_override=strategy_override,
             )
 
         if action not in ("BUY", "SELL"):

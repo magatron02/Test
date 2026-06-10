@@ -1,10 +1,15 @@
 """
-F5.1 Walk-forward parameter optimisation.
+F5.1 / F2.4 Walk-forward parameter optimisation.
 
-Grid-searches over key strategy parameters on rolling walk-forward windows,
-stores the best params as JSON, and exposes a loader for AITrader / AITrainer.
+Uses Optuna TPE sampler when available (pip install optuna) for efficient
+hyperparameter search over a larger space. Falls back to exhaustive grid
+search when Optuna is not installed.
 
-No Optuna required — pure scipy / numpy grid search.
+Optuna advantages over grid:
+- TPE (Tree-structured Parzen Estimator) focuses trials on promising regions
+- Handles continuous ranges (not just discrete grid points)
+- Pruning: stop bad trials early
+- Typically 3–5× fewer trials needed to find the same optimum
 """
 from __future__ import annotations
 
@@ -21,6 +26,14 @@ from ..core.config import settings
 
 logger = logging.getLogger(__name__)
 
+try:
+    import optuna
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
+    _OPTUNA_AVAILABLE = True
+except ImportError:
+    optuna = None  # type: ignore
+    _OPTUNA_AVAILABLE = False
+
 # ── Default parameter search space ───────────────────────────────────────────
 
 DEFAULT_GRID: Dict[str, List[Any]] = {
@@ -29,9 +42,16 @@ DEFAULT_GRID: Dict[str, List[Any]] = {
     "rsi_overbought":     [65, 70, 75],
     # ATR SL multiplier (exit_manager regime defaults act as baseline)
     "atr_sl_mult":        [1.5, 2.0, 2.5],
-    # Signal confidence gate — spans below and above the usual 0.60 default so
-    # the optimizer can recommend a *tighter* bar when the data supports it.
+    # Signal confidence gate
     "min_confidence":     [0.50, 0.55, 0.60, 0.65, 0.70],
+}
+
+# Optuna search ranges (continuous — richer than the discrete grid)
+OPTUNA_RANGES: Dict[str, tuple] = {
+    "rsi_oversold":   (20.0, 40.0),
+    "rsi_overbought": (60.0, 80.0),
+    "atr_sl_mult":    (1.0,  3.5),
+    "min_confidence": (0.45, 0.75),
 }
 
 _BEST_PARAMS_FILE = "best_params.json"
@@ -206,6 +226,72 @@ def grid_search(
     }
 
 
+# ── Optuna search ────────────────────────────────────────────────────────────
+
+def optuna_search(
+    data: List[Dict[str, float]],
+    ranges: Optional[Dict[str, tuple]] = None,
+    n_trials: int = 80,
+    n_splits: int = 3,
+) -> Dict[str, Any]:
+    """
+    Bayesian hyperparameter search via Optuna TPE sampler.
+
+    Falls back to grid_search if Optuna is not installed.
+    Roughly 3–5× more efficient than exhaustive grid over the same space.
+
+    Parameters
+    ----------
+    data : list of bar dicts with close, rsi, atr_pct, signal_confidence
+    ranges : {param_name: (low, high)} — defaults to OPTUNA_RANGES
+    n_trials : number of Optuna trials (80 = fast but thorough)
+    n_splits : walk-forward folds
+    """
+    if not _OPTUNA_AVAILABLE:
+        logger.info("ParamOptimizer: Optuna not installed — using grid search")
+        return grid_search(data, n_splits=n_splits)
+
+    ranges = ranges or OPTUNA_RANGES
+    splits = walk_forward_splits(data, n_splits=n_splits)
+    if not splits:
+        logger.warning("ParamOptimizer: not enough data for Optuna splits")
+        return {"best_params": {k: (lo + hi) / 2 for k, (lo, hi) in ranges.items()},
+                "best_sharpe": 0.0, "n_combos": 0,
+                "optimized_at": datetime.utcnow().isoformat()}
+
+    def objective(trial: "optuna.Trial") -> float:
+        params = {
+            k: trial.suggest_float(k, lo, hi)
+            for k, (lo, hi) in ranges.items()
+        }
+        oos_sharpes = []
+        for _, test in splits:
+            rets = _simulate_returns(
+                test,
+                rsi_oversold   = params["rsi_oversold"],
+                rsi_overbought = params["rsi_overbought"],
+                atr_sl_mult    = params["atr_sl_mult"],
+                min_confidence = params["min_confidence"],
+            )
+            oos_sharpes.append(_sharpe(rets))
+        return float(np.mean(oos_sharpes))
+
+    study = optuna.create_study(
+        direction="maximize",
+        sampler=optuna.samplers.TPESampler(seed=42),
+    )
+    study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
+
+    best = study.best_params
+    return {
+        "best_params":    best,
+        "best_sharpe":    round(study.best_value, 4),
+        "n_combos":       n_trials,
+        "optimized_at":   datetime.utcnow().isoformat(),
+        "method":         "optuna_tpe",
+    }
+
+
 # ── Persistence ───────────────────────────────────────────────────────────────
 
 def save_best_params(result: Dict[str, Any], models_dir: Optional[Path] = None) -> Path:
@@ -262,8 +348,12 @@ class ParamOptimizer:
         when the challenger cannot beat it; the new result is still accessible
         via ``_last_challenger`` for diagnostics.
         """
-        logger.info("ParamOptimizer: starting grid search (%d bars)", len(data))
-        challenger = grid_search(data, grid=self._grid, n_splits=self._n_splits)
+        if _OPTUNA_AVAILABLE:
+            logger.info("ParamOptimizer: starting Optuna search (%d bars)", len(data))
+            challenger = optuna_search(data, n_splits=self._n_splits)
+        else:
+            logger.info("ParamOptimizer: starting grid search (%d bars)", len(data))
+            challenger = grid_search(data, grid=self._grid, n_splits=self._n_splits)
         self._last_challenger = challenger
 
         champion_sharpe = (self._result or {}).get("best_sharpe", -999.0)
