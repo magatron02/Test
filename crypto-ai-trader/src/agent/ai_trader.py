@@ -18,6 +18,8 @@ from .strategy_manager import StrategyManager, TradingSignal
 from .trade_journal import TradeJournal
 from .trainer import AITrainer
 from .param_optimizer import ParamOptimizer
+from .exit_manager import ExitManager
+from .arbitrage import ArbitrageEngine
 from ..core.config import settings
 from ..core.database import SessionLocal, Trade, Portfolio
 from ..core.persistence import atomic_write_json, safe_read_json
@@ -62,6 +64,8 @@ class AITrader:
         self._signal_cache = SignalCache(settings.get("ai", "signal_cache", default={}) or {})
         self._journal      = TradeJournal()
         self._param_opt    = ParamOptimizer()
+        self._exit_mgr     = ExitManager()
+        self._arb          = ArbitrageEngine(exchange=exchange, dry_run=bool(settings.get("trading", "dry_run", default=False)))
 
         self._running     = False
         self._analyses:   Dict[str, MarketAnalysis] = {}
@@ -448,6 +452,17 @@ class AITrader:
             logger.debug("pairs_signal error for %s: %s", symbol, exc)
             return None
 
+    @staticmethod
+    def _attribution_summary(attribution: Optional[dict]) -> str:
+        if not attribution:
+            return ""
+        parts = []
+        for k in ("ml", "rule", "claude", "multi_model", "pairs"):
+            v = attribution.get(k)
+            if v:
+                parts.append(f"{k}:{v['action']}@{v['confidence']:.0%}")
+        return f"[{' '.join(parts)}]" if parts else ""
+
     # ── Portfolio helpers ─────────────────────────────────────────────────
 
     async def _get_portfolio_summary(self) -> dict:
@@ -709,29 +724,8 @@ class AITrader:
                 price=analysis.price,
             ))
 
-        # F3.1 — Pairs signal: blend stat-arb z-score into the decision when
-        # this symbol participates in a confirmed cointegrated pair.
-        pairs_sig = self._get_pairs_signal(analysis.symbol, sig)
-        if pairs_sig is not None:
-            _capture("pairs", pairs_sig)
-            # Align: pairs signal agrees with primary → small confidence boost
-            # Diverge: pairs signal disagrees → slight confidence penalty
-            if pairs_sig.action == sig.action and sig.action != "HOLD":
-                sig = TradingSignal(
-                    sig.action,
-                    min(1.0, sig.confidence + 0.05 * pairs_sig.confidence),
-                    sig.strategy,
-                    sig.reasoning + f" | pairs z={pairs_sig.reasoning}",
-                    sig.stop_loss_pct, sig.take_profit_pct,
-                )
-            elif pairs_sig.action not in ("HOLD", sig.action) and sig.action != "HOLD":
-                sig = TradingSignal(
-                    sig.action,
-                    max(0.0, sig.confidence - 0.05 * pairs_sig.confidence),
-                    sig.strategy,
-                    sig.reasoning,
-                    sig.stop_loss_pct, sig.take_profit_pct,
-                )
+        self._signal_attribution = {**components, "chosen": chosen}
+        return final_sig
 
     # ── Trade execution ───────────────────────────────────────────────────
 
@@ -1087,6 +1081,7 @@ class AITrader:
         # When trade was opened with atr_pct, ExitManager handles all three
         # exit types in one call (SL, trailing, TP).
         atr_pct = getattr(analysis, "atr_pct", None) or 0.0
+        regime = (self._regimes.get(symbol) or RegimeResult("RANGING", 0.5)).regime
         if atr_pct > 0:
             exit_reason = self._exit_mgr.check_exit(trade, price, atr_pct, regime)
             if exit_reason:
