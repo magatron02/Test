@@ -1,7 +1,7 @@
 # ทำต่อที่นี่ (Continue Here)
 
 > อัพเดตล่าสุด: 2026-06-10
-> สถานะ: ✅ App รันบน Singapore + impeccable design system ตั้งค่าแล้ว + critique ผ่าน (8/13 findings แก้แล้ว)
+> สถานะ: ✅ Lunai v2.0.0 features ส่วนใหญ่เสร็จแล้ว — รันอยู่บน GCP Singapore
 
 ---
 
@@ -10,26 +10,34 @@
 - [x] Clone repo จาก GitHub มาที่ local
 - [x] ตั้งค่า `/quicksave` command สำหรับ sync ระหว่างเครื่อง
 - [x] วิเคราะห์ codebase ด้วย understand-anything → knowledge graph 310 nodes (ภาษาไทย)
-- [x] dashboard local ใช้งานได้ที่ `.understand-anything/start-dashboard.bat`
-- [x] ศึกษา Lunai: v1.4.0 "Resilience" — ซื้อขายเองได้แบบ semi-auto
-- [x] สร้าง `Dockerfile` + อัพเดต `docker-compose.yml` สำหรับ `src/`
+- [x] ศึกษา Lunai: v1.4.0 → v2.0.0 upgrade
+- [x] สร้าง `Dockerfile` + อัพเดต `docker-compose.yml`
 - [x] Deploy บน GCP Singapore (asia-southeast1-b, e2-micro, free tier)
-- [x] แก้ bug: `_journal`, `_max_var_pct`, `_max_prob_ruin`, `_opt_rsi_oversold`, `_model_bandit`
+- [x] แก้ bugs ต่างๆ: `_journal`, `_max_var_pct`, `_opt_rsi_oversold`, `_model_bandit`
 - [x] Binance เชื่อมได้ — ราคาจริง, ML training ทำงาน
-- [x] ลบ Iowa VM อันเก่าออกแล้ว
-- [x] RTK PreToolUse hook เขียนใน `~/.claude/settings.json` แล้ว (ต้อง restart Claude Code ถึงจะโหลด)
-- [x] `/impeccable init` — สร้าง `PRODUCT.md` + `DESIGN.md` + `.impeccable/design.json`
-- [x] `/impeccable critique` — Health score 24/40, 13 findings (snapshot ที่ `.impeccable/snapshots/`)
-- [x] แก้ side-tab border-left ×3 (lines 480, 3039, 4684) → background tint + full border
-- [x] แก้ bounce easing ×2 (lines 285, 342) → `cubic-bezier(0.22,1,0.36,1)`
-- [x] แก้ em dash prose separators ×11 → `:` / `,`
-- [x] เพิ่ม `@media (prefers-reduced-motion: reduce)` ครอบทุก animation
+- [x] RTK PreToolUse hook ตั้งค่าแล้ว
+- [x] `/impeccable init` → PRODUCT.md + DESIGN.md + .impeccable/design.json
+- [x] `/impeccable critique` → Health score 24/40, 13 findings (snapshot ที่ `.impeccable/snapshots/`)
+- [x] แก้ side-tab border-left ×3, bounce easing ×2, em dash ×11, reduced-motion support
+- [x] **fast-trade analysis** → ดึงเฉพาะแนวคิดดี (FINTA, Optuna, parquet cache, C/C)
+- [x] **FINTA bridge** (`src/agent/finta_bridge.py`) — 50+ indicators เสริม
+- [x] **Parquet kline cache** (`src/agent/kline_cache.py`) — backtest ไม่ต้อง fetch API ซ้ำ
+- [x] **F5.3 Champion/Challenger** (`src/agent/champion_challenger.py`) — tournament 5 strategies
+- [x] **F2.4 Optuna optimizer** (`src/agent/param_optimizer.py`) — TPE Bayesian search
+- [x] **F2.4 wiring fix** — เพิ่ม `ParamOptimizer()` init + startup `_apply_opt_params()` call ใน ai_trader.py
+- [x] **F3.1 Pairs Trading** (`_get_pairs_signal()`) — Engle-Granger cointegration + OU z-score, cache 288 cycles
+- [x] **API endpoints**: `GET /api/champion`, `POST /api/champion/tournament`
+- [x] **Champion/Challenger UI** — tab ใน Analytics section, leaderboard, Run Tournament button
+- [x] **Alt+1–8 keyboard shortcuts** — sidebar nav + kbd badge hints
+- [x] **Audit P1 a11y fixes** — role="button" + aria-current บน nav items, chat input focus ring, price card keyboard support
+- [x] Docker rebuild → finta 1.3, optuna 4.9.0, pyarrow 24.0.0 install สำเร็จ
+- [x] Deploy ล่าสุดบน server → container healthy
 
 ---
 
 ## สิ่งที่ต้องทำต่อ 🚧
 
-### 1. 🟡 ใส่ Anthropic API Key (ถ้าต้องการ Claude AI วิเคราะห์)
+### 1. 🟡 ใส่ Anthropic API Key (สำคัญ — ทำให้ Claude AI วิเคราะห์ได้)
 SSH เข้า server แล้วแก้ `config/settings.yml`:
 ```bash
 gcloud compute ssh kongboonma2@aiterra-server-sg --zone=asia-southeast1-b
@@ -44,18 +52,23 @@ docker compose restart
 trading:
   mode: "live"
 ```
+หรือใช้ POST /api/mode/swap ผ่าน dashboard UI
 
-### 3. 🟡 Keyboard shortcuts (P2 จาก critique)
-`Alt+1`–`Alt+8` สำหรับ nav sections — เพิ่มใน `crypto-ai-trader/src/web/index.html`
-พิจารณา collapse 8 tabs → 5 primary + secondary group
+### 3. 🔵 Audit P2/P3 issues (จาก /impeccable audit)
+- Hardcoded `#0a0a0a` บน canvas background → `var(--bg-canvas, #0a0a0a)`
+- `z-index:9999` notification → CSS variable `--z-toast`
+- Modal `width:360px` → `min(360px, 95vw)`
+- รัน `/impeccable audit` อีกครั้งหลังแก้ → expect 15-16/20
 
-### 4. 🔵 `/impeccable audit` (ถัดไปหลัง polish)
-ตรวจ a11y, contrast, responsive — รัน `/impeccable audit crypto-ai-trader/src/web/index.html`
+### 4. 🔵 ทดสอบ F3.1 Pairs Trading ใน production
+- ต้องการ ≥2 symbols ที่มี ≥50 bars ใน `_price_history` (ปกติหลังรัน ~50 cycles)
+- ดูที่ logs: `Cointegration cache: X symbols in Y pairs`
+- ถ้ามี cointegrated pairs จะเห็น `pairs z=X.XX` ใน reasoning ของ trades
 
-### 5. 🔵 Remaining Lunai v2.0.0 features
-- F2.4 Adaptive Meta-Params
-- F5.3 Champion/Challenger
-- F3.1 Pairs Trading
+### 5. 🔵 ทดสอบ Champion/Challenger ใน dashboard
+- ไปที่ Analytics → Champion tab
+- เลือก symbol + days แล้วกด Run Tournament
+- ครั้งแรกอาจใช้เวลา 1-2 นาที (fetch 60 วันของ klines)
 
 ---
 
@@ -81,7 +94,21 @@ trading:
 |-----|--------|
 | BINANCE_TH_API_KEY | ✅ ใส่แล้ว |
 | BINANCE_TH_SECRET_KEY | ✅ ใส่แล้ว |
-| ANTHROPIC_API_KEY | ❌ ยังไม่ได้ใส่ |
+| ANTHROPIC_API_KEY | ❌ ยังไม่ได้ใส่ (ทำให้ Claude AI + chat ไม่ทำงาน) |
+
+---
+
+## Lunai v2.0.0 Feature Status
+
+| Feature | สถานะ |
+|---------|--------|
+| F1.x Market Intelligence | ✅ (sentiment, onchain, orderbook, social) |
+| F2.3 Trade Journal | ✅ |
+| F2.4 Adaptive Meta-Params (Optuna) | ✅ implemented + wired |
+| F3.1 Pairs Trading | ✅ implemented (cointegration + z-score) |
+| F5.1 Walk-forward Optimizer | ✅ |
+| F5.3 Champion/Challenger | ✅ code + API + UI |
+| Anthropic API Key | ❌ ยังไม่ได้ใส่ |
 
 ---
 
