@@ -1185,6 +1185,7 @@ body { overflow: hidden; }
   <div class="d-flex gap-2 mb-4">
     <button class="tab-btn active" id="anlTab-training" onclick="anlTab('training',this)">AI Training</button>
     <button class="tab-btn" id="anlTab-backtest" onclick="anlTab('backtest',this)">Backtest</button>
+    <button class="tab-btn" id="anlTab-champion" onclick="anlTab('champion',this)">Champion</button>
   </div>
   <div id="anl-training">
 <!-- AI TRAINING inner content start -->
@@ -1855,6 +1856,103 @@ body { overflow: hidden; }
   </div>
 </section><!-- end sec-analytics-backtest -->
   </div><!-- end anl-backtest-section -->
+
+  <!-- CHAMPION / CHALLENGER panel -->
+  <div id="anl-champion" style="display:none">
+    <div class="row g-3 mb-3">
+      <!-- Current champion card -->
+      <div class="col-md-5">
+        <div class="card h-100">
+          <div class="card-body">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+              <h6 class="mb-0 fw-bold" style="color:var(--accent)">Current Champion</h6>
+              <span class="badge" id="champPromotedBadge" style="display:none;background:rgba(168,255,83,0.15);color:var(--accent);border:1px solid rgba(168,255,83,0.3)">New</span>
+            </div>
+            <div id="champNone" class="text-muted small">No tournament run yet. Run a tournament to find the best strategy.</div>
+            <div id="champInfo" style="display:none">
+              <div class="mb-2">
+                <span class="stat-label">Strategy</span>
+                <div class="fw-bold fs-5" id="champName">—</div>
+              </div>
+              <div class="row g-2 mt-1">
+                <div class="col-6">
+                  <div class="stat-label">Sharpe</div>
+                  <div class="fw-bold" id="champSharpe" style="color:var(--accent-green)">—</div>
+                </div>
+                <div class="col-6">
+                  <div class="stat-label">Win Rate</div>
+                  <div class="fw-bold" id="champWinRate">—</div>
+                </div>
+                <div class="col-6">
+                  <div class="stat-label">Return</div>
+                  <div class="fw-bold" id="champReturn">—</div>
+                </div>
+                <div class="col-6">
+                  <div class="stat-label">Max DD</div>
+                  <div class="fw-bold" id="champDD" style="color:var(--accent-red)">—</div>
+                </div>
+                <div class="col-6">
+                  <div class="stat-label">TP / SL</div>
+                  <div class="fw-bold" id="champTpSl">—</div>
+                </div>
+                <div class="col-6">
+                  <div class="stat-label">Trades</div>
+                  <div class="fw-bold" id="champTrades">—</div>
+                </div>
+              </div>
+              <div class="mt-2 small text-muted" id="champPromotedAt"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Run tournament panel -->
+      <div class="col-md-7">
+        <div class="card h-100">
+          <div class="card-body">
+            <h6 class="mb-3 fw-bold">Run Tournament</h6>
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <label class="form-label small text-muted">Symbol</label>
+                <select class="form-select form-select-sm" id="champSymbol" onchange="loadChampion()" style="background:var(--bg2);color:var(--text-main);border-color:var(--border2)">
+                  <option value="BTC/USDT">BTC/USDT</option>
+                  <option value="ETH/USDT">ETH/USDT</option>
+                  <option value="SOL/USDT">SOL/USDT</option>
+                  <option value="BNB/USDT">BNB/USDT</option>
+                  <option value="XRP/USDT">XRP/USDT</option>
+                </select>
+              </div>
+              <div class="col-6">
+                <label class="form-label small text-muted">Lookback (days)</label>
+                <select class="form-select form-select-sm" id="champDays" style="background:var(--bg2);color:var(--text-main);border-color:var(--border2)">
+                  <option value="30">30 days</option>
+                  <option value="60" selected>60 days</option>
+                  <option value="90">90 days</option>
+                  <option value="120">120 days</option>
+                </select>
+              </div>
+            </div>
+            <button class="btn btn-sm px-3 mb-3" id="champRunBtn"
+              style="background:var(--accent);color:#000;font-weight:600"
+              onclick="runChampionTournament()">
+              <i class="bi bi-trophy-fill me-1"></i>Run Tournament
+            </button>
+            <div id="champRunStatus" class="small text-muted mb-2" style="display:none"></div>
+            <!-- Results table -->
+            <div id="champResultsWrap" style="display:none">
+              <div class="small text-muted mb-1">All challengers (OOS)</div>
+              <table class="table table-sm mb-0" style="font-size:12px">
+                <thead><tr style="color:var(--text-muted)">
+                  <th>Strategy</th><th>Sharpe</th><th>WR%</th><th>Return%</th><th>DD%</th>
+                </tr></thead>
+                <tbody id="champResultsBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div><!-- end anl-champion -->
+
 </section><!-- end sec-analytics -->
 
 <!-- SETTINGS -->
@@ -2328,9 +2426,94 @@ function showSection(name, el) {
 function anlTab(tab, el) {
   document.getElementById('anl-training').style.display = tab === 'training' ? '' : 'none';
   document.getElementById('anl-backtest-section').style.display = tab === 'backtest' ? '' : 'none';
+  document.getElementById('anl-champion').style.display = tab === 'champion' ? '' : 'none';
   document.querySelectorAll('[id^="anlTab-"]').forEach(b => b.classList.remove('active'));
   if (el) el.classList.add('active');
   if (tab === 'training') { try { loadQuantLab(); } catch(e){} }
+  if (tab === 'champion') { loadChampion(); }
+}
+
+// ── Champion / Challenger ──────────────────────────────────────────────────────
+async function loadChampion() {
+  const sym = document.getElementById('champSymbol')?.value || 'BTC/USDT';
+  try {
+    const r = await fetch(`/api/champion?symbol=${encodeURIComponent(sym)}`);
+    const d = await r.json();
+    renderChampion(d.champion, false);
+  } catch(e) {
+    console.warn('loadChampion:', e);
+  }
+}
+
+function renderChampion(c, promoted) {
+  const none = document.getElementById('champNone');
+  const info = document.getElementById('champInfo');
+  const badge = document.getElementById('champPromotedBadge');
+  if (!c) {
+    none.style.display = '';
+    info.style.display = 'none';
+    badge.style.display = 'none';
+    return;
+  }
+  none.style.display = 'none';
+  info.style.display = '';
+  badge.style.display = promoted ? '' : 'none';
+  document.getElementById('champName').textContent = c.name || c.strategy_type || '—';
+  document.getElementById('champSharpe').textContent = c.sharpe != null ? c.sharpe.toFixed(2) : '—';
+  document.getElementById('champWinRate').textContent = c.win_rate != null ? c.win_rate.toFixed(1) + '%' : '—';
+  document.getElementById('champReturn').textContent = c.total_return != null ? (c.total_return > 0 ? '+' : '') + c.total_return.toFixed(1) + '%' : '—';
+  document.getElementById('champDD').textContent = c.max_drawdown != null ? c.max_drawdown.toFixed(1) + '%' : '—';
+  document.getElementById('champTpSl').textContent =
+    (c.tp_pct != null ? (c.tp_pct * 100).toFixed(1) + '%' : '—') + ' / ' +
+    (c.sl_pct != null ? (c.sl_pct * 100).toFixed(1) + '%' : '—');
+  document.getElementById('champTrades').textContent = c.total_trades ?? '—';
+  const pa = document.getElementById('champPromotedAt');
+  pa.textContent = c.promoted_at ? 'Promoted: ' + new Date(c.promoted_at).toLocaleString() : '';
+}
+
+async function runChampionTournament() {
+  const btn = document.getElementById('champRunBtn');
+  const status = document.getElementById('champRunStatus');
+  const sym = document.getElementById('champSymbol').value;
+  const days = parseInt(document.getElementById('champDays').value, 10);
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Running…';
+  status.style.display = '';
+  status.textContent = 'Fetching klines and running ' + sym + ' tournament…';
+  try {
+    const r = await fetch('/api/champion/tournament', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ symbol: sym, days: days, use_cache: true })
+    });
+    const d = await r.json();
+    if (d.error) { status.textContent = 'Error: ' + d.error; return; }
+    status.textContent = d.promoted
+      ? `New champion: ${d.champion?.name} (Sharpe ${d.champion?.sharpe?.toFixed(2)})`
+      : `Champion retained: ${d.champion?.name || 'none'} — challenger did not improve enough`;
+    renderChampion(d.champion, d.promoted);
+    // Render results table
+    const tbody = document.getElementById('champResultsBody');
+    const wrap  = document.getElementById('champResultsWrap');
+    if (d.results?.length) {
+      tbody.innerHTML = d.results.map(row => {
+        const isChamp = d.champion && row.name === d.champion.name;
+        return `<tr style="${isChamp ? 'color:var(--accent);font-weight:600' : ''}">
+          <td>${row.name}${isChamp ? ' <i class="bi bi-trophy-fill"></i>' : ''}</td>
+          <td>${row.sharpe?.toFixed(2) ?? '—'}</td>
+          <td>${row.win_rate?.toFixed(1) ?? '—'}</td>
+          <td>${row.total_return != null ? (row.total_return > 0 ? '+' : '') + row.total_return.toFixed(1) : '—'}</td>
+          <td>${row.max_drawdown?.toFixed(1) ?? '—'}</td>
+        </tr>`;
+      }).join('');
+      wrap.style.display = '';
+    }
+  } catch(e) {
+    status.textContent = 'Request failed: ' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-trophy-fill me-1"></i>Run Tournament';
+  }
 }
 
 // shim for old ai-training section ref

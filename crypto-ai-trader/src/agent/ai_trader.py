@@ -17,6 +17,7 @@ from .signal_cache import SignalCache
 from .strategy_manager import StrategyManager, TradingSignal
 from .trade_journal import TradeJournal
 from .trainer import AITrainer
+from .param_optimizer import ParamOptimizer
 from ..core.config import settings
 from ..core.database import SessionLocal, Trade, Portfolio
 from ..core.persistence import atomic_write_json, safe_read_json
@@ -60,6 +61,7 @@ class AITrader:
         # Fingerprint cache: skip the costly Claude call when the market is unchanged
         self._signal_cache = SignalCache(settings.get("ai", "signal_cache", default={}) or {})
         self._journal      = TradeJournal()
+        self._param_opt    = ParamOptimizer()
 
         self._running     = False
         self._analyses:   Dict[str, MarketAnalysis] = {}
@@ -1220,6 +1222,11 @@ class AITrader:
             "AI Trader started — interval=%ds, mode=%s, model=%s",
             interval, settings.trading_mode, settings.ai_model,
         )
+        # Apply any previously-saved Optuna params immediately (F2.4)
+        try:
+            self._apply_opt_params()
+        except Exception as _e:
+            logger.debug("Startup opt-params load skipped: %s", _e)
         while self._running:
             try:
                 await self.run_cycle()
