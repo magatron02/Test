@@ -59,6 +59,7 @@ class AITrader:
         self._memory   = MemoryManager()   # supermemory: long-term trade recall
         # Fingerprint cache: skip the costly Claude call when the market is unchanged
         self._signal_cache = SignalCache(settings.get("ai", "signal_cache", default={}) or {})
+        self._journal      = TradeJournal()
 
         self._running     = False
         self._analyses:   Dict[str, MarketAnalysis] = {}
