@@ -25,6 +25,14 @@ ai:
     min_training_samples: 30  # เริ่ม train เมื่อมี trade ครบจำนวนนี้
     retrain_interval: 50      # retrain ทุก N trades
   hourly_train_interval: 3600  # ดึงข้อมูลจริงจาก Binance ทุก N วินาที (3600 = 1 ชั่วโมง)
+  # Model routing — Haiku สำหรับ routine, Sonnet สำหรับ CRASH/VOLATILE (ประหยัดค่า API ~60-80%)
+  routing:
+    enabled: true
+    haiku_model:    "claude-haiku-4-5-20251001"   # fast/cheap: BULL_TREND, BEAR_TREND ชัดเจน
+    sonnet_model:   "claude-sonnet-4-6"            # powerful: CRASH, VOLATILE, RANGING
+    sonnet_regimes: ["CRASH", "VOLATILE", "RANGING"]
+    low_win_rate:   0.40    # win_rate ต่ำกว่านี้ → escalate เป็น Sonnet
+    high_atr_pct:   3.0     # ATR% สูงกว่านี้ → escalate เป็น Sonnet
   # Incremental analysis cache — ข้ามการเรียก Claude ซ้ำเมื่อตลาดยังนิ่ง (ประหยัดค่า API)
   signal_cache:
     enabled: true

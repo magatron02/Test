@@ -14,6 +14,7 @@ from typing import Optional
 
 from .market_analyzer import MarketAnalysis, analyze
 from .memory_manager import MemoryManager
+from .model_router import get_router
 from .strategy_manager import TradingSignal
 from ..core.config import settings
 from ..core.database import SessionLocal, Trade
@@ -404,6 +405,15 @@ class ClaudeAnalyzer:
         except Exception as e:
             return TradingSignal("HOLD", 0.0, "claude", f"Claude unavailable: {e}", 0.03, 0.06)
 
+        # Select model based on market regime and volatility.
+        router = get_router()
+        model = router.select(
+            regime=getattr(analysis, "market_regime", "RANGING") or "RANGING",
+            atr_pct=float(getattr(analysis, "atr_pct", 1.0) or 1.0),
+            recent_win_rate=portfolio_summary.get("recent_win_rate"),
+        )
+        logger.debug("Model routing: %s — %s", model.split("-")[1], router._last_reason)
+
         max_tokens = int(settings.get("ai", "claude", "max_tokens", default=2048))
         system = [{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}]
         messages = [{"role": "user", "content": self._initial_prompt(analysis, portfolio_summary)}]
@@ -411,12 +421,13 @@ class ClaudeAnalyzer:
         try:
             for _ in range(MAX_STEPS):
                 resp = await client.messages.create(
-                    model=settings.claude_model,
+                    model=model,
                     max_tokens=max_tokens,
                     system=system,
                     tools=TOOLS,
                     messages=messages,
                 )
+                router.record_call(model)
 
                 tool_uses = [b for b in resp.content if b.type == "tool_use"]
 

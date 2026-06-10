@@ -1843,3 +1843,9 @@ async def run_champion_tournament(request: Request, data: Dict[str, Any] = None)
         return result
     except Exception as exc:
         raise HTTPException(500, str(exc))
+
+
+@router.get("/model-router/stats")
+async def get_model_router_stats():
+    from ..agent.model_router import get_router
+    return get_router().stats

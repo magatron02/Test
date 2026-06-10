@@ -32,6 +32,7 @@
 - [x] **Audit P1 a11y fixes** — role="button" + aria-current บน nav items, chat input focus ring, price card keyboard support
 - [x] Docker rebuild → finta 1.3, optuna 4.9.0, pyarrow 24.0.0 install สำเร็จ
 - [x] Deploy ล่าสุดบน server → container healthy
+- [x] **Model Routing** (`src/agent/model_router.py`) — Haiku สำหรับ BULL/BEAR_TREND, Sonnet สำหรับ CRASH/VOLATILE/RANGING + `GET /api/model-router/stats`
 
 ---
 
@@ -108,6 +109,7 @@ trading:
 | F3.1 Pairs Trading | ✅ implemented (cointegration + z-score) |
 | F5.1 Walk-forward Optimizer | ✅ |
 | F5.3 Champion/Challenger | ✅ code + API + UI |
+| Model Routing (Haiku/Sonnet) | ✅ model_router.py + integrated |
 | Anthropic API Key | ❌ ยังไม่ได้ใส่ |
 
 ---
