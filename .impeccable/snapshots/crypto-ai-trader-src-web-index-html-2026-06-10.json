@@ -1,0 +1,34 @@
+{
+  "slug": "crypto-ai-trader-src-web-index-html",
+  "target": "crypto-ai-trader/src/web/index.html",
+  "date": "2026-06-10",
+  "score": 24,
+  "scoreMax": 40,
+  "heuristics": [3, 3, 2, 3, 2, 3, 2, 3, 2, 1],
+  "findings": {
+    "p0": 0,
+    "p1": 2,
+    "p2": 3,
+    "p3": 0
+  },
+  "detector": {
+    "totalFindings": 13,
+    "sideTabs": 3,
+    "bounceEasing": 2,
+    "layoutTransitions": 6,
+    "emDashes": 43,
+    "darkGlow": 1
+  },
+  "topIssues": [
+    "side-tab border-left x3 (lines 480, 3039, 4684)",
+    "43 em dashes in body text (likely backend-generated)",
+    "no reduced-motion support for any animation",
+    "zero keyboard shortcuts on power-user tool",
+    "bounce easing contradicts DESIGN.md (lines 285, 342)"
+  ],
+  "strengths": [
+    "semantic three-font system fully implemented",
+    "top-accent ::before glow line on all cards",
+    "signal badge system (BUY/SELL/HOLD/regime) complete and correct"
+  ]
+}

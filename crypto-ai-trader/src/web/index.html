@@ -282,7 +282,7 @@ a:hover { color: #C6FF80; }
 
 /* ── Micro-interactions ── */
 .price-card {
-  transition: transform 0.2s cubic-bezier(.34,1.56,.64,1), border-color 0.15s, box-shadow 0.2s;
+  transition: transform 0.2s cubic-bezier(0.22,1,0.36,1), border-color 0.15s, box-shadow 0.2s;
 }
 .price-card:hover {
   transform: translateY(-3px) scale(1.015);
@@ -339,7 +339,7 @@ ol.small, ul.small, .small.text-muted,
   display:flex; align-items:center; justify-content:center;
   cursor:pointer; font-size:1.3rem;
   box-shadow:0 4px 20px rgba(168,255,83,0.4);
-  transition:transform 0.2s cubic-bezier(.34,1.56,.64,1), box-shadow 0.2s;
+  transition:transform 0.2s cubic-bezier(0.22,1,0.36,1), box-shadow 0.2s;
   border:none;
 }
 #chatFab:hover { transform:scale(1.1); box-shadow:0 8px 32px rgba(168,255,83,0.55); }
@@ -476,15 +476,15 @@ ol.small, ul.small, .small.text-muted,
 /* ── Market Narrative ── */
 .narrative-item {
   display: flex; align-items: flex-start; gap: 10px;
-  padding: 9px 12px; border-radius: 0 8px 8px 0;
-  border-left: 3px solid var(--border2);
+  padding: 9px 12px; border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.04);
   background: rgba(255,255,255,0.02);
   margin-bottom: 6px; transition: background 0.15s;
 }
 .narrative-item:last-child { margin-bottom: 0; }
-.narrative-item.nar-buy  { border-left-color: var(--accent-buy);  background: rgba(57,217,138,0.04); }
-.narrative-item.nar-sell { border-left-color: var(--accent-red);  background: rgba(255,107,53,0.04); }
-.narrative-item.nar-hold { border-left-color: var(--border2);     background: rgba(255,255,255,0.02); }
+.narrative-item.nar-buy  { border-color: rgba(57,217,138,0.18);  background: rgba(57,217,138,0.04); }
+.narrative-item.nar-sell { border-color: rgba(255,107,53,0.18);  background: rgba(255,107,53,0.04); }
+.narrative-item.nar-hold { border-color: rgba(255,255,255,0.04); background: rgba(255,255,255,0.02); }
 .narrative-sym { min-width: 42px; text-align: center; }
 .narrative-sym .sym-name { font-family: var(--font-headline); font-weight: 700; font-size: 0.88rem; }
 .narrative-text { font-size: 0.79rem; color: var(--text-muted); line-height: 1.55; flex: 1; }
@@ -582,6 +582,20 @@ body { overflow: hidden; }
 
 /* hide old topnav */
 .topnav, .mobile-menu, .topnav-hamburger { display: none !important; }
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes sectionIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  .section.active { animation: sectionIn 0.15s ease forwards; }
+  .price-card, .stat-card { transition: border-color 0.15s, box-shadow 0.15s; }
+  .price-card:hover, .stat-card:hover { transform: none; }
+  #chatFab { transition: box-shadow 0.15s; }
+  #chatFab:hover, #chatFab:active { transform: none; }
+  .regime-crash, .circuit-open, .ws-connected, .sf-dot.on { animation: none; }
+}
 
 </style>
 </head>
@@ -700,7 +714,7 @@ body { overflow: hidden; }
     <div class="col-12">
       <div class="card" style="border-color:rgba(220,53,69,0.3)">
         <div class="card-header d-flex justify-content-between align-items-center" style="background:rgba(220,53,69,0.08)">
-          <span><i class="bi bi-power me-2 text-danger"></i>Trading Controls <span class="text-muted" style="font-size:0.7rem;font-weight:400">— Kill Switch &amp; Dry-Run</span></span>
+          <span><i class="bi bi-power me-2 text-danger"></i>Trading Controls <span class="text-muted" style="font-size:0.7rem;font-weight:400">: Kill Switch &amp; Dry-Run</span></span>
           <div class="d-flex gap-2 align-items-center">
             <span id="killStatusBadge" class="badge bg-success" style="font-size:0.65rem">TRADING ACTIVE</span>
             <span id="dryRunBadge" class="badge bg-secondary d-none" style="font-size:0.65rem">DRY-RUN</span>
@@ -771,7 +785,7 @@ body { overflow: hidden; }
     <div class="col-12">
       <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-grid-3x3-gap me-2"></i>Correlation Matrix <span class="text-muted" style="font-size:0.7rem;font-weight:400">— ความสัมพันธ์ของราคา (กันถือเหรียญที่วิ่งทางเดียวกันซ้ำ)</span></span>
+          <span><i class="bi bi-grid-3x3-gap me-2"></i>Correlation Matrix <span class="text-muted" style="font-size:0.7rem;font-weight:400">: ความสัมพันธ์ของราคา (กันถือเหรียญที่วิ่งทางเดียวกันซ้ำ)</span></span>
           <span class="text-muted" style="font-size:0.65rem" id="corrUpdated">—</span>
         </div>
         <div class="card-body p-2" id="correlationPanel">
@@ -787,7 +801,7 @@ body { overflow: hidden; }
       <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
           <span><i class="bi bi-chat-left-text me-2"></i>Market Narrative
-            <span class="text-muted" style="font-size:0.68rem;font-weight:400;letter-spacing:0;text-transform:none"> — สรุปสภาพตลาดภาษาไทย (rule-based · ไม่ใช้ API)</span>
+            <span class="text-muted" style="font-size:0.68rem;font-weight:400;letter-spacing:0;text-transform:none">: สรุปสภาพตลาดภาษาไทย (rule-based · ไม่ใช้ API)</span>
           </span>
           <span class="text-muted" style="font-size:0.65rem;font-family:var(--font-mono)" id="narrativeUpdated">—</span>
         </div>
@@ -803,7 +817,7 @@ body { overflow: hidden; }
     <div class="col-12">
       <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-bar-chart-steps me-2"></i>Risk Analytics <span class="text-muted" style="font-size:0.7rem;font-weight:400">— live trades</span></span>
+          <span><i class="bi bi-bar-chart-steps me-2"></i>Risk Analytics <span class="text-muted" style="font-size:0.7rem;font-weight:400">: live trades</span></span>
           <div class="d-flex gap-2 align-items-center">
             <span class="text-muted" style="font-size:0.65rem" id="analyticsUpdated">—</span>
             <button class="btn btn-outline-secondary btn-sm" style="padding:1px 8px;font-size:0.7rem" onclick="fetchAnalytics()">↻</button>
@@ -821,7 +835,7 @@ body { overflow: hidden; }
     <div class="col-12">
       <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-emoji-smile me-2"></i>Market Sentiment &amp; On-chain <span class="text-muted" style="font-size:0.7rem;font-weight:400">— Fear &amp; Greed · Funding Rate · Open Interest</span></span>
+          <span><i class="bi bi-emoji-smile me-2"></i>Market Sentiment &amp; On-chain <span class="text-muted" style="font-size:0.7rem;font-weight:400">: Fear &amp; Greed · Funding Rate · Open Interest</span></span>
           <div class="d-flex gap-2 align-items-center">
             <span class="text-muted" style="font-size:0.65rem" id="sentimentUpdated">—</span>
             <button class="btn btn-outline-secondary btn-sm" style="padding:1px 8px;font-size:0.7rem" onclick="fetchSentiment()">↻</button>
@@ -1060,7 +1074,7 @@ body { overflow: hidden; }
           <!-- TWAP Alert -->
           <div id="msTwapAlert" class="d-none" style="background:rgba(255,193,7,0.08);border:1px solid rgba(255,193,7,0.2);border-radius:5px;padding:5px 8px;font-size:0.7rem">
             <i class="bi bi-robot me-1" style="color:#ffc107"></i><span style="color:#ffc107">TWAP Detected</span>
-            <span class="text-muted ms-1">— algo bot กำลัง execute</span>
+            <span class="text-muted ms-1">: algo bot กำลัง execute</span>
             <div class="text-muted" style="font-size:0.65rem">score: <span id="msTwapScore">—</span>σ</div>
           </div>
         </div>
@@ -1295,7 +1309,7 @@ body { overflow: hidden; }
       </div>
       <div class="d-flex align-items-center gap-3 flex-wrap">
         <div class="text-muted" style="font-size:0.75rem;font-family:var(--font-mono)">
-          <i class="bi bi-arrow-repeat me-1"></i>Fetches <strong style="color:var(--text-main)">200 × 1h candles</strong> per symbol from Binance public API every hour — no API key needed
+          <i class="bi bi-arrow-repeat me-1"></i>Fetches <strong style="color:var(--text-main)">200 × 1h candles</strong> per symbol from Binance public API every hour, no API key needed
         </div>
         <div class="ms-auto text-muted" style="font-size:0.72rem;font-family:var(--font-mono)">
           Next run in: <span id="htNextRun" style="color:var(--accent)">—</span>
@@ -1591,7 +1605,7 @@ body { overflow: hidden; }
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content" style="background:var(--bg-card);border:1px solid var(--border)">
       <div class="modal-header" style="border-color:var(--border);background:rgba(220,53,69,0.15)">
-        <h6 class="modal-title text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>เปิด Live Mode — ใช้เงินจริง</h6>
+        <h6 class="modal-title text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>เปิด Live Mode: ใช้เงินจริง</h6>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
@@ -1770,7 +1784,7 @@ body { overflow: hidden; }
 
       <!-- Hourly Signal Quality Heatmap -->
       <div class="card mb-3" id="btHourlyCard" style="display:none">
-        <div class="card-header"><i class="bi bi-clock-history me-2"></i>Signal Quality by Hour (UTC) — Intelligent Trading Bot concept</div>
+        <div class="card-header"><i class="bi bi-clock-history me-2"></i>Signal Quality by Hour (UTC): Intelligent Trading Bot concept</div>
         <div class="card-body p-2">
           <div id="btHourlyChart" style="min-height:130px"></div>
         </div>
@@ -1850,7 +1864,7 @@ body { overflow: hidden; }
           </div>
           <div id="symbolSaveMsg" class="small mt-2" style="display:none"></div>
           <small class="text-muted d-block mt-2" style="font-size:0.7rem">
-            กด × เพื่อลบ — มีผลทันทีในรอบวิเคราะห์ถัดไป ไม่ต้อง restart
+            กด × เพื่อลบ, มีผลทันทีในรอบวิเคราะห์ถัดไป ไม่ต้อง restart
           </small>
         </div>
       </div>
@@ -2006,7 +2020,7 @@ body { overflow: hidden; }
           </select>
           <hr style="border-color:var(--border);margin:0.75rem 0">
           <div class="small text-muted mb-2" style="font-size:0.7rem">
-            <i class="bi bi-people me-1"></i>Multi-Model Consensus — ใส่ key เพิ่มเพื่อให้ AI หลายตัวโหวตร่วมกัน (เลือกโหมด "Multi-Model Consensus")
+            <i class="bi bi-people me-1"></i>Multi-Model Consensus: ใส่ key เพิ่มเพื่อให้ AI หลายตัวโหวตร่วมกัน (เลือกโหมด "Multi-Model Consensus")
           </div>
           <label class="form-label small mb-1">OpenAI API Key (GPT-4)</label>
           <input type="password" class="form-control form-control-sm mb-2" id="openaiApiKey" placeholder="sk-... (เว้นว่างได้)">
@@ -2120,7 +2134,7 @@ body { overflow: hidden; }
           </div>
           <input type="text"     class="form-control form-control-sm mb-1" id="lineChannelId"     placeholder="Channel ID  (เช่น 2010257812)">
           <input type="password" class="form-control form-control-sm mb-1" id="lineChannelSecret" placeholder="Channel Secret  (32 ตัวอักษร)">
-          <input type="text"     class="form-control form-control-sm mb-2" id="lineUserId"        placeholder="User ID  (ไม่บังคับ — ว่าง = broadcast ทุกคนที่ follow bot)">
+          <input type="text"     class="form-control form-control-sm mb-2" id="lineUserId"        placeholder="User ID  (ไม่บังคับ, ว่าง = broadcast ทุกคนที่ follow bot)">
           <label class="form-label small mb-1">Telegram Bot Token
             <span class="text-muted ms-1" style="font-size:0.65rem">(@BotFather)</span>
           </label>
@@ -3036,7 +3050,7 @@ function updateAIPanel(sym) {
 
   // Narrative block
   const narrativeBlock = a.narrative
-    ? `<div class="mb-3 p-2" style="background:rgba(168,255,83,0.06);border-left:3px solid ${signalColor};border-radius:0 8px 8px 0;line-height:1.55">
+    ? `<div class="mb-3 p-2" style="background:rgba(168,255,83,0.06);border:1px solid rgba(168,255,83,0.18);border-radius:4px;line-height:1.55">
          <div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-mono);margin-bottom:3px">Market Narrative</div>
          <span class="small">${a.narrative}</span>
        </div>`
@@ -3320,7 +3334,7 @@ function showToast(title, body, type) {
   const container = document.getElementById('toastContainer');
   const t = document.createElement('div');
   t.className = `alert alert-${type} alert-dismissible fade show shadow-lg mb-2`;
-  t.innerHTML = `<strong>${title}</strong> — ${body}<button type="button" class="btn-close" onclick="this.parentElement.remove()"></button>`;
+  t.innerHTML = `<strong>${title}</strong>: ${body}<button type="button" class="btn-close" onclick="this.parentElement.remove()"></button>`;
   container.appendChild(t);
   setTimeout(() => t.remove(), 5000);
 }
@@ -3466,7 +3480,7 @@ async function startTrainingLoop() {
       loopRunning = true;
       updateLoopButtons(true);
       document.getElementById('loopLog').innerHTML = '<span class="text-muted">Training started…</span>';
-      const msg = autoTrade ? 'Started — จะ trade ทันทีเมื่อ WR ≥ 80%' : 'Started — aiming for 80% win rate';
+      const msg = autoTrade ? 'Started: จะ trade ทันทีเมื่อ WR ≥ 80%' : 'Started: aiming for 80% win rate';
       showToast('Training Loop', msg, 'success');
     }
   } catch(e) { showToast('Error', e.message, 'danger'); }
@@ -3549,7 +3563,7 @@ function handleLoopTradeClosed(d) {
 }
 
 function handleLoopModelUpdated(d) {
-  appendLoopLog(`<span style="color:#A8FF53">🧠 Model retrained — accuracy: ${d.accuracy ? (d.accuracy*100).toFixed(1)+'%' : 'N/A'} | trades: ${d.total}</span>`);
+  appendLoopLog(`<span style="color:#A8FF53">🧠 Model retrained, accuracy: ${d.accuracy ? (d.accuracy*100).toFixed(1)+'%' : 'N/A'} | trades: ${d.total}</span>`);
   if (d.accuracy) document.getElementById('loopAccuracy').textContent = (d.accuracy * 100).toFixed(1) + '%';
 }
 
@@ -3570,7 +3584,7 @@ function handleLoopCompleted(d) {
   document.getElementById('trainStatus').textContent = '🎯 Done!';
   updateLoopStats({...d, running: false, completed: true});
   showToast('🎯 Training Complete!', `Win Rate: ${(d.win_rate*100).toFixed(1)}% on ${d.total_trades} trades`, 'success');
-  appendLoopLog(`<span style="color:#f0883e;font-weight:bold">🎯 TARGET REACHED! WR=${(d.win_rate*100).toFixed(1)}% — ${d.total_trades} trades</span>`);
+  appendLoopLog(`<span style="color:#f0883e;font-weight:bold">🎯 TARGET REACHED! WR=${(d.win_rate*100).toFixed(1)}%, ${d.total_trades} trades</span>`);
 }
 
 async function refreshLoopStatus() {
@@ -3683,7 +3697,7 @@ async function refreshLiveReadiness() {
     if (ready) {
       el.innerHTML = `<span style="color:var(--accent-buy)">✓ พร้อมเทรดจริงผ่าน <b>${ready}</b></span>`;
     } else {
-      el.innerHTML = `<span style="color:var(--accent-red)">✗ ยังไม่พร้อม — เปิด exchange + ใส่ API key ในการ์ด Exchange API Keys</span>`;
+      el.innerHTML = `<span style="color:var(--accent-red)">✗ ยังไม่พร้อม: เปิด exchange + ใส่ API key ในการ์ด Exchange API Keys</span>`;
     }
   } catch(e) { el.innerHTML = ''; }
 }
@@ -3922,9 +3936,9 @@ async function testNotifications() {
     const d = await r.json();
     const rows = Object.entries(d).map(([name, res]) => {
       const label = name === 'line' ? 'LINE' : 'Telegram';
-      if (res.ok === true)   return `<div>🟢 <b>${label}</b> — ส่งสำเร็จ ✓</div>`;
-      if (res.ok === false)  return `<div>🔴 <b>${label}</b> — ${res.error || 'Failed'}</div>`;
-      return `<div>⚪ <b>${label}</b> — ยังไม่ได้ตั้งค่า</div>`;
+      if (res.ok === true)   return `<div>🟢 <b>${label}</b>: ส่งสำเร็จ ✓</div>`;
+      if (res.ok === false)  return `<div>🔴 <b>${label}</b>: ${res.error || 'Failed'}</div>`;
+      return `<div>⚪ <b>${label}</b>: ยังไม่ได้ตั้งค่า</div>`;
     }).join('');
     resultEl.innerHTML = `<div class="p-2 rounded small" style="background:var(--bg-card2)">${rows}</div>`;
   } catch(e) {
@@ -4681,7 +4695,7 @@ function renderNotifications(items) {
     const ts = n.ts ? new Date(n.ts + 'Z').toLocaleString('th') : '';
     const bg  = typeStyle[n.type] || 'rgba(100,100,100,0.08)';
     const bdr = typeBorder[n.type] || 'rgba(100,100,100,0.2)';
-    return `<div class="d-flex align-items-start gap-3 px-3 py-2" style="border-bottom:1px solid var(--border);background:${bg};border-left:3px solid ${bdr}">
+    return `<div class="d-flex align-items-start gap-3 px-3 py-2" style="border-bottom:1px solid var(--border);background:${bg}">
       <span style="font-size:1.1rem;flex-shrink:0;line-height:1.5">${n.icon||'🔔'}</span>
       <div class="flex-fill" style="min-width:0">
         <div style="font-weight:600;font-size:0.82rem;font-family:var(--font-headline)">${n.title||''}</div>
@@ -4808,11 +4822,11 @@ async function saveAndTest(exchange) {
       return;
     }
     if (res.ok === true) {
-      resultEl.innerHTML = `<span style="color:var(--accent-buy)">🟢 Connected — BTC: $${(res.price||0).toLocaleString('en',{maximumFractionDigits:2})} <span class="text-muted">(${res.source||'live'})</span></span>`;
+      resultEl.innerHTML = `<span style="color:var(--accent-buy)">🟢 Connected: BTC $${(res.price||0).toLocaleString('en',{maximumFractionDigits:2})} <span class="text-muted">(${res.source||'live'})</span></span>`;
     } else if (res.ok === false) {
-      resultEl.innerHTML = `<span style="color:var(--accent-red)">🔴 Failed — ${res.error || 'Connection error'}</span>`;
+      resultEl.innerHTML = `<span style="color:var(--accent-red)">🔴 Failed: ${res.error || 'Connection error'}</span>`;
     } else {
-      resultEl.innerHTML = `<span class="text-muted">⚪ Not configured — enable the exchange and add API keys first</span>`;
+      resultEl.innerHTML = `<span class="text-muted">⚪ Not configured: enable the exchange and add API keys first</span>`;
     }
   } catch(e) {
     resultEl.innerHTML = `<span style="color:var(--accent-red)">🔴 ${e.message}</span>`;
@@ -4893,13 +4907,13 @@ async function activateKillSwitch() {
   if (!confirm('Activate kill switch? All new trades will be halted immediately.')) return;
   const d = await fetch('/api/trading/kill-switch?action=activate', { method: 'POST' }).then(r => r.json());
   _applyKillState(d.killed, undefined);
-  _addNotif({ type: 'warning', message: 'Kill switch activated — trading halted', ts: new Date().toISOString() });
+  _addNotif({ type: 'warning', message: 'Kill switch activated: trading halted', ts: new Date().toISOString() });
 }
 
 async function deactivateKillSwitch() {
   const d = await fetch('/api/trading/kill-switch?action=deactivate', { method: 'POST' }).then(r => r.json());
   _applyKillState(d.killed, undefined);
-  _addNotif({ type: 'info', message: 'Kill switch deactivated — trading resumed', ts: new Date().toISOString() });
+  _addNotif({ type: 'info', message: 'Kill switch deactivated: trading resumed', ts: new Date().toISOString() });
 }
 
 async function toggleDryRun(enabled) {
@@ -5171,20 +5185,20 @@ async function probeExchange(name) {
     if (!r.ok) { resultEl.innerHTML = `<span class="text-danger">🔴 ${d.detail}</span>`; return; }
 
     const pubRow = d.public_ok
-      ? `<div>🟢 <b>Public API</b> — BTC ราคา ${(d.price||0).toLocaleString()} <span class="text-muted">(${d.latency_ms}ms)</span></div>`
-      : `<div>🔴 <b>Public API</b> — ไม่สามารถเชื่อมต่อได้</div>`;
+      ? `<div>🟢 <b>Public API</b>: BTC ราคา ${(d.price||0).toLocaleString()} <span class="text-muted">(${d.latency_ms}ms)</span></div>`
+      : `<div>🔴 <b>Public API</b>: ไม่สามารถเชื่อมต่อได้</div>`;
 
     let authRow = '';
     if (d.auth_ok === null) {
-      authRow = `<div>⚪ <b>Auth API</b> — ยังไม่ได้ใส่ API Key</div>`;
+      authRow = `<div>⚪ <b>Auth API</b>: ยังไม่ได้ใส่ API Key</div>`;
     } else if (d.auth_ok) {
       const balItems = Object.entries(d.balance || {})
         .map(([a, b]) => `${a}: <b>${b.free.toLocaleString(undefined,{maximumFractionDigits:4})}</b>`)
         .join(' · ');
-      authRow = `<div>🟢 <b>Auth API</b> — ยืนยัน Key สำเร็จ<br>
+      authRow = `<div>🟢 <b>Auth API</b>: ยืนยัน Key สำเร็จ<br>
         <span class="text-muted" style="font-size:0.72rem">💼 Balance: ${balItems || 'ยังไม่มีสินทรัพย์'}</span></div>`;
     } else {
-      authRow = `<div>🔴 <b>Auth API</b> — ${d.error || 'Key ไม่ถูกต้องหรือไม่มีสิทธิ์'}</div>`;
+      authRow = `<div>🔴 <b>Auth API</b>: ${d.error || 'Key ไม่ถูกต้องหรือไม่มีสิทธิ์'}</div>`;
     }
 
     resultEl.innerHTML = pubRow + authRow;
@@ -5243,7 +5257,7 @@ async function applySmallBudgetPreset() {
 
     if (resultEl) {
       resultEl.innerHTML = `<span style="color:var(--accent-buy)">
-        ✓ ปรับแล้ว — Kelly=100% · Min ${minTrade}${cur} · Max ${maxTrade}${cur}/trade · SL ${slPct}% · TP ${tpPct}% · Max 1 position · Budget cap ${budget}${cur}
+        ✓ ปรับแล้ว: Kelly=100% · Min ${minTrade}${cur} · Max ${maxTrade}${cur}/trade · SL ${slPct}% · TP ${tpPct}% · Max 1 position · Budget cap ${budget}${cur}
       </span>`;
     }
     showToast('Preset Applied', `ตั้งค่าสำหรับงบ ${budget.toLocaleString()} ${cur} แล้ว`, 'success');

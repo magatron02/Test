@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-10T00:00:00.000Z",
+  "title": "Design System: Aiterra v2.0.0",
+  "extensions": {
+    "colorMeta": {
+      "neural-lime":        { "role": "primary",   "displayName": "Neural Lime",      "canonical": "#A8FF53", "tonalRamp": ["#1a3300","#2d5500","#3f7800","#529900","#66bb00","#7dde00","#9aff2e","#A8FF53","#C6FF80","#e0ffbf","#f4ffe6","#fafffa"] },
+      "neural-lime-bright": { "role": "primary",   "displayName": "Neural Lime Bright","canonical": "#C6FF80", "tonalRamp": ["#1e3d00","#336600","#4d9900","#66cc00","#88ee33","#aaff55","#C6FF80","#dfffaa","#eeffcc","#f7ffe5"] },
+      "bg-void":            { "role": "neutral",   "displayName": "Void",              "canonical": "#000000", "tonalRamp": ["#000000","#0a0a0a","#141414","#1e1e1e","#282828","#323232","#3c3c3c","#464646","#505050","#646464","#787878","#8c8c8c"] },
+      "bg-surface":         { "role": "neutral",   "displayName": "Surface",           "canonical": "#0c0c0c", "tonalRamp": ["#000000","#080808","#0c0c0c","#111111","#161616","#1a1a1a","#222222","#2a2a2a","#333333","#444444","#666666","#888888"] },
+      "bg-raised":          { "role": "neutral",   "displayName": "Raised",            "canonical": "#0d0d0d", "tonalRamp": ["#000000","#090909","#0d0d0d","#121212","#171717","#1c1c1c","#232323","#2b2b2b","#343434","#454545","#676767","#898989"] },
+      "ink-primary":        { "role": "neutral",   "displayName": "Ink Primary",       "canonical": "#ffffff", "tonalRamp": ["#1a1a1a","#333333","#4d4d4d","#666666","#808080","#999999","#b3b3b3","#cccccc","#e0e0e0","#f0f0f0","#f7f7f7","#ffffff"] },
+      "ink-muted":          { "role": "neutral",   "displayName": "Ink Muted",         "canonical": "#666666", "tonalRamp": ["#1a1a1a","#2d2d2d","#404040","#525252","#666666","#7a7a7a","#8e8e8e","#a2a2a2","#b6b6b6","#cacaca","#dedede","#f0f0f0"] },
+      "signal-green":       { "role": "secondary", "displayName": "Signal Green",      "canonical": "#39d98a", "tonalRamp": ["#0a2e1c","#0f4d2e","#156d42","#1a8c55","#22b870","#39d98a","#55f0a2","#80ffbf","#aaffda","#ccffec","#e5fff5","#f5fffb"] },
+      "signal-orange":      { "role": "secondary", "displayName": "Signal Orange",     "canonical": "#ff6b35", "tonalRamp": ["#2e0e00","#5c1d00","#8a2b00","#b83a00","#e64900","#ff6b35","#ff8c63","#ffaa8a","#ffc4a8","#ffd9c5","#ffede0","#fff6f0"] },
+      "signal-alert":       { "role": "tertiary",  "displayName": "Signal Alert",      "canonical": "#ff4d6d", "tonalRamp": ["#2e0010","#5c0020","#8a0030","#b80040","#e60055","#ff4d6d","#ff7a92","#ffa0b3","#ffbbc8","#ffd0da","#ffe8ed","#fff3f5"] },
+      "signal-caution":     { "role": "tertiary",  "displayName": "Signal Caution",    "canonical": "#ffc107", "tonalRamp": ["#2e2000","#5c3d00","#8a5900","#b87500","#e69100","#ffc107","#ffd040","#ffdd73","#ffe899","#fff0bb","#fff7d9","#fffcf0"] },
+      "border-dim":         { "role": "neutral",   "displayName": "Border Dim",        "canonical": "#222222", "tonalRamp": ["#0a0a0a","#141414","#1e1e1e","#222222","#2a2a2a","#333333","#3c3c3c","#484848","#555555","#666666","#808080","#999999"] },
+      "border-subtle":      { "role": "neutral",   "displayName": "Border Subtle",     "canonical": "#2a2a2a", "tonalRamp": ["#0a0a0a","#161616","#222222","#2a2a2a","#333333","#3d3d3d","#484848","#555555","#636363","#727272","#888888","#aaaaaa"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display Numbers", "purpose": "Stat values in portfolio: large numbers requiring weight." },
+      "headline": { "displayName": "Headline / Nav", "purpose": "Brand name, section titles, navigation labels." },
+      "title": { "displayName": "Title", "purpose": "Card titles, price card symbols, component headings." },
+      "body": { "displayName": "Body / Prose", "purpose": "Thai + Latin prose: activity feed, alert copy, form helper text. 65-75ch max." },
+      "label": { "displayName": "Label / Card Header", "purpose": "Card header titles, stat sub-labels. Space Mono uppercase, short only." },
+      "data": { "displayName": "Data / Prices", "purpose": "All numeric data: prices, PnL, rates, win%, timestamps, tickers." }
+    },
+    "shadows": [
+      { "name": "card-glass",    "value": "backdrop-filter: blur(20px); background: rgba(12,12,12,0.6)",   "purpose": "Standard card surface. Semi-transparent; void bleeds through." },
+      { "name": "stat-glass",    "value": "backdrop-filter: blur(18px); background: rgba(12,12,12,0.55)",  "purpose": "Stat cards. Lighter weight than card-glass." },
+      { "name": "card-glow-hover","value": "0 6px 28px rgba(168,255,83,0.13)",                              "purpose": "Interactive card hover. Accent glow activates on hover." },
+      { "name": "button-glow",   "value": "0 0 22px rgba(168,255,83,0.28)",                                "purpose": "Primary button hover. Action readiness signal." },
+      { "name": "chat-depth",    "value": "0 20px 70px rgba(0,0,0,0.8)",                                   "purpose": "Chat panel. Deepest shadow; modal layer." },
+      { "name": "focus-ring",    "value": "0 0 0 2px rgba(168,255,83,0.12)",                               "purpose": "Input and interactive focus ring." },
+      { "name": "fab-glow",      "value": "0 4px 20px rgba(168,255,83,0.4)",                               "purpose": "Chat FAB ambient glow at rest. The only resting glow in the system." }
+    ],
+    "motion": [
+      { "name": "standard",    "value": "cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Default: fast-out, slow-in. Used for section transitions and section-in animation." },
+      { "name": "snappy",      "value": "cubic-bezier(0.34, 1.56, 0.64, 1)", "purpose": "Price card and FAB hover — slight overshoot for tactile feel. Use sparingly." },
+      { "name": "duration-fast","value": "150ms", "purpose": "Button state changes, tab switches." },
+      { "name": "duration-base","value": "200ms", "purpose": "Card hover transitions, form focus." },
+      { "name": "duration-slow","value": "280ms", "purpose": "Section page transitions." },
+      { "name": "pulse",       "value": "opacity: 0 → 1 → 0 at 2s infinite", "purpose": "WebSocket connected dot, CRASH regime badge. Reserved for live state indicators only." }
+    ],
+    "breakpoints": [
+      { "name": "topnav-collapse", "value": "768px", "purpose": "Nav pills hide; burger menu appears." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The AI's call to action. Neural Lime background with black text; glow on hover.",
+      "html": "<button class=\"ds-btn-primary\">EXECUTE TRADE</button>",
+      "css": ".ds-btn-primary { background: #A8FF53; color: #000; border: none; border-radius: 4px; padding: 8px 16px; font-family: 'Finlandica', sans-serif; font-weight: 700; font-size: 0.85rem; letter-spacing: 0.3px; cursor: pointer; transition: background 0.15s, box-shadow 0.15s, transform 0.1s; } .ds-btn-primary:hover { background: #C6FF80; box-shadow: 0 0 22px rgba(168,255,83,0.28); } .ds-btn-primary:active { transform: scale(0.96); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(168,255,83,0.5); }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary action. Invisible at rest; accent tint on hover.",
+      "html": "<button class=\"ds-btn-ghost\">Cancel</button>",
+      "css": ".ds-btn-ghost { background: transparent; color: #666; border: 1px solid #2a2a2a; border-radius: 4px; padding: 5px 14px; font-family: 'Finlandica', sans-serif; font-weight: 500; font-size: 0.8rem; cursor: pointer; transition: all 0.18s; } .ds-btn-ghost:hover { border-color: #A8FF53; color: #A8FF53; background: rgba(168,255,83,0.06); } .ds-btn-ghost:active { transform: scale(0.96); } .ds-btn-ghost:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(168,255,83,0.12); }"
+    },
+    {
+      "name": "Nav Pill",
+      "kind": "nav",
+      "refersTo": "nav-pill",
+      "description": "Top navigation pill. Inactive: ghost. Active: white bg / black text inversion.",
+      "html": "<nav class=\"ds-nav-pills\"><a class=\"ds-pill\">Dashboard</a><a class=\"ds-pill ds-pill-active\">Trading</a><a class=\"ds-pill\">History</a></nav>",
+      "css": ".ds-nav-pills { display: flex; gap: 3px; background: rgba(255,255,255,0.04); padding: 4px; border-radius: 100px; border: 1px solid rgba(255,255,255,0.07); } .ds-pill { padding: 6px 16px; border-radius: 100px; color: #666; cursor: pointer; font-size: 0.9rem; font-family: 'Finlandica', sans-serif; font-weight: 500; transition: all 0.18s; white-space: nowrap; border: none; background: none; text-decoration: none; display: inline-block; } .ds-pill:hover { color: #fff; } .ds-pill.ds-pill-active { background: #fff; color: #000; font-weight: 700; box-shadow: 0 2px 12px rgba(0,0,0,0.4); }"
+    },
+    {
+      "name": "Glass Card",
+      "kind": "card",
+      "refersTo": "button-primary",
+      "description": "The system's primary container. Semi-transparent glassmorphic lens with top accent glow line.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-header\">PORTFOLIO VALUE</div><div class=\"ds-card-body\"><span class=\"ds-stat\">$12,450.00</span></div></div>",
+      "css": ".ds-card { background: rgba(12,12,12,0.6); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.05); border-radius: 4px; position: relative; overflow: hidden; } .ds-card::before { content: ''; position: absolute; top: 0; left: 15%; right: 15%; height: 1px; background: linear-gradient(90deg, transparent, rgba(168,255,83,0.12), transparent); pointer-events: none; } .ds-card-header { background: #0d0d0d; border-bottom: 1px solid #222; padding: 11px 16px; font-family: 'Space Mono', monospace; font-weight: 400; font-size: 0.65rem; letter-spacing: 1.2px; text-transform: uppercase; color: #666; } .ds-card-body { padding: 16px; } .ds-stat { font-family: 'Space Mono', monospace; font-size: 1.65rem; font-weight: 700; color: #fff; letter-spacing: -0.5px; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Form field on dark surface. Neural Lime focus ring.",
+      "html": "<div class=\"ds-field\"><label class=\"ds-label\">API KEY</label><input class=\"ds-input\" type=\"text\" placeholder=\"Enter API key\" /></div>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 4px; } .ds-label { font-family: 'Space Mono', monospace; font-size: 0.7rem; color: #666; text-transform: uppercase; letter-spacing: 0.8px; } .ds-input { background: #0d0d0d; border: 1px solid #2a2a2a; color: #fff; border-radius: 4px; padding: 8px 12px; font-family: 'Noto Sans', sans-serif; font-size: 0.85rem; outline: none; transition: border-color 0.15s, box-shadow 0.15s; } .ds-input::placeholder { color: #666; } .ds-input:focus { border-color: #A8FF53; box-shadow: 0 0 0 2px rgba(168,255,83,0.12); color: #fff; background: #0d0d0d; }"
+    },
+    {
+      "name": "Signal Badge — BUY",
+      "kind": "chip",
+      "description": "BUY signal indicator. Signal Green tint with border.",
+      "html": "<span class=\"ds-badge-buy\">BUY</span>",
+      "css": ".ds-badge-buy { font-family: 'Space Mono', monospace; font-size: 0.62rem; padding: 2px 8px; border-radius: 3px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; background: rgba(57,217,138,0.12); color: #39d98a; border: 1px solid rgba(57,217,138,0.25); display: inline-block; }"
+    },
+    {
+      "name": "Signal Badge — SELL",
+      "kind": "chip",
+      "description": "SELL signal indicator. Signal Orange tint with border.",
+      "html": "<span class=\"ds-badge-sell\">SELL</span>",
+      "css": ".ds-badge-sell { font-family: 'Space Mono', monospace; font-size: 0.62rem; padding: 2px 8px; border-radius: 3px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; background: rgba(255,107,53,0.12); color: #ff6b35; border: 1px solid rgba(255,107,53,0.25); display: inline-block; }"
+    },
+    {
+      "name": "Regime Badge — CRASH",
+      "kind": "chip",
+      "description": "Emergency market condition. Signal Alert color with pulse animation.",
+      "html": "<span class=\"ds-badge-crash\">CRASH</span>",
+      "css": "@keyframes ds-pulse { 0%,100%{opacity:1} 50%{opacity:0.4} } .ds-badge-crash { font-family: 'Space Mono', monospace; font-size: 0.58rem; padding: 1px 6px; border-radius: 2px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; background: rgba(220,53,69,0.18); color: #ff4d6d; border: 1px solid rgba(220,53,69,0.4); animation: ds-pulse 1s infinite; display: inline-block; } @media (prefers-reduced-motion: reduce) { .ds-badge-crash { animation: none; } }"
+    },
+    {
+      "name": "Chat FAB",
+      "kind": "custom",
+      "description": "The AI chat entry point. Neural Lime circle, ambient glow at rest. The only resting glow in the system.",
+      "html": "<button class=\"ds-fab\" aria-label=\"Open AI chat\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"/></svg></button>",
+      "css": ".ds-fab { position: fixed; bottom: 24px; right: 24px; width: 52px; height: 52px; border-radius: 50%; background: #A8FF53; color: #000; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 20px rgba(168,255,83,0.4); transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s; border: none; } .ds-fab:hover { transform: scale(1.1); box-shadow: 0 8px 32px rgba(168,255,83,0.55); } .ds-fab:active { transform: scale(0.96); } @media (prefers-reduced-motion: reduce) { .ds-fab { transition: none; } }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Sentient Engine",
+    "overview": "Aiterra's visual system is built around one idea: an AI that never sleeps. The screen is not a dashboard you check once; it is the face of a system that is actively running, trading, and learning right now. Every visual element either carries live data or conveys the state of the engine. There is no decoration that is not also information.\n\nThe aesthetic is pure functional darkness. Black is not a mood choice; it is the canvas that makes signals legible. The Neural Lime accent exists precisely because it is the least natural color in the financial world, making every actionable element immediately distinguishable from data. The system reads like instrument glass at night: everything that matters glows; everything else recedes.\n\nTypography is a three-role system: Finlandica for human-readable labels and headings (the interface layer), Noto Sans for Thai and English prose (the explanation layer), and Space Mono for all numeric and identifier data (the machine layer). This separation is not aesthetic; it is semantic.",
+    "keyCharacteristics": [
+      "Pure black void canvas with glassmorphic card surfaces",
+      "One accent color (Neural Lime) reserved for primary actions, active states, and the AI's output signal",
+      "Three semantic fonts, each with exactly one role",
+      "Motion conveys state: every animation signals that something changed, not that the page loaded",
+      "Data density is a feature, not a problem to solve"
+    ],
+    "rules": [
+      { "name": "The One Signal Rule", "body": "Neural Lime appears on active, primary, and AI-output elements only. If it appears on something inactive, neutral, or decorative, that element is misclassified. Rarity is the point.", "section": "colors" },
+      { "name": "The Semantic Separation Rule", "body": "Signal Green is a positive market outcome. Neural Lime is an active system state. They are different things. Never substitute one for the other.", "section": "colors" },
+      { "name": "The Machine Layer Rule", "body": "Every number, rate, identifier, timestamp, and price renders in Space Mono. If a number appears in Finlandica or Noto Sans, it is wrong. The font choice encodes the data type.", "section": "typography" },
+      { "name": "The Thai-Latin Contract", "body": "Noto Sans handles both scripts. Any Thai body text in Finlandica or Space Mono will render incorrectly at some sizes. Prose is always Noto Sans.", "section": "typography" },
+      { "name": "The Fog Layer Rule", "body": "All cards are semi-transparent. No card has an opaque background. If a design calls for an opaque panel, it is either a fullscreen modal or a mistake.", "section": "elevation" },
+      { "name": "The Flat-at-Rest Rule", "body": "Shadows appear only in response to state (hover, active, focus). At rest, a card has only its top-accent line and its transparent background.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do render all numeric data in Space Mono. Prices, rates, percentages, timestamps — no exceptions.",
+      "Do use Neural Lime only for active states, primary actions, and AI-signal outputs.",
+      "Do keep cards semi-transparent with backdrop blur.",
+      "Do add the ::before top-accent glow line to every card.",
+      "Do animate on state change only.",
+      "Do use Signal Green for BUY and positive outcomes, Signal Orange for SELL and negative outcomes.",
+      "Do include :focus-visible ring (2px Neural Lime glow) on all interactive elements.",
+      "Do add @media (prefers-reduced-motion: reduce) for every animation."
+    ],
+    "donts": [
+      "Don't use a SaaS metric dashboard aesthetic: white backgrounds, bland card grids, cream neutrals.",
+      "Don't use Neural Lime decoratively, or on inactive/neutral elements.",
+      "Don't use glassmorphism on components that aren't cards or overlays.",
+      "Don't use gradient text (background-clip: text).",
+      "Don't put numbers in Finlandica or Noto Sans.",
+      "Don't animate layout properties. Only transform and opacity.",
+      "Don't add uppercase tracking to prose or body copy.",
+      "Don't use arbitrary z-index values (no 999 or 9999).",
+      "Don't make cards opaque.",
+      "Don't add a second floating action button."
+    ]
+  }
+}

@@ -1,7 +1,7 @@
 # ทำต่อที่นี่ (Continue Here)
 
 > อัพเดตล่าสุด: 2026-06-10
-> สถานะ: ✅ App รันบน Singapore — Binance เชื่อมต่อได้จริง, Dashboard ใช้งานได้
+> สถานะ: ✅ App รันบน Singapore + impeccable design system ตั้งค่าแล้ว + critique ผ่าน (8/13 findings แก้แล้ว)
 
 ---
 
@@ -17,6 +17,13 @@
 - [x] แก้ bug: `_journal`, `_max_var_pct`, `_max_prob_ruin`, `_opt_rsi_oversold`, `_model_bandit`
 - [x] Binance เชื่อมได้ — ราคาจริง, ML training ทำงาน
 - [x] ลบ Iowa VM อันเก่าออกแล้ว
+- [x] RTK PreToolUse hook เขียนใน `~/.claude/settings.json` แล้ว (ต้อง restart Claude Code ถึงจะโหลด)
+- [x] `/impeccable init` — สร้าง `PRODUCT.md` + `DESIGN.md` + `.impeccable/design.json`
+- [x] `/impeccable critique` — Health score 24/40, 13 findings (snapshot ที่ `.impeccable/snapshots/`)
+- [x] แก้ side-tab border-left ×3 (lines 480, 3039, 4684) → background tint + full border
+- [x] แก้ bounce easing ×2 (lines 285, 342) → `cubic-bezier(0.22,1,0.36,1)`
+- [x] แก้ em dash prose separators ×11 → `:` / `,`
+- [x] เพิ่ม `@media (prefers-reduced-motion: reduce)` ครอบทุก animation
 
 ---
 
@@ -37,6 +44,18 @@ docker compose restart
 trading:
   mode: "live"
 ```
+
+### 3. 🟡 Keyboard shortcuts (P2 จาก critique)
+`Alt+1`–`Alt+8` สำหรับ nav sections — เพิ่มใน `crypto-ai-trader/src/web/index.html`
+พิจารณา collapse 8 tabs → 5 primary + secondary group
+
+### 4. 🔵 `/impeccable audit` (ถัดไปหลัง polish)
+ตรวจ a11y, contrast, responsive — รัน `/impeccable audit crypto-ai-trader/src/web/index.html`
+
+### 5. 🔵 Remaining Lunai v2.0.0 features
+- F2.4 Adaptive Meta-Params
+- F5.3 Champion/Challenger
+- F3.1 Pairs Trading
 
 ---
 
