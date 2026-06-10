@@ -1805,3 +1805,41 @@ async def get_microstructure(symbol: str = "BTC/USDT"):
         "twap_detected":   analysis.twap_detected,
         "twap_score":      round(analysis.twap_score, 2),
     }
+
+
+# ─── Champion / Challenger (F5.3) ─────────────────────────────
+
+@router.get("/champion")
+async def get_champion(symbol: str = "BTC/USDT"):
+    """GET /api/champion?symbol=BTC/USDT — current champion strategy for a symbol."""
+    from ..agent.champion_challenger import ChampionChallenger
+    cc = ChampionChallenger(symbol=symbol)
+    champ = cc.champion
+    if champ is None:
+        return {"symbol": symbol, "champion": None, "note": "no tournament run yet"}
+    return {"symbol": symbol, "champion": champ}
+
+
+@router.post("/champion/tournament")
+@(_limiter.limit("2/minute") if _limiter else lambda f: f)
+async def run_champion_tournament(request: Request, data: Dict[str, Any] = None):
+    """POST /api/champion/tournament — run Champion/Challenger tournament.
+
+    Body (all optional):
+      symbol:     BTC/USDT (default)
+      days:       60       (lookback, 14-180)
+      use_cache:  true     (use parquet kline cache)
+    """
+    from ..agent.champion_challenger import ChampionChallenger
+    d = data or {}
+    symbol    = str(d.get("symbol", "BTC/USDT"))
+    days      = int(d.get("days", 60))
+    use_cache = bool(d.get("use_cache", True))
+    if days < 14 or days > 180:
+        raise HTTPException(400, "days must be 14-180")
+    try:
+        cc = ChampionChallenger(symbol=symbol)
+        result = await cc.run_tournament(days=days, use_cache=use_cache)
+        return result
+    except Exception as exc:
+        raise HTTPException(500, str(exc))
