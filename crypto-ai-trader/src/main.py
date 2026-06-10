@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .core.config import settings
-from .core.database import init_db
+from .core.database import init_db, SessionLocal, Trade
 from .exchanges import create_exchange
 from .agent.ai_trader import AITrader
 from .agent.training_loop import TrainingLoop
@@ -143,6 +143,7 @@ async def startup():
                        "Add API keys in Settings, then switch to Live Mode.")
     _trader = AITrader(exchange)
     _trader.set_broadcast(broadcast)
+    _trader._journal.load_from_db(SessionLocal, Trade)  # F2.3 — hydrate memory from past trades
 
     _training_loop_inst = TrainingLoop(_trader, broadcast_fn=broadcast)
     _hourly_trainer_inst = HourlyTrainer(

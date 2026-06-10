@@ -1777,6 +1777,14 @@ async def get_orderbook_heatmap(symbol: str = "BTC/USDT"):
     }
 
 
+@router.get("/journal")
+async def get_journal():
+    """GET /api/journal — F2.3 Trade Journal / Memory summary."""
+    if not _trader:
+        raise HTTPException(503, "Trader not initialised")
+    return _trader._journal.summary()
+
+
 @router.get("/microstructure")
 async def get_microstructure(symbol: str = "BTC/USDT"):
     """GET /api/microstructure?symbol=BTC/USDT

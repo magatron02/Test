@@ -52,7 +52,7 @@ Foundation  Awareness  Judgment  Perception  Resilience       Autonomy
 | **v1.3.0** ✅ | Perception | F1.1, F1.2, F1.3 | ข้อมูลที่ตลาด spot มองไม่เห็น | — |
 | **v1.3.0** ✅ | Perception | F1.1, F1.2, F1.3 | ข้อมูลที่ตลาด spot มองไม่เห็น | — |
 | **v1.4.0** ✅ | Resilience | F3.4, F5.1, F3.3 | self-validate + tail-risk control | — |
-| **v2.0.0** | Autonomy | F3.1, F5.3, F2.3, F2.4 | multi-strategy + self-managing | 4–6 สัปดาห์ |
+| **v2.0.0** | Autonomy | F3.1, F5.3, ~~F2.3~~, F2.4 | multi-strategy + self-managing | 3–5 สัปดาห์ |
 | _backlog_ | Advanced | F4.1–F4.4, F5.2 | ของเสริม ทำเมื่อ ROI คุ้ม | — |
 
 ---

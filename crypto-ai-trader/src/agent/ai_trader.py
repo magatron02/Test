@@ -982,6 +982,13 @@ class AITrader:
             self._rl.update_outcome(trade_id, pnl_pct, self._strategy)
             self._model_bandit.update_outcome(trade_id, pnl_pct)  # F2.1
             self._sizer.update_outcome(symbol, pnl_pct)
+            self._journal.record(                                  # F2.3
+                regime=trade.get("regime", "UNKNOWN"),
+                strategy=trade.get("strategy", "UNKNOWN"),
+                confidence=trade.get("confidence", 0.0),
+                rsi_signal=trade.get("rsi_signal", "NEUTRAL"),
+                pnl_pct=pnl_pct,
+            )
             holding_h = (datetime.now(timezone.utc) - trade.get("opened_at", datetime.now(timezone.utc))).total_seconds() / 3600
             asyncio.ensure_future(self._memory.add_outcome(
                 symbol, side="buy", pnl_pct=pnl_pct, reason=reason,
