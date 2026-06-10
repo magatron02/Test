@@ -1,7 +1,7 @@
 # ทำต่อที่นี่ (Continue Here)
 
 > อัพเดตล่าสุด: 2026-06-10
-> สถานะ: ✅ Lunai v2.0.0 features ส่วนใหญ่เสร็จแล้ว — รันอยู่บน GCP Singapore
+> สถานะ: ⚠️ Bot รันอยู่บน GCP แต่ **ไม่เทรดเลย** — มี critical bugs ใน ai_trader.py ที่ต้องแก้ก่อน
 
 ---
 
@@ -36,7 +36,60 @@
 
 ---
 
+## 🚨 BUGS ที่ต้องแก้ก่อน (Bot ไม่เทรดเลยตอนนี้!)
+
+> ตรวจพบโดย Opus code audit — 2026-06-10
+
+### BUG #1 — CRITICAL: `_get_final_signal()` ไม่มี `return` statement
+**ไฟล์:** `crypto-ai-trader/src/agent/ai_trader.py` บริเวณ line 569-734
+**ปัญหา:** F3.1 commit ทำให้ pairs-signal block ซ้ำสองรอบ และ `return final_sig` หายไป
+→ method คืนค่า `None` → caller ทุกตัว crash `AttributeError: 'NoneType'.action`
+**แก้:** หา `final_sig` บริเวณท้ายฟังก์ชัน → เพิ่ม `return final_sig` + ลบ dead pairs block ซ้ำ (lines ~712-734)
+
+### BUG #2 — CRITICAL: `self._exit_mgr` ไม่ถูก init
+**ไฟล์:** `crypto-ai-trader/src/agent/ai_trader.py` — `__init__`
+**ปัญหา:** `ExitManager` มีใน `exit_manager.py` แต่ไม่เคย import/assign ใน `__init__`
+→ ATR-based trades เปิดไม่ได้, stop-loss/take-profit ไม่ทำงาน
+**แก้:** ใน `__init__` เพิ่ม:
+```python
+from .exit_manager import ExitManager
+self._exit_mgr = ExitManager()
+```
+
+### BUG #3 — CRITICAL: `regime` undefined ใน `_check_exit_conditions()`
+**ไฟล์:** `crypto-ai-trader/src/agent/ai_trader.py:1091`
+**ปัญหา:** `self._exit_mgr.check_exit(trade, price, atr_pct, regime)` — `regime` ไม่ใช่ param หรือ local
+**แก้:** เพิ่ม `regime = self._regimes.get(analysis.symbol, "RANGING")` ก่อน call
+
+### BUG #4 — CRITICAL: `self._arb` (ArbitrageEngine) ไม่ถูก init
+**ไฟล์:** `crypto-ai-trader/src/api/routes.py:961, 972, 986` + `ai_trader.py` `__init__`
+**ปัญหา:** 3 arbitrage endpoints crash `AttributeError`
+**แก้:** ใน `AITrader.__init__` เพิ่ม:
+```python
+from .arbitrage import ArbitrageEngine
+self._arb = ArbitrageEngine()
+```
+
+### BUG #5 — CRITICAL: `self._attribution_summary()` method ไม่มี
+**ไฟล์:** `crypto-ai-trader/src/agent/ai_trader.py:890`
+**ปัญหา:** method ถูก call แต่ไม่มีการ define ที่ไหนเลยใน codebase
+**แก้:** define method หรือ remove call (ใช้ inline dict แทน)
+
+### BUG #6 — HIGH: `self._signal_attribution` ค้าง `None` ตลอด
+**ไฟล์:** `crypto-ai-trader/src/agent/ai_trader.py:97`
+**ปัญหา:** `_get_final_signal` สร้าง local `components` dict แต่ไม่เคย assign `self._signal_attribution`
+→ ModelBandit reward "rule" เสมอ → learning corrupt
+**แก้:** ใน `_get_final_signal` ก่อน `return final_sig` เพิ่ม:
+```python
+self._signal_attribution = {**components, "chosen": chosen}
+```
+
+---
+
 ## สิ่งที่ต้องทำต่อ 🚧
+
+### 0. 🔴 แก้ BUGS #1-6 ก่อน (ทำตามลำดับ)
+แก้ไฟล์ `crypto-ai-trader/src/agent/ai_trader.py` เป็นหลัก ดูรายละเอียดข้างบน
 
 ### 1. 🟡 ใส่ Anthropic API Key (สำคัญ — ทำให้ Claude AI วิเคราะห์ได้)
 SSH เข้า server แล้วแก้ `config/settings.yml`:
