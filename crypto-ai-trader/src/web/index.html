@@ -583,6 +583,21 @@ body { overflow: hidden; }
 /* hide old topnav */
 .topnav, .mobile-menu, .topnav-hamburger { display: none !important; }
 
+/* ── Nav keyboard shortcut badge ── */
+.snav-item { position: relative; }
+.snav-item .kbd-hint {
+  margin-left: auto;
+  font-size: 9px; font-family: monospace; letter-spacing: 0;
+  color: var(--text-muted); opacity: 0;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 3px; padding: 1px 4px;
+  transition: opacity 0.15s ease;
+  pointer-events: none; white-space: nowrap;
+}
+.snav:hover .snav-item .kbd-hint { opacity: 0.55; }
+.snav-item.active .kbd-hint { opacity: 0.75; }
+.snav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
   @keyframes sectionIn {
@@ -5164,6 +5179,43 @@ showSection = function(name, el) {
   _showSectionBase(name, el);
   if (name === 'alerts') loadAlerts();
 };
+
+// ── Keyboard shortcuts: Alt+1…8 → nav sections ──────────────────────────────
+(function() {
+  const NAV_SECTIONS = [
+    'dashboard', 'trading', 'portfolio', 'analytics',
+    'trade-history', 'positions', 'alerts', 'notifications'
+  ];
+
+  // Inject kbd-hint badges into sidebar nav items
+  document.querySelectorAll('#sideNav .snav-item[data-section]').forEach(el => {
+    const idx = NAV_SECTIONS.indexOf(el.dataset.section);
+    if (idx === -1) return;
+    const badge = document.createElement('span');
+    badge.className = 'kbd-hint';
+    badge.textContent = 'Alt+' + (idx + 1);
+    badge.setAttribute('aria-hidden', 'true');
+    el.appendChild(badge);
+    el.setAttribute('aria-keyshortcuts', 'Alt+' + (idx + 1));
+    el.setAttribute('tabindex', '0');
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showSection(el.dataset.section, el); }
+    });
+  });
+
+  // Global Alt+1…8 listener
+  document.addEventListener('keydown', e => {
+    if (!e.altKey || e.ctrlKey || e.metaKey) return;
+    const n = parseInt(e.key, 10);
+    if (n >= 1 && n <= NAV_SECTIONS.length) {
+      // Don't fire when typing in an input/textarea
+      const tag = document.activeElement && document.activeElement.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      e.preventDefault();
+      showSection(NAV_SECTIONS[n - 1], null);
+    }
+  });
+})();
 
 // ── Exchange Connection Probe ─────────────────────────────────────────────────
 
