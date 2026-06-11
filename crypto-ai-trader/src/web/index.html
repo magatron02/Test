@@ -756,6 +756,89 @@ body { overflow: hidden; }
   .at-conf-bar, .at-attr-fill { transition: none; }
 }
 
+/* ════════════════════════════════════════════════
+   AI DASHBOARD HERO
+   ════════════════════════════════════════════════ */
+.ai-dash-hero {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 24px; margin-bottom: 20px; flex-wrap: wrap;
+}
+.ai-dash-left { display: flex; flex-direction: column; gap: 4px; }
+.ai-dash-eyebrow {
+  font-family: var(--font-mono); font-size: 0.62rem;
+  text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted);
+}
+.ai-dash-value {
+  font-family: var(--font-headline); font-size: 2.8rem;
+  font-weight: 700; line-height: 1.05; letter-spacing: -1.5px;
+  display: flex; align-items: baseline; gap: 12px;
+}
+.ai-dash-pnl {
+  font-family: var(--font-mono); font-size: 1rem;
+  color: var(--accent); letter-spacing: 0;
+}
+.ai-dash-sub {
+  font-family: var(--font-body); font-size: 0.85rem; color: var(--text-muted);
+}
+.ai-dash-sub strong { color: var(--text-main); }
+
+.ai-dash-right {
+  display: flex; flex-direction: column; gap: 10px;
+  align-items: flex-end; min-width: 320px;
+}
+
+/* Pair chips */
+.ai-pair-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.ai-pair-label {
+  font-family: var(--font-mono); font-size: 0.65rem;
+  text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted);
+}
+.ai-pair-chips { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+.ai-chip {
+  font-family: var(--font-mono); font-size: 0.68rem;
+  padding: 3px 9px; border-radius: 100px;
+  border: 1px solid var(--border); background: var(--bg-card);
+  color: var(--text-muted); cursor: pointer; transition: all 0.12s; user-select: none;
+}
+.ai-chip:hover { border-color: var(--accent); color: var(--text-main); }
+.ai-chip.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 700; }
+
+/* Control row */
+.ai-ctrl-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.ai-btn-start {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.05em; padding: 8px 18px; border: none; border-radius: 6px;
+  background: var(--accent); color: #000; cursor: pointer; transition: opacity 0.15s;
+}
+.ai-btn-start:hover { opacity: 0.85; }
+.ai-btn-start:disabled { opacity: 0.4; cursor: not-allowed; }
+.ai-btn-stop {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.05em; padding: 8px 18px; border: 1px solid rgba(220,53,69,0.5);
+  border-radius: 6px; background: rgba(220,53,69,0.08); color: #dc3545;
+  cursor: pointer; transition: all 0.15s;
+}
+.ai-btn-stop:hover { background: rgba(220,53,69,0.18); border-color: #dc3545; }
+.ai-btn-stop:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Status pill */
+.ai-status-pill {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.05em;
+  padding: 5px 12px; border-radius: 100px;
+  background: var(--bg-card); border: 1px solid var(--border); color: var(--text-muted);
+}
+.ai-status-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--text-muted); flex-shrink: 0;
+}
+.ai-status-pill.running .ai-status-dot { background: var(--accent); box-shadow: 0 0 5px var(--accent); }
+.ai-status-pill.running { color: var(--accent); border-color: rgba(168,255,83,0.3); }
+.ai-status-pill.stopped .ai-status-dot { background: #dc3545; }
+.ai-status-pill.stopped { color: #dc3545; border-color: rgba(220,53,69,0.3); }
+
 </style>
 </head>
 <body>
@@ -841,31 +924,48 @@ body { overflow: hidden; }
 <!-- DASHBOARD -->
 <section id="sec-dashboard" class="section active">
 
-  <!-- Hero row -->
-  <div class="row g-0 mb-4 align-items-end">
-    <div class="col-md-6">
-      <div class="text-muted mb-1" style="font-size:0.65rem;text-transform:uppercase;letter-spacing:1.5px;font-family:var(--font-mono)">Total Portfolio</div>
-      <div style="font-size:3rem;font-weight:700;line-height:1.05;letter-spacing:-1.5px;font-family:var(--font-headline)">
+  <!-- AI Dashboard Hero -->
+  <div class="ai-dash-hero">
+    <!-- Left: Portfolio value -->
+    <div class="ai-dash-left">
+      <div class="ai-dash-eyebrow">AI Dashboard</div>
+      <div class="ai-dash-value">
         <span id="totalValue">$0.00</span>
-        <span id="totalPnlPct" class="ms-3" style="font-size:1.1rem;color:var(--accent);vertical-align:middle;font-family:var(--font-mono);letter-spacing:0">+0.00%</span>
+        <span id="totalPnlPct" class="ai-dash-pnl">+0.00%</span>
       </div>
-      <div class="text-muted mt-1" style="font-size:0.85rem;font-family:var(--font-body)">Available: <strong id="cashValue" style="color:var(--text-main)">$0.00</strong>&nbsp;&nbsp;|&nbsp;&nbsp;<span id="positionCount">0 positions</span></div>
-      <div class="d-flex gap-2 mt-3">
-        <button class="btn btn-sm px-3" style="background:var(--accent);color:#000;font-weight:700;border:none;border-radius:100px" onclick="showSection('trading',null)">
-          Buy / Sell ↑
+      <div class="ai-dash-sub">Available: <strong id="cashValue">$0.00</strong> &nbsp;|&nbsp; <span id="positionCount">0 positions</span></div>
+    </div>
+    <!-- Right: Autotrade controls -->
+    <div class="ai-dash-right">
+      <!-- Pair selector -->
+      <div class="ai-pair-row">
+        <span class="ai-pair-label">Pairs</span>
+        <div class="ai-pair-chips" id="aiPairChips">
+          <!-- populated by JS from allAnalyses -->
+        </div>
+      </div>
+      <!-- Action buttons -->
+      <div class="ai-ctrl-row">
+        <button id="aiStartBtn" class="ai-btn-start" onclick="aiStartAutotrade()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+          START Autotrade
         </button>
-        <button class="btn btn-sm px-3" style="background:var(--bg-card);color:var(--text-main);border:1px solid var(--border);border-radius:100px" onclick="showSection('portfolio',null)">
-          Portfolio →
+        <button id="aiStopBtn" class="ai-btn-stop" onclick="aiStopForceClose()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16"/></svg>
+          STOP + Force Sell All
         </button>
+        <div class="ai-status-pill" id="aiStatusPill">
+          <span class="ai-status-dot" id="aiStatusDot"></span>
+          <span id="aiStatusText">—</span>
+        </div>
       </div>
     </div>
-    <div class="col-md-6 text-md-end d-flex justify-content-md-end align-items-center gap-2 mt-3 mt-md-0">
-      <div class="d-flex gap-2 p-1" style="background:var(--bg-card);border:1px solid var(--border);border-radius:100px">
-        <button class="tab-btn active" onclick="setChartRange('1h',this)" style="border-radius:100px">1H</button>
-        <button class="tab-btn" onclick="setChartRange('24h',this)" style="border-radius:100px">24H</button>
-        <button class="tab-btn" onclick="setChartRange('7d',this)" style="border-radius:100px">7D</button>
-      </div>
-    </div>
+  </div>
+  <!-- Chart range tabs (kept compact) -->
+  <div class="d-flex gap-2 mb-3 p-1" style="width:fit-content;background:var(--bg-card);border:1px solid var(--border);border-radius:100px">
+    <button class="tab-btn active" onclick="setChartRange('1h',this)" style="border-radius:100px">1H</button>
+    <button class="tab-btn" onclick="setChartRange('24h',this)" style="border-radius:100px">24H</button>
+    <button class="tab-btn" onclick="setChartRange('7d',this)" style="border-radius:100px">7D</button>
   </div>
 
   <!-- Price ticker row -->
@@ -2649,6 +2749,7 @@ function showSection(name, el) {
   if (name === 'trade-history') refreshHistory();
   if (name === 'analytics') { refreshTraining(); refreshLoopStatus(); refreshHourlyTrainer(); }
   if (name === 'autotrade') refreshAutotrade();
+  if (name === 'dashboard') { renderAiPairChips(); aiSyncStatus(); }
   if (name === 'settings') { loadSettings(); loadSymbols(); }
   if (name === 'trading' && currentSymbol) { loadMTF(); refreshHeatmap(); if (allAnalyses[currentSymbol]) updateMicrostructurePanel(allAnalyses[currentSymbol]); }
   if (name === 'positions') refreshPositions();
@@ -3605,6 +3706,7 @@ function handleAnalysisUpdate(d) {
   allPrices[d.symbol] = { ...d, price: d.price, signal: d.signal, signal_strength: d.confidence };
   allAnalyses[d.symbol] = d;
   if (document.getElementById('sec-autotrade').classList.contains('active')) updateAutotrade(d);
+  if (document.getElementById('sec-dashboard').classList.contains('active')) renderAiPairChips();
   if (d.signal !== 'HOLD') {
     const c = d.signal === 'BUY' ? '#A8FF53' : '#ff6b35';
     addActivity(d.signal === 'BUY' ? '▲' : '▼', `${d.symbol} ${d.signal} (conf: ${(d.confidence*100).toFixed(0)}%)`, c);
@@ -5278,6 +5380,7 @@ async function init() {
   connectWS();
   await fetchStatus();
   await fetchPrices();
+  await aiSyncStatus();
   await fetchPortfolioStats();
   await fetchStats();
   await refreshDashboardState();
@@ -5754,6 +5857,82 @@ async function applySmallBudgetPreset() {
     if (liveBudgetEl) liveBudgetEl.value = budget;
   } catch(e) {
     if (resultEl) { resultEl.innerHTML = `<span class="text-danger">🔴 ${e.message}</span>`; }
+  }
+}
+
+// ============================================================
+// AI DASHBOARD — Autotrade controls + pair chips
+// ============================================================
+let _aiSelectedPairs = new Set();
+
+function renderAiPairChips() {
+  const wrap = document.getElementById('aiPairChips');
+  if (!wrap) return;
+  const syms = Object.keys(allAnalyses).sort();
+  if (!syms.length) { wrap.innerHTML = '<span style="font-size:0.7rem;color:var(--text-muted)">—</span>'; return; }
+  // init: select all if empty
+  if (_aiSelectedPairs.size === 0) syms.forEach(s => _aiSelectedPairs.add(s));
+  wrap.innerHTML = syms.map(s => {
+    const label = s.replace('USDT','').replace('/','');
+    const active = _aiSelectedPairs.has(s) ? ' active' : '';
+    return `<span class="ai-chip${active}" onclick="aiTogglePair('${s}')">${label}</span>`;
+  }).join('');
+}
+
+function aiTogglePair(sym) {
+  if (_aiSelectedPairs.has(sym)) {
+    if (_aiSelectedPairs.size > 1) _aiSelectedPairs.delete(sym);
+  } else {
+    _aiSelectedPairs.add(sym);
+  }
+  renderAiPairChips();
+}
+
+async function aiSyncStatus() {
+  try {
+    const d = await fetch('/api/trading/kill-switch').then(r => r.json());
+    const pill = document.getElementById('aiStatusPill');
+    const txt = document.getElementById('aiStatusText');
+    const startBtn = document.getElementById('aiStartBtn');
+    const stopBtn = document.getElementById('aiStopBtn');
+    if (!pill) return;
+    const running = !d.killed;
+    pill.className = 'ai-status-pill ' + (running ? 'running' : 'stopped');
+    txt.textContent = running ? 'RUNNING' : 'STOPPED';
+    if (startBtn) startBtn.disabled = running;
+    if (stopBtn) stopBtn.disabled = !running;
+  } catch(e) {}
+}
+
+async function aiStartAutotrade() {
+  const btn = document.getElementById('aiStartBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Starting…'; }
+  try {
+    await fetch('/api/trading/kill-switch?action=deactivate', { method: 'POST' });
+    await fetch('/api/trading/dry-run?enabled=false', { method: 'POST' });
+    showToast('Autotrade Started', 'AI is now trading live', 'success');
+  } catch(e) {
+    showToast('Error', e.message, 'danger');
+  } finally {
+    if (btn) btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg> START Autotrade';
+    await aiSyncStatus();
+  }
+}
+
+async function aiStopForceClose() {
+  const btn = document.getElementById('aiStopBtn');
+  if (!confirm('Force-sell all open positions and stop trading?')) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Stopping…'; }
+  try {
+    await fetch('/api/trading/kill-switch?action=activate', { method: 'POST' });
+    const res = await fetch('/api/trading/close-all', { method: 'POST' }).then(r => r.json());
+    const n = res.closed ? res.closed.length : 0;
+    showToast('Autotrade Stopped', `Kill switch activated · ${n} position(s) closed`, 'warning');
+  } catch(e) {
+    showToast('Error', e.message, 'danger');
+  } finally {
+    if (btn) btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16"/></svg> STOP + Force Sell All';
+    await aiSyncStatus();
   }
 }
 

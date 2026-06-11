@@ -1760,6 +1760,26 @@ async def set_dry_run(enabled: bool = True):
     }
 
 
+@router.post("/trading/close-all")
+async def close_all_positions():
+    """POST /api/trading/close-all — force-close every open position at current market price."""
+    if not _trader:
+        raise HTTPException(503, "Trader not initialised")
+    open_syms = list(_trader._open_trades.keys())
+    if not open_syms:
+        return {"closed": [], "message": "No open positions"}
+    results = []
+    for sym in open_syms:
+        try:
+            ticker = await _trader._exchange.fetch_ticker(sym)
+            price = ticker.get("last") or ticker.get("close", 0)
+            result = await _trader._close_trade(sym, price, "force_close_all")
+            results.append({"symbol": sym, "ok": True, "result": result})
+        except Exception as e:
+            results.append({"symbol": sym, "ok": False, "error": str(e)})
+    return {"closed": results, "message": f"Attempted to close {len(open_syms)} position(s)"}
+
+
 
 
 @router.get("/orderbook/heatmap")
