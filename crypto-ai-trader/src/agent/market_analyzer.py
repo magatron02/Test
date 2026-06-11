@@ -67,6 +67,11 @@ class MarketAnalysis:
     aroon_signal: str = "NEUTRAL"
     market_regime: str = ""              # set by AITrader after detect_regime (BULL_TREND, …)
 
+    # Fibonacci retracement confluence
+    near_fib: bool = False               # price within 1% of any key fib level
+    fib_nearest_level: str = ""          # "23.6" | "38.2" | "50.0" | "61.8" | "78.6" | "100.0"
+    fib_zone: str = "NEUTRAL"            # SUPPORT | RESISTANCE | NEUTRAL
+
     # Quant features (ML4T Ch.4/Ch.9) — Kalman trend, GARCH vol forecast, WorldQuant alphas
     kalman_trend: str = "FLAT"           # BULLISH | BEARISH | FLAT (denoised)
     kalman_velocity: float = 0.0
@@ -343,6 +348,7 @@ def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
         from .indicators_extra import (
             supertrend, stoch_rsi, williams_r as calc_wr, cci as calc_cci,
             rsi_divergence, ichimoku, ichimoku_signal_score, aroon,
+            fibonacci_levels,
         )
         # SuperTrend
         st = supertrend(closes, highs, lows)
@@ -399,6 +405,21 @@ def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
             buy_score  += 0.08
         elif arr["signal"] == "BEAR":
             sell_score += 0.08
+
+        # Fibonacci retracement confluence
+        fib = fibonacci_levels(closes)
+        result.near_fib          = fib["near_fib"]
+        result.fib_nearest_level = fib["nearest_level"]
+        _GOLDEN = {"38.2", "61.8"}
+        if fib["near_fib"]:
+            lvl    = fib["nearest_level"]
+            weight = 0.15 if lvl in _GOLDEN else 0.08
+            if result.bb_position < 0.5 and lvl in {"23.6", "38.2", "50.0"}:
+                result.fib_zone = "SUPPORT"
+                buy_score  += weight
+            elif result.bb_position >= 0.5 and lvl in {"61.8", "78.6", "100.0"}:
+                result.fib_zone = "RESISTANCE"
+                sell_score += weight
 
     except Exception as e:
         logger.debug("Extended indicators skipped: %s", e)
@@ -479,6 +500,9 @@ def analyze(symbol: str, candles: List[OHLCV], price: float, change_24h: float,
         "supertrend_buy":   1 if result.supertrend_signal == "BUY" else 0,
         "rsi_div_bull":     1 if result.rsi_divergence == "BULLISH" else 0,
         "rsi_div_bear":     1 if result.rsi_divergence == "BEARISH" else 0,
+        # Fibonacci retracement
+        "near_fib":         1 if result.near_fib else 0,
+        "fib_zone":         1 if result.fib_zone == "SUPPORT" else (-1 if result.fib_zone == "RESISTANCE" else 0),
         # Quant features (ML4T)
         "kalman_velocity":  result.kalman_velocity,
         "kalman_dev_pct":   result.kalman_deviation_pct,
