@@ -20,12 +20,12 @@
   --bg-canvas: #080808;
 
   /* Borders */
-  --border:  rgba(255,255,255,0.07);
-  --border2: rgba(255,255,255,0.05);
+  --border:  rgba(255,255,255,0.12);
+  --border2: rgba(255,255,255,0.08);
 
   /* Text */
-  --text-main:  #F0F0FA;
-  --text-muted: #72728A;
+  --text-main:  #F2F2FC;
+  --text-muted: #9898AE;
 
   /* Accents */
   --accent:        #A8FF53;
@@ -55,7 +55,7 @@ body {
   color: var(--text-main);
   font-family: var(--font-body), sans-serif;
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.55;
   font-weight: 400;
 }
@@ -87,7 +87,7 @@ body {
 .card-header {
   background: transparent; border-bottom: 1px solid var(--border);
   padding: 14px 18px;
-  font-family: var(--font-headline); font-weight: 600; font-size: 0.88rem;
+  font-family: var(--font-headline); font-weight: 600; font-size: 0.92rem;
   letter-spacing: 0; text-transform: none; color: var(--text-main);
   border-radius: var(--radius-card) var(--radius-card) 0 0;
 }
@@ -96,7 +96,7 @@ body {
 /* ── Stat cards ── */
 .stat-card { border-radius: var(--radius-card); padding: 18px; background: var(--bg-card); border: 1px solid var(--border); }
 .stat-value { font-size: 1.75rem; font-weight: 700; line-height: 1.15; color: var(--text-main); font-family: var(--font-headline); letter-spacing: -0.5px; }
-.stat-label { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; font-family: var(--font-mono); }
+.stat-label { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; font-family: var(--font-mono); }
 
 /* ── Signal badges ── */
 .badge-signal { font-size: 0.62rem; padding: 3px 10px; border-radius: var(--radius-pill); font-weight: 700; letter-spacing: 0.8px; font-family: var(--font-mono); }
@@ -107,7 +107,7 @@ body {
 .signal-sell-text { color: var(--accent-red); font-weight: 700; }
 
 /* ── Regime badges ── */
-.regime-badge { font-size: 0.58rem; padding: 2px 8px; border-radius: var(--radius-pill); font-weight: 700; letter-spacing: 0.6px; font-family: var(--font-mono); display: inline-block; }
+.regime-badge { font-size: 0.63rem; padding: 2px 8px; border-radius: var(--radius-pill); font-weight: 700; letter-spacing: 0.6px; font-family: var(--font-mono); display: inline-block; }
 .regime-bull   { background: rgba(57,217,138,0.15);  color: #39d98a; border: 1px solid rgba(57,217,138,0.3); }
 .regime-bear   { background: rgba(255,107,53,0.15);  color: #ff6b35; border: 1px solid rgba(255,107,53,0.3); }
 .regime-range  { background: rgba(168,255,83,0.10);  color: #A8FF53; border: 1px solid rgba(168,255,83,0.25); }
@@ -120,7 +120,7 @@ body {
 .circuit-open { color: #ff4d6d; font-weight: 700; animation: pulse 1.2s infinite; }
 
 /* ── Pattern pill ── */
-.pat-pill { font-size: 0.6rem; padding: 2px 7px; border-radius: 100px; font-family: var(--font-mono); font-weight: 600; display: inline-block; margin: 1px 2px; }
+.pat-pill { font-size: 0.65rem; padding: 2px 7px; border-radius: 100px; font-family: var(--font-mono); font-weight: 600; display: inline-block; margin: 1px 2px; }
 .pat-buy  { background: rgba(57,217,138,0.12); color: #39d98a; border: 1px solid rgba(57,217,138,0.2); }
 .pat-sell { background: rgba(255,107,53,0.12);  color: #ff6b35; border: 1px solid rgba(255,107,53,0.2); }
 .pat-neu  { background: rgba(100,100,100,0.12); color: #888;    border: 1px solid rgba(100,100,100,0.2); }
@@ -144,7 +144,7 @@ body {
 .price-down { color: var(--accent-red); font-weight: 600; }
 
 /* ── Indicators ── */
-.indicator-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(34,34,34,0.8); font-size: 0.8rem; font-family: var(--font-body); }
+.indicator-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 0.82rem; font-family: var(--font-body); }
 .indicator-row:last-child { border-bottom: none; }
 .indicator-bar { width: 60px; height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 6px; }
 .indicator-fill { height: 100%; transition: width 0.5s; }
@@ -540,15 +540,15 @@ body { overflow: hidden; }
   font-weight: 800; font-size: 12px; color: #000; font-family: var(--font-mono);
   box-shadow: 0 4px 16px -4px rgba(168,255,83,0.40);
 }
-.sb-title { font-family: var(--font-headline); font-weight: 700; font-size: 15px; color: var(--text-main); }
-.sb-sub   { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 1px; }
+.sb-title { font-family: var(--font-headline); font-weight: 700; font-size: 16px; color: var(--text-main); }
+.sb-sub   { font-size: 11.5px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 1px; }
 
 .snav { display: flex; flex-direction: column; gap: 3px; }
 .snav-item {
   display: flex; align-items: center; gap: 11px;
   padding: 11px 13px; border-radius: 12px;
-  color: var(--text-muted); cursor: pointer;
-  font-size: 13.5px; font-weight: 500; font-family: var(--font-headline);
+  color: rgba(255,255,255,0.6); cursor: pointer;
+  font-size: 14px; font-weight: 500; font-family: var(--font-headline);
   transition: background 0.15s, color 0.15s;
   position: relative; user-select: none;
 }
@@ -570,8 +570,8 @@ body { overflow: hidden; }
   border-radius: 14px; padding: 13px 14px; font-size: 10.5px;
 }
 .sb-footer .sf-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
-.sf-k { color: var(--text-muted); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.5px; font-family: var(--font-mono); }
-.sf-v { font-family: var(--font-mono); font-size: 10.5px; font-weight: 600; }
+.sf-k { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-family: var(--font-mono); }
+.sf-v { font-family: var(--font-mono); font-size: 12px; font-weight: 600; }
 .sf-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 4px; vertical-align: middle; }
 .sf-dot.on { background: var(--accent-buy); box-shadow: 0 0 6px var(--accent-buy); animation: pulse 2s infinite; }
 
