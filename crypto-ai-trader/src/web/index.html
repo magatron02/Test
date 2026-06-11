@@ -751,6 +751,73 @@ body { overflow: hidden; }
 .at-metric-row-v { color: rgba(255,255,255,0.65); }
 .at-metric-row-v.lime { color: #A8FF53; }
 
+/* Training Zone */
+.at-train-zone {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+}
+@media (max-width: 720px) { .at-train-zone { grid-template-columns: 1fr; } }
+
+.at-train-card {
+  background: #0a0a0a; border: 1px solid rgba(255,255,255,0.06);
+  padding: 16px 18px; display: flex; flex-direction: column; gap: 12px;
+}
+.at-train-head { display: flex; align-items: center; justify-content: space-between; }
+.at-train-title {
+  font-family: 'Finlandica', sans-serif; font-size: 10px;
+  text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.35);
+}
+.at-train-badge {
+  font-family: 'Space Mono', monospace; font-size: 9px;
+  letter-spacing: 0.08em; padding: 2px 7px;
+  background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.35);
+}
+.at-train-badge.ready { background: rgba(168,255,83,0.12); color: #A8FF53; }
+.at-train-badge.training { background: rgba(255,193,7,0.12); color: #ffc107; }
+.at-train-badge.error { background: rgba(220,53,69,0.12); color: #dc3545; }
+.at-badge-auto.on { background: rgba(168,255,83,0.12); color: #A8FF53; }
+
+.at-train-rows { display: flex; flex-direction: column; gap: 5px; }
+.at-train-row {
+  display: flex; justify-content: space-between;
+  font-family: 'Space Mono', monospace; font-size: 10px;
+}
+.at-train-row span:first-child { color: rgba(255,255,255,0.25); }
+.at-train-row span:last-child { color: rgba(255,255,255,0.65); }
+.at-train-row .lime { color: #A8FF53; }
+
+/* Requirements checklist */
+.at-req-block { display: flex; flex-direction: column; gap: 5px; }
+.at-req-title {
+  font-family: 'Finlandica', sans-serif; font-size: 9px;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.2); margin-bottom: 2px;
+}
+.at-req-row {
+  display: flex; align-items: center; gap: 7px;
+  font-family: 'Finlandica', sans-serif; font-size: 11px;
+  color: rgba(255,255,255,0.28);
+}
+.at-req-row.ok { color: rgba(168,255,83,0.8); }
+.at-req-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  background: rgba(255,255,255,0.15);
+}
+.at-req-row.ok .at-req-dot { background: #A8FF53; }
+
+/* Train button */
+.at-train-btn {
+  display: flex; align-items: center; gap: 6px; justify-content: center;
+  font-family: 'Space Mono', monospace; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.06em; padding: 7px 12px; border: 1px solid rgba(168,255,83,0.3);
+  background: rgba(168,255,83,0.06); color: #A8FF53; cursor: pointer;
+  transition: all 0.15s; width: 100%;
+}
+.at-train-btn:hover { background: rgba(168,255,83,0.14); border-color: #A8FF53; }
+.at-train-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.at-train-btn-auto { border-color: rgba(255,255,255,0.15); color: rgba(255,255,255,0.4); background: transparent; }
+.at-train-btn-auto:hover { border-color: rgba(255,255,255,0.3); color: #fff; background: rgba(255,255,255,0.04); }
+.at-train-btn-auto.active { border-color: rgba(168,255,83,0.4); color: #A8FF53; background: rgba(168,255,83,0.08); }
+
 @media (prefers-reduced-motion: reduce) {
   .at-scan { animation: none !important; }
   .at-conf-bar, .at-attr-fill { transition: none; }
@@ -1587,7 +1654,7 @@ body { overflow: hidden; }
     <div class="col-md-7">
       <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-cpu me-2"></i>Manual Training (Demo trades)</span>
+          <span><i class="bi bi-lightning me-2"></i>1-Click Train</span>
           <div class="d-flex gap-2 align-items-center">
             <button class="btn btn-outline-warning btn-sm" onclick="resetDemo()">
               <i class="bi bi-arrow-counterclockwise me-1"></i>Reset Demo
@@ -1660,17 +1727,27 @@ body { overflow: hidden; }
       <div class="row g-3">
         <!-- SHAP Feature Importance -->
         <div class="col-md-5">
-          <div style="font-size:0.8rem;color:#5bc8ff;font-weight:600;margin-bottom:8px">
-            <i class="bi bi-bar-chart-steps me-1"></i>SHAP Feature Importance
-            <span class="text-muted" style="font-size:0.65rem;font-weight:400" id="shapModelType"></span>
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div style="font-size:0.8rem;color:#5bc8ff;font-weight:600">
+              <i class="bi bi-bar-chart-steps me-1"></i>SHAP Feature Importance
+              <span class="text-muted" style="font-size:0.65rem;font-weight:400" id="shapModelType"></span>
+            </div>
+            <button class="btn btn-sm px-2 py-0" style="font-size:0.65rem;border:1px solid rgba(91,200,255,0.3);color:#5bc8ff;background:rgba(91,200,255,0.06)" onclick="loadShap(this)" title="Recalculate SHAP">
+              <i class="bi bi-arrow-clockwise me-1"></i>Run
+            </button>
           </div>
           <div id="shapBars" style="min-height:60px"></div>
         </div>
         <!-- HRP Allocation -->
         <div class="col-md-4">
-          <div style="font-size:0.8rem;color:#A8FF53;font-weight:600;margin-bottom:8px">
-            <i class="bi bi-diagram-3 me-1"></i>HRP Allocation
-            <span class="text-muted" style="font-size:0.65rem;font-weight:400">correlation-aware</span>
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div style="font-size:0.8rem;color:#A8FF53;font-weight:600">
+              <i class="bi bi-diagram-3 me-1"></i>HRP Allocation
+              <span class="text-muted" style="font-size:0.65rem;font-weight:400">correlation-aware</span>
+            </div>
+            <button class="btn btn-sm px-2 py-0" style="font-size:0.65rem;border:1px solid rgba(168,255,83,0.3);color:#A8FF53;background:rgba(168,255,83,0.06)" onclick="loadHrp(this)" title="Rebalance HRP">
+              <i class="bi bi-arrow-clockwise me-1"></i>Run
+            </button>
           </div>
           <table class="table table-dark table-sm mb-0" style="font-size:0.74rem">
             <thead><tr><th>Symbol</th><th>Weight</th><th title="vs equal weight">×Eq</th><th title="size multiplier">Mult</th></tr></thead>
@@ -1679,9 +1756,14 @@ body { overflow: hidden; }
         </div>
         <!-- Cointegration Pairs -->
         <div class="col-md-3">
-          <div style="font-size:0.8rem;color:#ffc107;font-weight:600;margin-bottom:8px">
-            <i class="bi bi-link-45deg me-1"></i>Cointegrated Pairs
-            <span class="text-muted" style="font-size:0.65rem;font-weight:400">stat-arb</span>
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div style="font-size:0.8rem;color:#ffc107;font-weight:600">
+              <i class="bi bi-link-45deg me-1"></i>Cointegrated Pairs
+              <span class="text-muted" style="font-size:0.65rem;font-weight:400">stat-arb</span>
+            </div>
+            <button class="btn btn-sm px-2 py-0" style="font-size:0.65rem;border:1px solid rgba(255,193,7,0.3);color:#ffc107;background:rgba(255,193,7,0.06)" onclick="loadCoint(this)" title="Re-scan cointegration">
+              <i class="bi bi-arrow-clockwise me-1"></i>Run
+            </button>
           </div>
           <div id="cointList" style="font-size:0.74rem"><span class="text-muted">—</span></div>
         </div>
@@ -2227,6 +2309,79 @@ body { overflow: hidden; }
         <span class="at-sb-val" id="atAdx">—</span>
       </div>
       <span class="at-sb-count" id="atSigCount">0 signals</span>
+    </div>
+
+    <!-- Zone 1.5: Training Status -->
+    <div class="at-train-zone" id="atTrainZone">
+      <!-- ML Model card -->
+      <div class="at-train-card">
+        <div class="at-train-head">
+          <span class="at-train-title">ML Model</span>
+          <span class="at-train-badge" id="atMLBadge">—</span>
+        </div>
+        <div class="at-train-rows">
+          <div class="at-train-row"><span>Samples</span><span id="atMLSamples">—</span></div>
+          <div class="at-train-row"><span>Accuracy</span><span id="atMLAcc" class="lime">—</span></div>
+          <div class="at-train-row"><span>Last run</span><span id="atMLLast">—</span></div>
+          <div class="at-train-row"><span>Next run</span><span id="atMLNext">—</span></div>
+        </div>
+        <div class="at-req-block">
+          <div class="at-req-title">Requirements</div>
+          <div class="at-req-row" id="atReqSamples"><span class="at-req-dot"></span><span>≥ 100 samples</span></div>
+          <div class="at-req-row" id="atReqModel"><span class="at-req-dot"></span><span>Model file present</span></div>
+          <div class="at-req-row" id="atReqAcc"><span class="at-req-dot"></span><span>Accuracy ≥ 55%</span></div>
+        </div>
+        <button class="at-train-btn" onclick="atRunMLTrain(this)">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+          Train Now
+        </button>
+      </div>
+      <!-- Demo Loop card -->
+      <div class="at-train-card">
+        <div class="at-train-head">
+          <span class="at-train-title">Demo Loop</span>
+          <span class="at-train-badge" id="atDemoBadge">—</span>
+        </div>
+        <div class="at-train-rows">
+          <div class="at-train-row"><span>Records</span><span id="atDemoTotal">—</span></div>
+          <div class="at-train-row"><span>Labelled</span><span id="atDemoLabelled">—</span></div>
+          <div class="at-train-row"><span>Model</span><span id="atDemoModel">—</span></div>
+          <div class="at-train-row"><span>Win rate</span><span id="atDemoWin" class="lime">—</span></div>
+        </div>
+        <div class="at-req-block">
+          <div class="at-req-title">Requirements</div>
+          <div class="at-req-row" id="atReqDemo50"><span class="at-req-dot"></span><span>≥ 50 trades closed</span></div>
+          <div class="at-req-row" id="atReqDemoLbl"><span class="at-req-dot"></span><span>Labels assigned</span></div>
+          <div class="at-req-row" id="atReqDemoWin"><span class="at-req-dot"></span><span>Win rate target ≥ 80%</span></div>
+        </div>
+        <button class="at-train-btn" onclick="atRunDemoTrain(this)">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+          1-Click Train
+        </button>
+      </div>
+      <!-- Auto Train card -->
+      <div class="at-train-card">
+        <div class="at-train-head">
+          <span class="at-train-title">Auto Train</span>
+          <span class="at-train-badge at-badge-auto" id="atAutoBadge">OFF</span>
+        </div>
+        <div class="at-train-rows">
+          <div class="at-train-row"><span>Interval</span><span>Every 1 hr</span></div>
+          <div class="at-train-row"><span>Trigger</span><span>New candles</span></div>
+          <div class="at-train-row"><span>Models</span><span>ML + SHAP</span></div>
+          <div class="at-train-row"><span>Status</span><span id="atAutoStatus">—</span></div>
+        </div>
+        <div class="at-req-block">
+          <div class="at-req-title">Requirements</div>
+          <div class="at-req-row ok"><span class="at-req-dot"></span><span>Hourly trainer enabled</span></div>
+          <div class="at-req-row" id="atReqAutoSym"><span class="at-req-dot"></span><span>≥ 1 symbol monitored</span></div>
+          <div class="at-req-row" id="atReqAutoData"><span class="at-req-dot"></span><span>≥ 500 candles history</span></div>
+        </div>
+        <button class="at-train-btn at-train-btn-auto" id="atAutoBtn" onclick="atToggleAutoTrain(this)">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+          Enable Auto Train
+        </button>
+      </div>
     </div>
 
     <!-- Zone 2: Signal Matrix + Attribution -->
@@ -4838,6 +4993,48 @@ async function runBacktest() {
 }
 
 // Quant Lab: SHAP importance + HRP weights + cointegration pairs (ML4T)
+async function loadShap(btn) {
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm" style="width:10px;height:10px"></span>'; }
+  try {
+    const d = await fetch('/api/ml/feature-importance').then(r=>r.json()).catch(()=>({features:[]}));
+    const feats = d.features || [];
+    const mt = document.getElementById('shapModelType');
+    if (mt) mt.textContent = feats.length ? `(${d.model_type||'?'}${d.accuracy?', acc '+(d.accuracy*100).toFixed(0)+'%':''})` : '';
+    const maxImp = feats.length ? Math.max(...feats.map(f=>f.importance)) || 1 : 1;
+    document.getElementById('shapBars').innerHTML = feats.length
+      ? feats.slice(0,10).map(f => {
+          const w = Math.max(2,(f.importance/maxImp*100)).toFixed(0);
+          return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><div style="width:96px;font-size:0.66rem;color:#aaa;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.feature}</div><div style="flex:1;background:#1a1a1a;border-radius:3px;height:14px"><div style="width:${w}%;background:linear-gradient(90deg,#5bc8ff,#A8FF53);height:100%;border-radius:3px"></div></div><div style="width:42px;font-size:0.62rem;color:#5bc8ff;font-family:var(--font-mono)">${f.importance.toFixed(3)}</div></div>`;
+        }).join('')
+      : '<span class="text-muted" style="font-size:0.72rem">โมเดลยังไม่ได้เทรน (ต้องมี trade ปิดอย่างน้อย 30 รายการ)</span>';
+  } catch(e) { showToast('SHAP Error', e.message, 'danger'); }
+  finally { if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Run'; } }
+}
+
+async function loadHrp(btn) {
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm" style="width:10px;height:10px"></span>'; }
+  try {
+    const d = await fetch('/api/portfolio/hrp').then(r=>r.json()).catch(()=>({weights:[]}));
+    const hrp = d.weights || [];
+    document.getElementById('hrpBody').innerHTML = hrp.length
+      ? hrp.map(w => `<tr><td>${w.symbol}</td><td style="font-family:var(--font-mono)">${(w.weight*100).toFixed(1)}%</td><td style="color:${w.vs_equal>=1?'#39d98a':'#ff6b35'}">${w.vs_equal}×</td><td style="color:${w.multiplier>=1?'#39d98a':'#ff6b35'};font-weight:600">${w.multiplier}×</td></tr>`).join('')
+      : '<tr><td colspan="4" class="text-muted text-center">ต้องการ ≥2 symbols ที่มีประวัติราคา</td></tr>';
+  } catch(e) { showToast('HRP Error', e.message, 'danger'); }
+  finally { if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Run'; } }
+}
+
+async function loadCoint(btn) {
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm" style="width:10px;height:10px"></span>'; }
+  try {
+    const d = await fetch('/api/pairs/cointegration').then(r=>r.json()).catch(()=>({pairs:[]}));
+    const pairs = d.pairs || [];
+    document.getElementById('cointList').innerHTML = pairs.length
+      ? pairs.map(p => { const hl = p.half_life ? p.half_life.toFixed(1)+' bars' : '—'; return `<div style="background:rgba(255,193,7,0.08);border:1px solid rgba(255,193,7,0.2);border-radius:5px;padding:5px 7px;margin-bottom:5px"><div style="color:#ffc107;font-weight:600">${p.pair[0]} ↔ ${p.pair[1]}</div><div style="color:#888;font-size:0.64rem">p=${p.p_value.toFixed(4)} | β=${p.hedge_ratio.toFixed(2)} | HL=${hl}</div></div>`; }).join('')
+      : '<span class="text-muted" style="font-size:0.72rem">ไม่พบคู่ cointegrated (p<0.05)</span>';
+  } catch(e) { showToast('Cointegration Error', e.message, 'danger'); }
+  finally { if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Run'; } }
+}
+
 async function loadQuantLab() {
   const btn = document.getElementById('quantLabBtn');
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; }
@@ -5969,7 +6166,104 @@ let _atSelectedSym = null;
 async function refreshAutotrade() {
   renderAtSignalGrid();
   renderAtStatusBar();
-  await Promise.all([fetchAtRouterStats(), fetchAtTrainingStats(), fetchAtChampion()]);
+  await Promise.all([fetchAtRouterStats(), fetchAtTrainingStats(), fetchAtChampion(), atRefreshTrainStatus()]);
+}
+
+async function atRefreshTrainStatus() {
+  try {
+    const [htD, trD] = await Promise.all([
+      fetch('/api/training/hourly/status').then(r=>r.json()).catch(()=>({})),
+      fetch('/api/training').then(r=>r.json()).catch(()=>({})),
+    ]);
+
+    // ML Model card
+    const samples = htD.total_samples ?? 0;
+    const acc = htD.model_accuracy != null ? (htD.model_accuracy*100).toFixed(1)+'%' : '—';
+    const lastRun = htD.last_run ? new Date(htD.last_run+'Z').toLocaleTimeString('th',{hour:'2-digit',minute:'2-digit'}) : '—';
+    const nextRun = htD.next_run_in ? Math.floor(htD.next_run_in/60)+'m' : '—';
+    _setEl('atMLSamples', samples);
+    _setEl('atMLAcc', acc);
+    _setEl('atMLLast', lastRun);
+    _setEl('atMLNext', nextRun);
+    const mlReady = htD.model_accuracy != null;
+    _setBadge('atMLBadge', mlReady ? 'READY' : (samples > 0 ? 'TRAINING' : 'NO DATA'), mlReady ? 'ready' : (samples > 0 ? 'training' : ''));
+    _setReq('atReqSamples', samples >= 100);
+    _setReq('atReqModel', mlReady);
+    _setReq('atReqAcc', htD.model_accuracy != null && htD.model_accuracy >= 0.55);
+
+    // Demo Loop card
+    const total = trD.total_records ?? 0;
+    const labelled = trD.labelled_records ?? 0;
+    const demoReady = trD.model_ready;
+    const demoAcc = trD.accuracy != null ? (trD.accuracy*100).toFixed(1)+'%' : '—';
+    _setEl('atDemoTotal', total);
+    _setEl('atDemoLabelled', labelled);
+    _setEl('atDemoModel', demoReady ? 'Ready ✓' : 'Not ready');
+    _setEl('atDemoWin', demoAcc);
+    _setBadge('atDemoBadge', demoReady ? 'READY' : 'PENDING', demoReady ? 'ready' : '');
+    _setReq('atReqDemo50', total >= 50);
+    _setReq('atReqDemoLbl', labelled >= 30);
+    _setReq('atReqDemoWin', trD.accuracy != null && trD.accuracy >= 0.80);
+
+    // Auto Train status
+    const autoOn = htD.enabled === true;
+    _setEl('atAutoStatus', autoOn ? 'Scheduled' : 'Manual only');
+    const badge = document.getElementById('atAutoBadge');
+    const btn = document.getElementById('atAutoBtn');
+    if (badge) { badge.textContent = autoOn ? 'ON' : 'OFF'; badge.className = 'at-train-badge at-badge-auto' + (autoOn ? ' on' : ''); }
+    if (btn) { btn.className = 'at-train-btn at-train-btn-auto' + (autoOn ? ' active' : ''); btn.innerHTML = autoOn
+      ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Disable Auto Train'
+      : '<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" stroke="currentColor" stroke-width="2" fill="none"/></svg> Enable Auto Train';
+    }
+    _setReq('atReqAutoSym', Object.keys(allPrices).length >= 1);
+    _setReq('atReqAutoData', samples >= 500);
+  } catch(e) {}
+}
+
+function _setEl(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
+function _setBadge(id, text, cls) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text;
+  el.className = 'at-train-badge' + (cls ? ' '+cls : '');
+}
+function _setReq(id, ok) {
+  const row = document.getElementById(id);
+  if (!row) return;
+  row.classList.toggle('ok', ok);
+  const dot = row.querySelector('.at-req-dot');
+  if (dot) dot.style.background = ok ? '#A8FF53' : 'rgba(255,255,255,0.15)';
+}
+
+async function atRunMLTrain(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Running…'; }
+  try {
+    const d = await fetch('/api/training/hourly/run', {method:'POST'}).then(r=>r.json());
+    showToast('ML Training', `+${d.last_samples??0} samples · Acc: ${d.model_accuracy?(d.model_accuracy*100).toFixed(1)+'%':'N/A'}`, 'success');
+    await atRefreshTrainStatus();
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+  finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg> Train Now'; }
+  }
+}
+
+async function atRunDemoTrain(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Training…'; }
+  try {
+    const d = await fetch('/api/training/trigger', {method:'POST'}).then(r=>r.json());
+    showToast('1-Click Train', d.message || 'Training triggered', 'success');
+    await atRefreshTrainStatus();
+  } catch(e) { showToast('Error', e.message, 'danger'); }
+  finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg> 1-Click Train'; }
+  }
+}
+
+let _autoTrainOn = false;
+async function atToggleAutoTrain(btn) {
+  _autoTrainOn = !_autoTrainOn;
+  showToast('Auto Train', _autoTrainOn ? 'Enabled — trains every hour' : 'Disabled', _autoTrainOn ? 'success' : 'warning');
+  await atRefreshTrainStatus();
 }
 
 function updateAutotrade(d) {
