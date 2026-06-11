@@ -5252,7 +5252,7 @@ function renderAgents(agents) {
     const pulse = a.status === 'active' ? 'animation:pulse 1.5s infinite' : '';
     const sprite = AGENT_SPRITES[k];
     const spriteStyle = sprite
-      ? `box-shadow:${makePixelSprite(sprite.rows, a.status === 'idle' ? 'rgba(255,255,255,0.2)' : sprite.color)}`
+      ? `box-shadow:${makePixelSprite(sprite.rows, a.status === 'idle' ? 'rgba(255,255,255,0.45)' : sprite.color)}`
       : '';
     return `
       <div class="d-flex align-items-center gap-2 px-2 py-2" style="border-bottom:1px solid var(--border)">
@@ -5260,8 +5260,8 @@ function renderAgents(agents) {
           <div class="pixel-sprite" style="${spriteStyle}"></div>
         </div>
         <div class="flex-fill" style="min-width:0">
-          <div style="font-family:var(--font-headline);font-weight:600;font-size:0.8rem">${AGENT_META[k].label}</div>
-          <div class="text-muted text-truncate" style="font-size:0.7rem">${esc(a.detail || '')}</div>
+          <div style="font-family:var(--font-headline);font-weight:600;font-size:0.88rem;color:var(--text-main)">${AGENT_META[k].label}</div>
+          <div class="text-truncate" style="font-size:0.78rem;color:var(--text-muted)">${esc(a.detail || '')}</div>
         </div>
         <span class="ws-dot" style="background:${dotColor(a.status)};${pulse}"></span>
       </div>`;
