@@ -26,10 +26,12 @@
 - [x] **Chart colors** — ApexCharts foreColor/labels/grid ทั้งหมด → #9898AE / rgba(255,255,255,0.08)
 - [x] **Hardcoded dark colors** (#444/#555/#666/#888) ใน inline styles และ JS-rendered HTML → var(--text-muted)
 - [x] **Topbar symbol display** — แสดง currentSymbol ที่เลือกอยู่
-- [x] **Opus design audit** — 9 remaining inconsistencies แก้แล้ว:
-  - topbar-slim: remove backdrop-filter, bg → var(--bg-card)
-  - price-card: 14px → var(--radius-card)
-  - #1a1a1a bar tracks → var(--bg-card2) ทั้งหมด
+- [x] **Opus design audit** — 9 remaining inconsistencies แก้แล้ว
+- [x] **/impeccable critique** — score 29/40, พบ P0×2 + P1×2
+- [x] **P0: SELL color consistency** — แทน `#ff6b35` ทั้งหมด (50+ instances) ด้วย `#EF4444` / `rgba(239,68,68,...)` ทั้งใน CSS, JS, inline styles
+- [x] **P0: Micro-label contrast** — `.at-badge` 9→11px, `.at-train-badge` 9→10px, `.kbd-hint` 9→10px, hover opacity 0.55→0.65
+- [x] **P1: Bottom duplicate stat grid ลบออก** — Win Rate/Avg PnL/Open Positions/Today PnL ที่ซ้ำถูกลบ
+- [x] **DESIGN.md อัพเดต** — เขียนใหม่ทั้งหมดให้ตรงกับ Finance aesthetic ที่ใช้จริงใน code
 
 ---
 
@@ -63,11 +65,20 @@ trading:
 
 ---
 
+## Design Score Tracker
+
+| วัน | Score | หมายเหตุ |
+|-----|-------|---------|
+| 2026-06-11 (ก่อน) | 29/40 | impeccable critique ครั้งแรก |
+| 2026-06-11 (หลัง) | ~35/40 (est.) | แก้ P0×2 + P1×2 แล้ว |
+
+---
+
 ## Deploy Method
 
 | งาน | คำสั่ง |
 |-----|--------|
-| HTML-only (ไม่ restart) | `gcloud compute scp index.html aiterra-server-sg:/tmp/` → `docker cp /tmp/index.html container:/app/src/web/` |
+| HTML-only (ไม่ restart) | `gcloud compute scp index.html aiterra-server-sg:/tmp/` → `docker cp /tmp/index.html crypto-ai-trader-aiterra-1:/app/src/web/index.html` |
 | Python files | `docker cp file.py container:/app/path/` + `docker restart` |
 | Full rebuild | `git pull` + `docker compose up -d --build` |
 
