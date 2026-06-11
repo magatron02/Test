@@ -615,6 +615,147 @@ body { overflow: hidden; }
   .regime-crash, .circuit-open, .ws-connected, .sf-dot.on { animation: none; }
 }
 
+/* ════════════════════════════════════════════════════════════
+   AI AUTOTRADE COMMAND CENTER — Armory Monotone
+   Palette: #000 void · #A8FF53 lime · #fff ink
+   No glassmorphism · No blur · 1px borders only
+   ════════════════════════════════════════════════════════════ */
+#sec-autotrade { background: #000; }
+.at-body { display: flex; flex-direction: column; gap: 16px; }
+
+/* Zone 1: Status bar */
+.at-statusbar {
+  position: relative; height: 64px;
+  background: #0a0a0a; border: 1px solid rgba(255,255,255,0.06);
+  display: flex; align-items: center; gap: 28px; padding: 0 24px; overflow: hidden;
+}
+.at-scan {
+  position: absolute; inset: 0; pointer-events: none; opacity: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(168,255,83,0.06) 50%, transparent 100%);
+  transition: opacity 0.3s;
+}
+.at-statusbar.at-active .at-scan { opacity: 1; animation: atScanLine 2.4s linear infinite; }
+@keyframes atScanLine { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
+.at-state-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: rgba(255,255,255,0.18); flex-shrink: 0; transition: background 0.3s;
+}
+.at-statusbar.at-active .at-state-dot { background: #A8FF53; box-shadow: 0 0 6px rgba(168,255,83,0.7); }
+.at-state-label {
+  font-family: 'Space Mono', monospace; font-size: 12px;
+  letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.3); transition: color 0.3s;
+}
+.at-statusbar.at-active .at-state-label { color: #A8FF53; }
+.at-sb-div { width: 1px; height: 24px; background: rgba(255,255,255,0.07); flex-shrink: 0; }
+.at-sb-field { display: flex; flex-direction: column; gap: 2px; }
+.at-sb-key {
+  font-family: 'Finlandica', sans-serif; font-size: 10px;
+  text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.28);
+}
+.at-sb-val { font-family: 'Space Mono', monospace; font-size: 13px; color: #fff; }
+.at-sb-val.lime { color: #A8FF53; }
+.at-sb-count {
+  margin-left: auto; font-family: 'Space Mono', monospace;
+  font-size: 11px; color: rgba(255,255,255,0.2);
+}
+
+/* Zone 2 layout */
+.at-zone2 { display: grid; grid-template-columns: 1fr 320px; gap: 16px; }
+@media (max-width: 920px) { .at-zone2 { grid-template-columns: 1fr; } }
+
+.at-panel { background: #0a0a0a; border: 1px solid rgba(255,255,255,0.06); }
+.at-panel-head {
+  padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.at-panel-title {
+  font-family: 'Finlandica', sans-serif; font-size: 10px;
+  text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.35);
+}
+.at-panel-body { padding: 16px 20px; }
+
+/* Signal grid */
+.at-signal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.at-sig-card {
+  background: #000; border: 1px solid rgba(255,255,255,0.06);
+  padding: 14px 16px; display: flex; flex-direction: column; gap: 8px;
+  cursor: pointer; transition: border-color 0.15s;
+}
+.at-sig-card:hover { border-color: rgba(255,255,255,0.14); }
+.at-sig-card.buy  { border-color: rgba(168,255,83,0.22); }
+.at-sig-card.sell { border-color: rgba(255,255,255,0.22); }
+.at-sig-card.at-selected { outline: 1px solid rgba(168,255,83,0.5); }
+.at-sig-row1 { display: flex; align-items: center; justify-content: space-between; }
+.at-sym { font-family: 'Space Mono', monospace; font-size: 13px; color: #fff; }
+.at-badge {
+  font-family: 'Space Mono', monospace; font-size: 9px;
+  letter-spacing: 0.08em; padding: 2px 6px; line-height: 1.5;
+}
+.at-badge.buy  { background: #A8FF53; color: #000; }
+.at-badge.sell { background: #fff; color: #000; }
+.at-badge.hold { background: transparent; color: rgba(255,255,255,0.22); border: 1px solid rgba(255,255,255,0.1); }
+.at-price { font-family: 'Space Mono', monospace; font-size: 11px; color: rgba(255,255,255,0.35); }
+.at-conf-wrap { display: flex; flex-direction: column; gap: 3px; }
+.at-conf-label {
+  font-family: 'Finlandica', sans-serif; font-size: 10px;
+  color: rgba(255,255,255,0.22); display: flex; justify-content: space-between;
+}
+.at-conf-track { height: 2px; background: #1a1a1a; overflow: hidden; }
+.at-conf-bar { height: 100%; background: #A8FF53; transition: width 0.4s ease-out; }
+.at-sig-card.sell .at-conf-bar { background: #fff; }
+.at-sig-card.hold .at-conf-bar { background: rgba(255,255,255,0.18); }
+.at-regime-tag {
+  font-family: 'Space Mono', monospace; font-size: 9px;
+  color: rgba(255,255,255,0.18); text-transform: uppercase; letter-spacing: 0.06em;
+}
+
+/* Attribution panel */
+.at-attr-empty {
+  font-family: 'Finlandica', sans-serif; font-size: 12px;
+  color: rgba(255,255,255,0.18); text-align: center; padding: 48px 0;
+}
+.at-attr-sym { font-family: 'Space Mono', monospace; font-size: 13px; color: #fff; margin-bottom: 16px; }
+.at-attr-row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+.at-attr-key {
+  font-family: 'Finlandica', sans-serif; font-size: 11px;
+  color: rgba(255,255,255,0.3); width: 72px; flex-shrink: 0;
+}
+.at-attr-track { flex: 1; height: 3px; background: #1a1a1a; overflow: hidden; }
+.at-attr-fill { height: 100%; background: #A8FF53; transition: width 0.4s ease-out; }
+.at-attr-pct {
+  font-family: 'Space Mono', monospace; font-size: 10px;
+  color: rgba(255,255,255,0.3); width: 28px; text-align: right;
+}
+.at-narrative {
+  font-family: 'Finlandica', sans-serif; font-size: 12px; line-height: 1.65;
+  color: rgba(255,255,255,0.4); border-top: 1px solid rgba(255,255,255,0.06);
+  padding-top: 14px; margin-top: 10px;
+}
+
+/* Zone 3: metrics row */
+.at-zone3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+@media (max-width: 720px) { .at-zone3 { grid-template-columns: 1fr; } }
+.at-metric-card {
+  background: #0a0a0a; border: 1px solid rgba(255,255,255,0.06); padding: 20px;
+}
+.at-metric-head {
+  font-family: 'Finlandica', sans-serif; font-size: 10px;
+  text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.28); margin-bottom: 12px;
+}
+.at-metric-num { font-family: 'Space Mono', monospace; font-size: 26px; color: #fff; line-height: 1; margin-bottom: 4px; }
+.at-metric-num .lime { color: #A8FF53; }
+.at-metric-sub { font-family: 'Finlandica', sans-serif; font-size: 11px; color: rgba(255,255,255,0.28); margin-bottom: 14px; }
+.at-metric-rows { display: flex; flex-direction: column; gap: 7px; }
+.at-metric-row { display: flex; justify-content: space-between; font-family: 'Space Mono', monospace; font-size: 10px; }
+.at-metric-row-k { color: rgba(255,255,255,0.22); }
+.at-metric-row-v { color: rgba(255,255,255,0.65); }
+.at-metric-row-v.lime { color: #A8FF53; }
+
+@media (prefers-reduced-motion: reduce) {
+  .at-scan { animation: none !important; }
+  .at-conf-bar, .at-attr-fill { transition: none; }
+}
+
 </style>
 </head>
 <body>
@@ -640,6 +781,9 @@ body { overflow: hidden; }
     </div>
     <div class="snav-item" data-section="analytics" onclick="showSection('analytics',null)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>Analytics
+    </div>
+    <div class="snav-item" data-section="autotrade" onclick="showSection('autotrade',null)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>AI Brain
     </div>
     <div class="snav-sep"></div>
     <div class="snav-item" data-section="trade-history" onclick="showSection('trade-history',null)">
@@ -1958,6 +2102,94 @@ body { overflow: hidden; }
 
 </section><!-- end sec-analytics -->
 
+<!-- AI AUTOTRADE COMMAND CENTER -->
+<section id="sec-autotrade" class="section">
+  <div class="at-body">
+
+    <!-- Zone 1: Status Bar -->
+    <div class="at-statusbar" id="atStatusBar">
+      <div class="at-scan"></div>
+      <div class="at-state-dot"></div>
+      <span class="at-state-label" id="atStateLabel">IDLE</span>
+      <div class="at-sb-div"></div>
+      <div class="at-sb-field">
+        <span class="at-sb-key">Regime</span>
+        <span class="at-sb-val" id="atRegime">—</span>
+      </div>
+      <div class="at-sb-div"></div>
+      <div class="at-sb-field">
+        <span class="at-sb-key">Model</span>
+        <span class="at-sb-val lime" id="atModel">—</span>
+      </div>
+      <div class="at-sb-div"></div>
+      <div class="at-sb-field">
+        <span class="at-sb-key">ADX</span>
+        <span class="at-sb-val" id="atAdx">—</span>
+      </div>
+      <span class="at-sb-count" id="atSigCount">0 signals</span>
+    </div>
+
+    <!-- Zone 2: Signal Matrix + Attribution -->
+    <div class="at-zone2">
+      <div class="at-panel">
+        <div class="at-panel-head">
+          <span class="at-panel-title">Signal Matrix</span>
+          <span class="at-panel-title" id="atLastUpdate">—</span>
+        </div>
+        <div class="at-panel-body">
+          <div class="at-signal-grid" id="atSignalGrid">
+            <div class="at-attr-empty">Waiting for analysis data…</div>
+          </div>
+        </div>
+      </div>
+      <div class="at-panel">
+        <div class="at-panel-head">
+          <span class="at-panel-title">Attribution</span>
+          <span class="at-panel-title" id="atAttrSymLabel">—</span>
+        </div>
+        <div class="at-panel-body" id="atAttrPanel">
+          <div class="at-attr-empty">Click a signal card to inspect attribution</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Zone 3: Metrics Row -->
+    <div class="at-zone3">
+      <div class="at-metric-card">
+        <div class="at-metric-head">Model Router</div>
+        <div class="at-metric-num" id="atRouterTotal">—</div>
+        <div class="at-metric-sub">total calls</div>
+        <div class="at-metric-rows">
+          <div class="at-metric-row"><span class="at-metric-row-k">Haiku</span><span class="at-metric-row-v" id="atRouterHaiku">—</span></div>
+          <div class="at-metric-row"><span class="at-metric-row-k">Sonnet</span><span class="at-metric-row-v lime" id="atRouterSonnet">—</span></div>
+          <div class="at-metric-row"><span class="at-metric-row-k">Savings est.</span><span class="at-metric-row-v lime" id="atRouterSave">—</span></div>
+        </div>
+      </div>
+      <div class="at-metric-card">
+        <div class="at-metric-head">ML Training</div>
+        <div class="at-metric-num" id="atTrainSamples">—</div>
+        <div class="at-metric-sub">training samples</div>
+        <div class="at-metric-rows">
+          <div class="at-metric-row"><span class="at-metric-row-k">Accuracy</span><span class="at-metric-row-v lime" id="atTrainAcc">—</span></div>
+          <div class="at-metric-row"><span class="at-metric-row-k">Last run</span><span class="at-metric-row-v" id="atTrainLast">—</span></div>
+          <div class="at-metric-row"><span class="at-metric-row-k">Status</span><span class="at-metric-row-v" id="atTrainStatus">—</span></div>
+        </div>
+      </div>
+      <div class="at-metric-card">
+        <div class="at-metric-head">Champion Strategy</div>
+        <div class="at-metric-num" id="atChampName">—</div>
+        <div class="at-metric-sub">current leader</div>
+        <div class="at-metric-rows">
+          <div class="at-metric-row"><span class="at-metric-row-k">Win rate</span><span class="at-metric-row-v lime" id="atChampWin">—</span></div>
+          <div class="at-metric-row"><span class="at-metric-row-k">P&amp;L</span><span class="at-metric-row-v" id="atChampPnl">—</span></div>
+          <div class="at-metric-row"><span class="at-metric-row-k">Trades</span><span class="at-metric-row-v" id="atChampTrades">—</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section><!-- end sec-autotrade -->
+
 <!-- SETTINGS -->
 <section id="sec-settings" class="section">
   <div class="row g-3">
@@ -2323,6 +2555,7 @@ let portfolioData = { labels: [], values: [] };
 let currentSymbol = null;
 let allPrices = {};
 let allAnalyses = {};
+let allAttributions = {};
 let charts = {};
 // Theme toggle
 function toggleTheme() {
@@ -2415,6 +2648,7 @@ function showSection(name, el) {
   if (name === 'portfolio') refreshPortfolio();
   if (name === 'trade-history') refreshHistory();
   if (name === 'analytics') { refreshTraining(); refreshLoopStatus(); refreshHourlyTrainer(); }
+  if (name === 'autotrade') refreshAutotrade();
   if (name === 'settings') { loadSettings(); loadSymbols(); }
   if (name === 'trading' && currentSymbol) { loadMTF(); refreshHeatmap(); if (allAnalyses[currentSymbol]) updateMicrostructurePanel(allAnalyses[currentSymbol]); }
   if (name === 'positions') refreshPositions();
@@ -3370,6 +3604,7 @@ function addActivity(icon, text, color) {
 function handleAnalysisUpdate(d) {
   allPrices[d.symbol] = { ...d, price: d.price, signal: d.signal, signal_strength: d.confidence };
   allAnalyses[d.symbol] = d;
+  if (document.getElementById('sec-autotrade').classList.contains('active')) updateAutotrade(d);
   if (d.signal !== 'HOLD') {
     const c = d.signal === 'BUY' ? '#A8FF53' : '#ff6b35';
     addActivity(d.signal === 'BUY' ? '▲' : '▼', `${d.symbol} ${d.signal} (conf: ${(d.confidence*100).toFixed(0)}%)`, c);
@@ -3515,6 +3750,7 @@ function renderHeatmap(ctx, canvas, snaps) {
 }
 
 function handleTradeExecuted(d) {
+  if (d.signal_attribution) allAttributions[d.symbol] = d.signal_attribution;
   const c = d.side === 'BUY' ? '#A8FF53' : '#ff6b35';
   addActivity(d.side === 'BUY' ? '🟢' : '🔴',
     `${d.mode.toUpperCase()} ${d.side} ${d.symbol} @ $${formatPrice(d.price)}`, c);
@@ -5519,6 +5755,171 @@ async function applySmallBudgetPreset() {
   } catch(e) {
     if (resultEl) { resultEl.innerHTML = `<span class="text-danger">🔴 ${e.message}</span>`; }
   }
+}
+
+// ============================================================
+// AI AUTOTRADE COMMAND CENTER
+// ============================================================
+let _atSelectedSym = null;
+
+async function refreshAutotrade() {
+  renderAtSignalGrid();
+  renderAtStatusBar();
+  await Promise.all([fetchAtRouterStats(), fetchAtTrainingStats(), fetchAtChampion()]);
+}
+
+function updateAutotrade(d) {
+  renderAtSignalGrid();
+  renderAtStatusBar();
+  if (_atSelectedSym === d.symbol) renderAtAttribution(d.symbol);
+}
+
+function renderAtStatusBar() {
+  const analyses = Object.values(allAnalyses);
+  const bar = document.getElementById('atStatusBar');
+  const label = document.getElementById('atStateLabel');
+  const regimeEl = document.getElementById('atRegime');
+  const modelEl = document.getElementById('atModel');
+  const adxEl = document.getElementById('atAdx');
+  const countEl = document.getElementById('atSigCount');
+  if (!bar) return;
+
+  const active = analyses.length > 0;
+  bar.classList.toggle('at-active', active);
+  label.textContent = active ? 'ACTIVE' : 'IDLE';
+
+  // pick dominant regime from latest analyses
+  const regimes = analyses.map(a => a.regime).filter(Boolean);
+  const regimeCounts = regimes.reduce((m, r) => { m[r] = (m[r]||0)+1; return m; }, {});
+  const topRegime = Object.entries(regimeCounts).sort((a,b) => b[1]-a[1])[0];
+  regimeEl.textContent = topRegime ? topRegime[0].replace('_',' ') : '—';
+
+  // model from most recent analysis
+  const latest = analyses.sort((a,b) => (b.timestamp||0)-(a.timestamp||0))[0];
+  modelEl.textContent = latest ? (latest.model || '—').replace('claude-','').replace('-20251022','').replace('-20240620','') : '—';
+  adxEl.textContent = latest && latest.adx != null ? parseFloat(latest.adx).toFixed(1) : '—';
+
+  const nonHold = analyses.filter(a => a.signal && a.signal !== 'HOLD').length;
+  countEl.textContent = `${nonHold} signal${nonHold !== 1 ? 's' : ''}`;
+  document.getElementById('atLastUpdate').textContent = analyses.length ? new Date().toLocaleTimeString() : '—';
+}
+
+function renderAtSignalGrid() {
+  const grid = document.getElementById('atSignalGrid');
+  if (!grid) return;
+  const entries = Object.entries(allAnalyses);
+  if (!entries.length) {
+    grid.innerHTML = '<div class="at-attr-empty">Waiting for analysis data…</div>';
+    return;
+  }
+  grid.innerHTML = entries
+    .sort((a,b) => {
+      const order = {BUY:0,SELL:1,HOLD:2};
+      return (order[a[1].signal]??2) - (order[b[1].signal]??2);
+    })
+    .map(([sym, d]) => {
+      const sig = (d.signal || 'HOLD').toLowerCase();
+      const conf = d.confidence != null ? Math.round(d.confidence * 100) : 0;
+      const price = d.price != null ? formatPrice(d.price) : '—';
+      const regime = (d.regime || '').replace(/_/g, ' ');
+      const selected = _atSelectedSym === sym ? ' at-selected' : '';
+      return `<div class="at-sig-card ${sig}${selected}" onclick="atSelectSym('${sym}')">
+        <div class="at-sig-row1">
+          <span class="at-sym">${sym.replace('USDT','')}</span>
+          <span class="at-badge ${sig}">${sig.toUpperCase()}</span>
+        </div>
+        <span class="at-price">$${price}</span>
+        <div class="at-conf-wrap">
+          <span class="at-conf-label"><span>Confidence</span><span>${conf}%</span></span>
+          <div class="at-conf-track"><div class="at-conf-bar" style="width:${conf}%"></div></div>
+        </div>
+        <span class="at-regime-tag">${regime}</span>
+      </div>`;
+    }).join('');
+}
+
+function atSelectSym(sym) {
+  _atSelectedSym = sym;
+  document.querySelectorAll('.at-sig-card').forEach(c => c.classList.remove('at-selected'));
+  const cards = document.querySelectorAll('.at-sig-card');
+  cards.forEach(c => { if (c.onclick && c.onclick.toString().includes(`'${sym}'`)) c.classList.add('at-selected'); });
+  document.getElementById('atAttrSymLabel').textContent = sym.replace('USDT','') + '/USDT';
+  renderAtAttribution(sym);
+}
+
+function renderAtAttribution(sym) {
+  const panel = document.getElementById('atAttrPanel');
+  if (!panel) return;
+  const attr = allAttributions[sym];
+  const analysis = allAnalyses[sym];
+  if (!attr && !analysis) {
+    panel.innerHTML = '<div class="at-attr-empty">No attribution data yet</div>';
+    return;
+  }
+  const rows = attr ? Object.entries(attr)
+    .filter(([k]) => k !== 'chosen')
+    .map(([k, v]) => {
+      const pct = Math.round(Math.abs(parseFloat(v) || 0) * 100);
+      return `<div class="at-attr-row">
+        <span class="at-attr-key">${k.replace(/_/g,' ')}</span>
+        <div class="at-attr-track"><div class="at-attr-fill" style="width:${Math.min(pct,100)}%"></div></div>
+        <span class="at-attr-pct">${pct}%</span>
+      </div>`;
+    }).join('') : '';
+
+  const narrative = analysis && analysis.narrative
+    ? `<div class="at-narrative">${analysis.narrative}</div>` : '';
+
+  const rsiLine = analysis && analysis.rsi != null
+    ? `<div class="at-attr-row"><span class="at-attr-key">RSI</span><div class="at-attr-track"><div class="at-attr-fill" style="width:${Math.min(analysis.rsi,100)}%"></div></div><span class="at-attr-pct">${parseFloat(analysis.rsi).toFixed(1)}</span></div>` : '';
+  const bbLine = analysis && analysis.bb_position != null
+    ? `<div class="at-attr-row"><span class="at-attr-key">BB pos</span><div class="at-attr-track"><div class="at-attr-fill" style="width:${Math.round(Math.abs(analysis.bb_position)*100)}%"></div></div><span class="at-attr-pct">${parseFloat(analysis.bb_position).toFixed(2)}</span></div>` : '';
+
+  panel.innerHTML = `${rows || (rsiLine + bbLine)}${narrative}`;
+}
+
+async function fetchAtRouterStats() {
+  try {
+    const r = await fetch('/api/model-router/stats');
+    if (!r.ok) return;
+    const s = await r.json();
+    const total = (s.haiku_calls||0) + (s.sonnet_calls||0);
+    document.getElementById('atRouterTotal').textContent = total || '0';
+    document.getElementById('atRouterHaiku').textContent = s.haiku_calls || '0';
+    document.getElementById('atRouterSonnet').textContent = s.sonnet_calls || '0';
+    const savePct = total > 0 ? Math.round((s.haiku_calls||0)/total*100) : 0;
+    document.getElementById('atRouterSave').textContent = savePct + '% cheap';
+  } catch(e) {}
+}
+
+async function fetchAtTrainingStats() {
+  try {
+    const r = await fetch('/api/training/hourly/status');
+    if (!r.ok) return;
+    const s = await r.json();
+    document.getElementById('atTrainSamples').textContent = s.total_samples ?? '—';
+    const acc = s.accuracy != null ? (parseFloat(s.accuracy)*100).toFixed(1)+'%' : '—';
+    document.getElementById('atTrainAcc').textContent = acc;
+    document.getElementById('atTrainLast').textContent = s.last_trained
+      ? new Date(s.last_trained).toLocaleTimeString() : '—';
+    document.getElementById('atTrainStatus').textContent = s.status || '—';
+  } catch(e) {}
+}
+
+async function fetchAtChampion() {
+  try {
+    const r = await fetch('/api/champion');
+    if (!r.ok) return;
+    const s = await r.json();
+    const champ = s.champion || s;
+    const name = (champ.strategy || '—').replace(/_/g,' ');
+    document.getElementById('atChampName').textContent = name.length > 10 ? name.slice(0,10) : name;
+    const wr = champ.win_rate != null ? (parseFloat(champ.win_rate)*100).toFixed(1)+'%' : '—';
+    document.getElementById('atChampWin').textContent = wr;
+    const pnl = champ.total_pnl != null ? (champ.total_pnl>=0?'+':'')+parseFloat(champ.total_pnl).toFixed(2)+'%' : '—';
+    document.getElementById('atChampPnl').textContent = pnl;
+    document.getElementById('atChampTrades').textContent = champ.trade_count ?? '—';
+  } catch(e) {}
 }
 </script>
 
