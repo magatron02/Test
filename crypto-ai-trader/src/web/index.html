@@ -101,7 +101,7 @@ body {
 /* ── Signal badges ── */
 .badge-signal { font-size: 0.62rem; padding: 3px 10px; border-radius: var(--radius-pill); font-weight: 700; letter-spacing: 0.8px; font-family: var(--font-mono); }
 .signal-buy  { background: rgba(57,217,138,0.12); color: var(--accent-buy);  border: 1px solid rgba(57,217,138,0.25); }
-.signal-sell { background: rgba(255,107,53,0.12);  color: var(--accent-red);  border: 1px solid rgba(255,107,53,0.25); }
+.signal-sell { background: rgba(239,68,68,0.12);  color: var(--accent-red);  border: 1px solid rgba(239,68,68,0.25); }
 .signal-hold { background: rgba(102,102,102,0.12); color: var(--text-muted); border: 1px solid rgba(102,102,102,0.25); }
 .signal-buy-text  { color: var(--accent-buy); font-weight: 700; }
 .signal-sell-text { color: var(--accent-red); font-weight: 700; }
@@ -109,7 +109,7 @@ body {
 /* ── Regime badges ── */
 .regime-badge { font-size: 0.63rem; padding: 2px 8px; border-radius: var(--radius-pill); font-weight: 700; letter-spacing: 0.6px; font-family: var(--font-mono); display: inline-block; }
 .regime-bull   { background: rgba(57,217,138,0.15);  color: #39d98a; border: 1px solid rgba(57,217,138,0.3); }
-.regime-bear   { background: rgba(255,107,53,0.15);  color: #ff6b35; border: 1px solid rgba(255,107,53,0.3); }
+.regime-bear   { background: rgba(239,68,68,0.15);  color: #EF4444; border: 1px solid rgba(239,68,68,0.3); }
 .regime-range  { background: rgba(168,255,83,0.10);  color: #A8FF53; border: 1px solid rgba(168,255,83,0.25); }
 .regime-vol    { background: rgba(255,193,7,0.12);   color: #ffc107; border: 1px solid rgba(255,193,7,0.25); }
 .regime-crash  { background: rgba(220,53,69,0.18);   color: #ff4d6d; border: 1px solid rgba(220,53,69,0.4); animation: pulse 1s infinite; }
@@ -122,7 +122,7 @@ body {
 /* ── Pattern pill ── */
 .pat-pill { font-size: 0.65rem; padding: 2px 7px; border-radius: 100px; font-family: var(--font-mono); font-weight: 600; display: inline-block; margin: 1px 2px; }
 .pat-buy  { background: rgba(57,217,138,0.12); color: #39d98a; border: 1px solid rgba(57,217,138,0.2); }
-.pat-sell { background: rgba(255,107,53,0.12);  color: #ff6b35; border: 1px solid rgba(255,107,53,0.2); }
+.pat-sell { background: rgba(239,68,68,0.12);  color: #EF4444; border: 1px solid rgba(239,68,68,0.2); }
 .pat-neu  { background: rgba(100,100,100,0.12); color: var(--text-muted); border: 1px solid rgba(100,100,100,0.25); }
 
 /* ── Table ── */
@@ -494,7 +494,7 @@ ol.small, ul.small, .small.text-muted,
 }
 .narrative-item:last-child { margin-bottom: 0; }
 .narrative-item.nar-buy  { border-color: rgba(57,217,138,0.18);  background: rgba(57,217,138,0.04); }
-.narrative-item.nar-sell { border-color: rgba(255,107,53,0.18);  background: rgba(255,107,53,0.04); }
+.narrative-item.nar-sell { border-color: rgba(239,68,68,0.18);  background: rgba(239,68,68,0.04); }
 .narrative-item.nar-hold { border-color: rgba(255,255,255,0.04); background: rgba(255,255,255,0.02); }
 .narrative-sym { min-width: 42px; text-align: center; }
 .narrative-sym .sym-name { font-family: var(--font-headline); font-weight: 700; font-size: 0.88rem; }
@@ -599,14 +599,14 @@ body { overflow: hidden; }
 .snav-item { position: relative; }
 .snav-item .kbd-hint {
   margin-left: auto;
-  font-size: 9px; font-family: monospace; letter-spacing: 0;
+  font-size: 10px; font-family: monospace; letter-spacing: 0;
   color: var(--text-muted); opacity: 0;
   background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10);
   border-radius: 3px; padding: 1px 4px;
   transition: opacity 0.15s ease;
   pointer-events: none; white-space: nowrap;
 }
-.snav:hover .snav-item .kbd-hint { opacity: 0.55; }
+.snav:hover .snav-item .kbd-hint { opacity: 0.65; }
 .snav-item.active .kbd-hint { opacity: 0.75; }
 .snav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
@@ -697,7 +697,7 @@ body { overflow: hidden; }
 .at-sig-row1 { display: flex; align-items: center; justify-content: space-between; }
 .at-sym { font-family: var(--font-mono); font-size: 13px; color: var(--text-main); }
 .at-badge {
-  font-family: var(--font-mono); font-size: 9px;
+  font-family: var(--font-mono); font-size: 11px;
   letter-spacing: 0.08em; padding: 2px 8px; line-height: 1.5;
   border-radius: var(--radius-pill);
 }
@@ -779,7 +779,7 @@ body { overflow: hidden; }
   text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted);
 }
 .at-train-badge {
-  font-family: var(--font-mono); font-size: 9px;
+  font-family: var(--font-mono); font-size: 10px;
   letter-spacing: 0.06em; padding: 2px 8px;
   background: var(--border); color: var(--text-muted);
   border-radius: var(--radius-pill);
@@ -1106,7 +1106,7 @@ body { overflow: hidden; }
               <div class="fw-bold" style="color:var(--accent-buy);font-family:var(--font-mono);font-size:1.15rem" id="funApproved">0</div>
               <div class="stat-label" style="margin:0">Approved ✓</div>
             </div>
-            <div class="flex-fill p-2 text-center" style="background:rgba(255,107,53,0.08);border:1px solid rgba(255,107,53,0.2);border-radius:6px">
+            <div class="flex-fill p-2 text-center" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:6px">
               <div class="fw-bold" style="color:var(--accent-red);font-family:var(--font-mono);font-size:1.15rem" id="funRejected">0</div>
               <div class="stat-label" style="margin:0">Rejected ✕</div>
             </div>
@@ -1197,37 +1197,6 @@ body { overflow: hidden; }
     </div>
   </div>
 
-  <!-- Bottom stats row -->
-  <div class="row g-3 mt-1">
-    <div class="col-6 col-md-3">
-      <div class="stat-card">
-        <div class="stat-label">Win Rate</div>
-        <div class="stat-value" style="color:var(--accent)" id="winRateBottom">0%</div>
-        <div class="small text-muted mt-1" id="totalTradesBottom">0 trades</div>
-      </div>
-    </div>
-    <div class="col-6 col-md-3">
-      <div class="stat-card">
-        <div class="stat-label">Avg PnL/Trade</div>
-        <div class="stat-value text-success" id="avgPnl">0.00%</div>
-        <div class="small text-muted mt-1" id="bestTrade">Best: 0%</div>
-      </div>
-    </div>
-    <div class="col-6 col-md-3">
-      <div class="stat-card">
-        <div class="stat-label">Open Positions</div>
-        <div class="stat-value" style="color:var(--text-main)" id="openPosCount">0</div>
-        <div class="small text-muted mt-1">Active trades</div>
-      </div>
-    </div>
-    <div class="col-6 col-md-3">
-      <div class="stat-card">
-        <div class="stat-label">Today PnL</div>
-        <div class="stat-value text-success" id="todayPnl">$0.00</div>
-        <div class="small text-muted mt-1">24h change</div>
-      </div>
-    </div>
-  </div>
 </section>
 
 <!-- MARKET ANALYTICS -->
@@ -1369,7 +1338,7 @@ body { overflow: hidden; }
           <div class="d-flex justify-content-between mt-1" style="font-size:0.65rem;color:var(--text-muted)">
             <span>-30 min</span>
             <span style="color:#3ad98a">■ Bid</span>
-            <span style="color:#ff6b35">■ Ask</span>
+            <span style="color:#EF4444">■ Ask</span>
             <span>Now</span>
           </div>
         </div>
@@ -1406,8 +1375,8 @@ body { overflow: hidden; }
             <div id="msWhaleBid" class="d-none" style="background:rgba(58,217,138,0.08);border:1px solid rgba(58,217,138,0.2);border-radius:5px;padding:4px 8px;font-size:0.7rem;margin-bottom:3px">
               <span style="color:#3ad98a">▲ BID</span> <span id="msWhaleBidPrice" class="ms-1" style="font-family:var(--font-mono)">—</span> <span class="text-muted ms-1">×</span> <span id="msWhaleBidSize" style="font-family:var(--font-mono)">—</span>
             </div>
-            <div id="msWhaleAsk" class="d-none" style="background:rgba(255,107,53,0.08);border:1px solid rgba(255,107,53,0.2);border-radius:5px;padding:4px 8px;font-size:0.7rem;margin-bottom:3px">
-              <span style="color:#ff6b35">▼ ASK</span> <span id="msWhaleAskPrice" class="ms-1" style="font-family:var(--font-mono)">—</span> <span class="text-muted ms-1">×</span> <span id="msWhaleAskSize" style="font-family:var(--font-mono)">—</span>
+            <div id="msWhaleAsk" class="d-none" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:5px;padding:4px 8px;font-size:0.7rem;margin-bottom:3px">
+              <span style="color:#EF4444">▼ ASK</span> <span id="msWhaleAskPrice" class="ms-1" style="font-family:var(--font-mono)">—</span> <span class="text-muted ms-1">×</span> <span id="msWhaleAskSize" style="font-family:var(--font-mono)">—</span>
             </div>
             <div id="msNoWhale" style="font-size:0.7rem;color:var(--text-muted)">ไม่พบ whale wall</div>
           </div>
@@ -1466,7 +1435,7 @@ body { overflow: hidden; }
       </div>
     </div>
     <div class="col-6 col-md-3">
-      <div class="stat-card" style="background:rgba(255,107,53,0.06);border:1px solid rgba(255,107,53,0.18)">
+      <div class="stat-card" style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.18)">
         <div class="stat-label">Total PnL</div>
         <div class="stat-value" style="color:var(--accent-red)" id="pfTotalPnl">—</div>
         <div class="small text-muted">Closed trades</div>
@@ -1569,7 +1538,7 @@ body { overflow: hidden; }
       </div>
     </div>
     <div class="col-md-3">
-      <div class="stat-card" style="background:rgba(255,107,53,0.06);border:1px solid rgba(255,107,53,0.18)">
+      <div class="stat-card" style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.18)">
         <div class="stat-label">Model Accuracy</div>
         <div class="stat-value" style="color:var(--accent-red)" id="loopAccuracy">—</div>
         <div class="small text-muted" id="trainAccuracy">Cross-validation</div>
@@ -3068,7 +3037,7 @@ function initCharts() {
     series: [{data:[]}],
     xaxis: { type:'datetime', labels:{style:{colors:'#9898AE',fontSize:'10px'}, datetimeFormatter:{hour:'HH:mm',day:'dd MMM'}} },
     yaxis: { tooltip:{enabled:true}, labels:{style:{colors:'#9898AE',fontSize:'10px'}, formatter:v=>formatPrice(v)} },
-    plotOptions: { candlestick:{ colors:{upward:'#A8FF53',downward:'#ff6b35'}, wick:{useFillColor:true} } },
+    plotOptions: { candlestick:{ colors:{upward:'#A8FF53',downward:'#EF4444'}, wick:{useFillColor:true} } },
     grid: { borderColor:'rgba(255,255,255,0.08)' },
     tooltip: { theme:'dark' },
     noData: { text:'เลือก symbol เพื่อดู chart', style:{color:'#9898AE'} },
@@ -3226,7 +3195,7 @@ function _corrCell(v) {
   if (isDiag) {
     bg = 'rgba(168,255,83,0.15)'; color = 'var(--accent)';
   } else if (v >= 0) {
-    bg = `rgba(255,107,53,${(a * 0.9).toFixed(2)})`; color = a > 0.45 ? '#fff' : 'var(--text-muted)';
+    bg = `rgba(239,68,68,${(a * 0.9).toFixed(2)})`; color = a > 0.45 ? '#fff' : 'var(--text-muted)';
   } else {
     bg = `rgba(57,217,138,${(a * 0.9).toFixed(2)})`; color = a > 0.45 ? '#fff' : 'var(--text-muted)';
   }
@@ -3279,7 +3248,7 @@ function renderCorrelationPanel(d) {
     </div>
     <div class="d-flex align-items-center gap-3 mt-2">
       <span style="font-size:0.62rem;color:var(--text-muted)">
-        <span style="display:inline-block;width:10px;height:10px;background:rgba(255,107,53,0.8);border-radius:2px;vertical-align:middle;margin-right:3px"></span>วิ่งทางเดียวกัน (ควรหลีกเลี่ยง)
+        <span style="display:inline-block;width:10px;height:10px;background:rgba(239,68,68,0.8);border-radius:2px;vertical-align:middle;margin-right:3px"></span>วิ่งทางเดียวกัน (ควรหลีกเลี่ยง)
       </span>
       <span style="font-size:0.62rem;color:var(--text-muted)">
         <span style="display:inline-block;width:10px;height:10px;background:rgba(57,217,138,0.8);border-radius:2px;vertical-align:middle;margin-right:3px"></span>สวนทางกัน (กระจายเสี่ยงดี)
@@ -3515,7 +3484,7 @@ function renderRiskPanel() {
   const rs = riskState;
   const dd = (rs.drawdown_pct * 100).toFixed(1);
   const heat = (rs.portfolio_heat * 100).toFixed(1);
-  const heatColor = rs.portfolio_heat > 0.15 ? '#ff6b35' : rs.portfolio_heat > 0.08 ? '#ffc107' : '#39d98a';
+  const heatColor = rs.portfolio_heat > 0.15 ? '#EF4444' : rs.portfolio_heat > 0.08 ? '#ffc107' : '#39d98a';
 
   if (badge) { badge.style.display = rs.circuit_open ? '' : 'none'; }
 
@@ -3734,7 +3703,7 @@ function updateIndicatorPanel(sym) {
   const d = allPrices[sym];
   const a = allAnalyses[sym];
   if (!d) return;
-  const rsiColor = d.rsi < 30 ? '#A8FF53' : d.rsi > 70 ? '#ff6b35' : '#555555';
+  const rsiColor = d.rsi < 30 ? '#A8FF53' : d.rsi > 70 ? '#EF4444' : '#555555';
   const panel = document.getElementById('indicatorPanel');
   panel.innerHTML = `
     <div class="indicator-row"><span>RSI(14)</span><span style="color:${rsiColor}">${(d.rsi||0).toFixed(1)}</span></div>
@@ -3844,7 +3813,7 @@ function updateAllocationChart(positions, cash, cur) {
   const labels = [cur || 'USDT'];
   const data = [cash];
   const colors = ['#A8FF53'];
-  const palette = ['#39d98a','#ff6b35','#d29922','#A8FF53','#A8FF53','#A8FF53'];
+  const palette = ['#39d98a','#EF4444','#d29922','#A8FF53','#A8FF53','#A8FF53'];
   positions.forEach((p, i) => {
     labels.push(p.symbol.split('/')[0]);
     data.push(p.value);
@@ -3880,7 +3849,7 @@ function handleAnalysisUpdate(d) {
   if (document.getElementById('sec-autotrade').classList.contains('active')) updateAutotrade(d);
   if (document.getElementById('sec-dashboard').classList.contains('active')) renderAiPairChips();
   if (d.signal !== 'HOLD') {
-    const c = d.signal === 'BUY' ? '#A8FF53' : '#ff6b35';
+    const c = d.signal === 'BUY' ? '#A8FF53' : '#EF4444';
     addActivity(d.signal === 'BUY' ? '▲' : '▼', `${d.symbol} ${d.signal} (conf: ${(d.confidence*100).toFixed(0)}%)`, c);
   }
   if (document.getElementById('sec-dashboard').classList.contains('active')) renderPriceCards();
@@ -3905,7 +3874,7 @@ function updateMicrostructurePanel(d) {
   const bar = document.getElementById('msImbalanceBar');
   bar.style.width = pct + '%';
   bar.style.background = imb >= 0.6 ? 'linear-gradient(90deg,#3ad98a,#a8ff53)'
-    : imb <= 0.4 ? 'linear-gradient(90deg,#ff6b35,#ff4444)'
+    : imb <= 0.4 ? 'linear-gradient(90deg,#EF4444,#ff4444)'
     : 'linear-gradient(90deg,#666,#888)';
 
   // Whale walls
@@ -4001,7 +3970,7 @@ function renderHeatmap(ctx, canvas, snaps) {
       if (bin < 0 || bin >= N_PRICE) continue;
       const y = H - (bin + 1) * rowH;
       const alpha = Math.min(q / maxQty, 1);
-      ctx.fillStyle = `rgba(255,107,53,${(0.15 + alpha * 0.85).toFixed(2)})`;
+      ctx.fillStyle = `rgba(239,68,68,${(0.15 + alpha * 0.85).toFixed(2)})`;
       ctx.fillRect(Math.floor(x), Math.floor(y), Math.ceil(colW) + 1, Math.ceil(rowH) + 1);
     }
   }
@@ -4025,7 +3994,7 @@ function renderHeatmap(ctx, canvas, snaps) {
 
 function handleTradeExecuted(d) {
   if (d.signal_attribution) allAttributions[d.symbol] = d.signal_attribution;
-  const c = d.side === 'BUY' ? '#A8FF53' : '#ff6b35';
+  const c = d.side === 'BUY' ? '#A8FF53' : '#EF4444';
   addActivity(d.side === 'BUY' ? '🟢' : '🔴',
     `${d.mode.toUpperCase()} ${d.side} ${d.symbol} @ $${formatPrice(d.price)}`, c);
   showToast(`${d.side} ${d.symbol}`, `@ $${formatPrice(d.price)} | ${d.strategy}`, d.side === 'BUY' ? 'success' : 'danger');
@@ -4034,7 +4003,7 @@ function handleTradeExecuted(d) {
 function handleTradeClosed(d) {
   const win = d.pnl >= 0;
   addActivity(win ? '✅' : '❌',
-    `${d.symbol} closed: ${d.pnl_pct >= 0 ? '+' : ''}${d.pnl_pct.toFixed(2)}% (${d.reason})`, win ? '#A8FF53' : '#ff6b35');
+    `${d.symbol} closed: ${d.pnl_pct >= 0 ? '+' : ''}${d.pnl_pct.toFixed(2)}% (${d.reason})`, win ? '#A8FF53' : '#EF4444');
   showToast('Trade Closed', `${d.symbol}: ${d.pnl_pct >= 0 ? '+' : ''}${d.pnl_pct.toFixed(2)}%`, win ? 'success' : 'warning');
 }
 
@@ -4252,7 +4221,7 @@ function updateLoopStats(d) {
     document.getElementById('trainStatus').textContent = d.completed ? '🎯 Done!' : d.running ? '⚡ Running' : 'Idle';
   }
   if (d.last_regime && Object.keys(d.last_regime).length) {
-    const colors = {BULL:'#A8FF53', BEAR:'#ff6b35', RANGE:'#A8FF53', VOLATILE:'#f0883e'};
+    const colors = {BULL:'#A8FF53', BEAR:'#EF4444', RANGE:'#A8FF53', VOLATILE:'#f0883e'};
     document.getElementById('regimesBadges').innerHTML = Object.entries(d.last_regime)
       .map(([sym, r]) => `<span class="badge" style="background:${colors[r]||'#888'}22;color:${colors[r]||'#888'};border:1px solid ${colors[r]||'#888'}44;font-size:10px">${sym.split('/')[0]}:${r}</span>`)
       .join('');
@@ -4261,13 +4230,13 @@ function updateLoopStats(d) {
 
 function handleLoopTradeOpened(d) {
   const icon = d.side === 'BUY' ? '🟢' : '🔴';
-  const col = d.side === 'BUY' ? '#A8FF53' : '#ff6b35';
+  const col = d.side === 'BUY' ? '#A8FF53' : '#EF4444';
   appendLoopLog(`<span style="color:${col}">${icon} OPEN ${d.side} ${d.symbol} @ ${d.price} | conf:${(d.confidence*100).toFixed(0)}% | <span style="color:var(--text-muted)">${d.regime}</span></span>`);
 }
 
 function handleLoopTradeClosed(d) {
   const icon = d.win ? '✅' : '❌';
-  const col = d.win ? '#A8FF53' : '#ff6b35';
+  const col = d.win ? '#A8FF53' : '#EF4444';
   const wr = (d.win_rate * 100).toFixed(1);
   appendLoopLog(`<span style="color:${col}">${icon} CLOSE ${d.symbol} ${d.pnl_pct >= 0 ? '+' : ''}${d.pnl_pct.toFixed(2)}% | WR=${wr}% (${d.wins}/${d.total}) | <span style="color:var(--text-muted)">${d.regime}</span></span>`);
   updateLoopStats(d);
@@ -4283,7 +4252,7 @@ function handleLoopProgress(d) {
   if (d.log && d.log.length) {
     const log = document.getElementById('loopLog');
     log.innerHTML = d.log.map(l => {
-      const col = l.includes('✅') ? '#A8FF53' : l.includes('❌') ? '#ff6b35' : l.includes('🧠') ? '#A8FF53' : l.includes('🎯') ? '#f0883e' : '#555555';
+      const col = l.includes('✅') ? '#A8FF53' : l.includes('❌') ? '#EF4444' : l.includes('🧠') ? '#A8FF53' : l.includes('🎯') ? '#f0883e' : '#555555';
       return `<div style="color:${col}">${l}</div>`;
     }).join('');
   }
@@ -4690,7 +4659,7 @@ async function loadMTF() {
   try {
     const r = await fetch(`/api/analysis/mtf?symbol=${encodeURIComponent(currentSymbol)}`);
     const d = await r.json();
-    const sigColor = s => s === 'BUY' ? '#A8FF53' : s === 'SELL' ? '#ff6b35' : '#555555';
+    const sigColor = s => s === 'BUY' ? '#A8FF53' : s === 'SELL' ? '#EF4444' : '#555555';
     const sigCls = s => s === 'BUY' ? 'signal-buy' : s === 'SELL' ? 'signal-sell' : 'signal-hold';
     const tfRows = Object.entries(d.timeframes).map(([tf, a]) => `
       <div class="indicator-row">
@@ -4728,14 +4697,14 @@ async function refreshAdvancedStats() {
     const sr = document.getElementById('sharpeRatio');
     if (sr) {
       sr.textContent = d.sharpe.toFixed(2);
-      sr.style.color = d.sharpe >= 1 ? '#A8FF53' : d.sharpe >= 0 ? '#d29922' : '#ff6b35';
+      sr.style.color = d.sharpe >= 1 ? '#A8FF53' : d.sharpe >= 0 ? '#d29922' : '#EF4444';
     }
 
     if (d.daily_pnl && d.daily_pnl.length) {
       const labels = d.daily_pnl.map(x => x.date);
       const values = d.daily_pnl.map(x => x.pnl);
       const colors = values.map(v => v >= 0 ? 'rgba(46,160,67,0.7)' : 'rgba(248,81,73,0.7)');
-      const _pColors = values.map(v => v >= 0 ? '#A8FF53' : '#ff6b35');
+      const _pColors = values.map(v => v >= 0 ? '#A8FF53' : '#EF4444');
       charts.dailyPnl.updateOptions({xaxis:{categories:labels},colors:_pColors,plotOptions:{bar:{distributed:true,borderRadius:4,columnWidth:'65%'}}},false,false);
       charts.dailyPnl.updateSeries([{name:'Daily PnL',data:values}],false);
     }
@@ -4755,7 +4724,7 @@ async function refreshPortfolio() {
     const pp = document.getElementById('pfTotalPnl');
     if (pp) {
       pp.textContent = (d.total_pnl >= 0 ? '+' : '') + d.total_pnl.toFixed(2) + ' USDT';
-      pp.style.color = d.total_pnl >= 0 ? '#A8FF53' : '#ff6b35';
+      pp.style.color = d.total_pnl >= 0 ? '#A8FF53' : '#EF4444';
     }
   } catch {}
 }
@@ -4798,7 +4767,7 @@ async function runBacktest() {
 
     // ── Primary metrics (autotrade) ────────────────────────────────
     const aiRet = d.total_return_pct;
-    const retColor = aiRet >= 0 ? '#A8FF53' : '#ff6b35';
+    const retColor = aiRet >= 0 ? '#A8FF53' : '#EF4444';
     document.getElementById('btReturn').textContent  = (aiRet >= 0 ? '+' : '') + aiRet.toFixed(2) + '%';
     document.getElementById('btReturn').style.color  = retColor;
     document.getElementById('btWinRate').textContent  = d.win_rate.toFixed(1) + '%';
@@ -4809,11 +4778,11 @@ async function runBacktest() {
     // ── 3-way comparison table (full analytics) ───────────────────
     if (d.comparison) {
       const cmp = d.comparison;
-      const fmtRet = (v) => `<span style="color:${v>=0?'#A8FF53':'#ff6b35'}">${v>=0?'+':''}${v.toFixed(2)}%</span>`;
+      const fmtRet = (v) => `<span style="color:${v>=0?'#A8FF53':'#EF4444'}">${v>=0?'+':''}${v.toFixed(2)}%</span>`;
       const fmtN   = (v, dec=2, suffix='') => v == null ? '—' : v.toFixed(dec) + suffix;
       const fmtPF  = (v) => v == null ? '—' : (v >= 99 ? '∞' : v.toFixed(2));
-      const pfColor = (v) => v >= 1.5 ? '#39d98a' : v >= 1 ? '#ccc' : '#ff6b35';
-      const srColor = (v) => v >= 1 ? '#39d98a' : v >= 0 ? '#ccc' : '#ff6b35';
+      const pfColor = (v) => v >= 1.5 ? '#39d98a' : v >= 1 ? '#ccc' : '#EF4444';
+      const srColor = (v) => v >= 1 ? '#39d98a' : v >= 0 ? '#ccc' : '#EF4444';
 
       // Update table headers to show all analytics columns
       const thead = document.querySelector('#btCompareCard thead tr');
@@ -4841,10 +4810,10 @@ async function runBacktest() {
           <td style="color:${srColor(c.sharpe||0)}">${fmtN(c.sharpe)}</td>
           <td style="color:${srColor(c.sortino||0)}">${fmtN(c.sortino)}</td>
           <td style="color:${srColor(c.calmar||0)}">${fmtN(c.calmar)}</td>
-          <td style="color:#ff6b35">${fmtN(c.var_95_pct,1,'%')}</td>
+          <td style="color:#EF4444">${fmtN(c.var_95_pct,1,'%')}</td>
           <td style="color:${pfColor(c.profit_factor||0)}">${fmtPF(c.profit_factor)}</td>
           <td class="text-danger">${fmtN(c.max_drawdown_pct,2,'%')}</td>
-          <td style="font-size:0.75rem"><span style="color:#39d98a">${c.max_win_streak||0}W</span> / <span style="color:#ff6b35">${c.max_loss_streak||0}L</span></td>
+          <td style="font-size:0.75rem"><span style="color:#39d98a">${c.max_win_streak||0}W</span> / <span style="color:#EF4444">${c.max_loss_streak||0}L</span></td>
           <td style="font-family:var(--font-mono)">$${(c.final_capital||0).toFixed(0)}</td>
         </tr>`;
       }).join('');
@@ -4898,7 +4867,7 @@ async function runBacktest() {
     const regStats = d.regime_stats || {};
     const patStats = d.pattern_stats || {};
     const regimeMeta = {BULL_TREND:'↑ BULL',BEAR_TREND:'↓ BEAR',RANGING:'↔ RANGE',VOLATILE:'⚡ VOL',CRASH:'⚠ CRASH'};
-    const regimeColor= {BULL_TREND:'#39d98a',BEAR_TREND:'#ff6b35',RANGING:'#A8FF53',VOLATILE:'#ffc107',CRASH:'#ff4d6d'};
+    const regimeColor= {BULL_TREND:'#39d98a',BEAR_TREND:'#EF4444',RANGING:'#A8FF53',VOLATILE:'#ffc107',CRASH:'#ff4d6d'};
     if (Object.keys(regStats).length) {
       document.getElementById('btRegimeBody').innerHTML =
         Object.entries(regStats).sort((a,b)=>b[1].trades-a[1].trades).map(([rn, rs]) => {
@@ -4906,8 +4875,8 @@ async function runBacktest() {
           return `<tr>
             <td><span style="color:${color};font-weight:600;font-size:0.75rem">${regimeMeta[rn]||rn}</span></td>
             <td style="font-family:var(--font-mono)">${rs.trades}</td>
-            <td style="color:${rs.win_rate>=50?'#39d98a':'#ff6b35'}">${rs.win_rate}%</td>
-            <td style="color:${rs.avg_pnl>=0?'#39d98a':'#ff6b35'}">${rs.avg_pnl>=0?'+':''}${rs.avg_pnl}%</td>
+            <td style="color:${rs.win_rate>=50?'#39d98a':'#EF4444'}">${rs.win_rate}%</td>
+            <td style="color:${rs.avg_pnl>=0?'#39d98a':'#EF4444'}">${rs.avg_pnl>=0?'+':''}${rs.avg_pnl}%</td>
           </tr>`;
         }).join('');
     }
@@ -4916,8 +4885,8 @@ async function runBacktest() {
         Object.entries(patStats).map(([pn, ps]) => `<tr>
           <td style="font-size:0.75rem">${pn}</td>
           <td style="font-family:var(--font-mono)">${ps.trades}</td>
-          <td style="color:${ps.win_rate>=50?'#39d98a':'#ff6b35'}">${ps.win_rate}%</td>
-          <td style="color:${ps.avg_pnl>=0?'#39d98a':'#ff6b35'}">${ps.avg_pnl>=0?'+':''}${ps.avg_pnl}%</td>
+          <td style="color:${ps.win_rate>=50?'#39d98a':'#EF4444'}">${ps.win_rate}%</td>
+          <td style="color:${ps.avg_pnl>=0?'#39d98a':'#EF4444'}">${ps.avg_pnl>=0?'+':''}${ps.avg_pnl}%</td>
         </tr>`).join('');
     }
     if (Object.keys(regStats).length || Object.keys(patStats).length) {
@@ -4928,7 +4897,7 @@ async function runBacktest() {
     if (d.trades && d.trades.length) {
       document.getElementById('btTradeCount').textContent = d.total_trades + ' total trades';
       const _exitLabel = {take_profit:'TP',roi_table:'ROI',trailing_stop:'Trail',stop_loss:'SL',end_of_period:'EoP'};
-      const _exitColor = {take_profit:'#39d98a',roi_table:'#A8FF53',trailing_stop:'#5bc8ff',stop_loss:'#ff6b35',end_of_period:'#666'};
+      const _exitColor = {take_profit:'#39d98a',roi_table:'#A8FF53',trailing_stop:'#5bc8ff',stop_loss:'#EF4444',end_of_period:'#666'};
       document.getElementById('btTradesBody').innerHTML = d.trades.map(t => {
         const pats = (t.patterns||[]).map(p => `<span class="regime-badge regime-range" style="font-size:0.55rem">${p}</span>`).join(' ');
         const er = t.exit_reason||'';
@@ -4960,7 +4929,7 @@ async function runBacktest() {
       _btHourlyChart = new ApexCharts(document.getElementById('btHourlyChart'), {
         chart: {type:'bar', height:130, background:'transparent', toolbar:{show:false}, animations:{enabled:false}, fontFamily:'var(--font-mono)'},
         series: [{name:'Avg PnL%', data: vals}],
-        colors: [({value}) => value >= 0 ? '#39d98a' : '#ff6b35'],
+        colors: [({value}) => value >= 0 ? '#39d98a' : '#EF4444'],
         xaxis: {categories: hrs, labels:{style:{colors:'#9898AE',fontSize:'9px'}}, title:{text:'UTC Hour', style:{color:'#9898AE',fontSize:'10px'}}},
         yaxis: {labels:{style:{colors:'#9898AE',fontSize:'9px'}, formatter:v=>v.toFixed(1)+'%'}},
         grid: {borderColor:'rgba(255,255,255,0.08)', strokeDashArray:3},
@@ -4980,7 +4949,7 @@ async function runBacktest() {
     // ── Exit reason breakdown ──────────────────────────────────────
     const exitStats = d.exit_reason_stats || {};
     const exitTotal = Object.values(exitStats).reduce((s,v)=>s+v,0) || 1;
-    const _ec = {take_profit:'#39d98a',roi_table:'#A8FF53',trailing_stop:'#5bc8ff',stop_loss:'#ff6b35',end_of_period:'#555'};
+    const _ec = {take_profit:'#39d98a',roi_table:'#A8FF53',trailing_stop:'#5bc8ff',stop_loss:'#EF4444',end_of_period:'#555'};
     const _en = {take_profit:'Take Profit',roi_table:'ROI Table',trailing_stop:'Trailing SL',stop_loss:'Stop Loss',end_of_period:'End of Period'};
     if (Object.keys(exitStats).length) {
       document.getElementById('btExitBars').innerHTML =
@@ -5035,7 +5004,7 @@ async function loadHrp(btn) {
     const d = await fetch('/api/portfolio/hrp').then(r=>r.json()).catch(()=>({weights:[]}));
     const hrp = d.weights || [];
     document.getElementById('hrpBody').innerHTML = hrp.length
-      ? hrp.map(w => `<tr><td>${w.symbol}</td><td style="font-family:var(--font-mono)">${(w.weight*100).toFixed(1)}%</td><td style="color:${w.vs_equal>=1?'#39d98a':'#ff6b35'}">${w.vs_equal}×</td><td style="color:${w.multiplier>=1?'#39d98a':'#ff6b35'};font-weight:600">${w.multiplier}×</td></tr>`).join('')
+      ? hrp.map(w => `<tr><td>${w.symbol}</td><td style="font-family:var(--font-mono)">${(w.weight*100).toFixed(1)}%</td><td style="color:${w.vs_equal>=1?'#39d98a':'#EF4444'}">${w.vs_equal}×</td><td style="color:${w.multiplier>=1?'#39d98a':'#EF4444'};font-weight:600">${w.multiplier}×</td></tr>`).join('')
       : '<tr><td colspan="4" class="text-muted text-center">ต้องการ ≥2 symbols ที่มีประวัติราคา</td></tr>';
   } catch(e) { showToast('HRP Error', e.message, 'danger'); }
   finally { if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Run'; } }
@@ -5085,11 +5054,11 @@ async function loadQuantLab() {
     const hrp = hrpR.weights || [];
     document.getElementById('hrpBody').innerHTML = hrp.length
       ? hrp.map(w => {
-          const mc = w.multiplier>=1?'#39d98a':'#ff6b35';
+          const mc = w.multiplier>=1?'#39d98a':'#EF4444';
           return `<tr>
             <td>${w.symbol}</td>
             <td style="font-family:var(--font-mono)">${(w.weight*100).toFixed(1)}%</td>
-            <td style="color:${w.vs_equal>=1?'#39d98a':'#ff6b35'}">${w.vs_equal}×</td>
+            <td style="color:${w.vs_equal>=1?'#39d98a':'#EF4444'}">${w.vs_equal}×</td>
             <td style="color:${mc};font-weight:600">${w.multiplier}×</td>
           </tr>`;
         }).join('')
@@ -5131,17 +5100,17 @@ async function runWalkForward() {
     // Summary stats
     const s = d.summary || {};
     const ovRisk = s.overfit_risk || 'N/A';
-    const ovColor = ovRisk==='LOW'?'#39d98a':ovRisk==='MEDIUM'?'#ffc107':'#ff6b35';
+    const ovColor = ovRisk==='LOW'?'#39d98a':ovRisk==='MEDIUM'?'#ffc107':'#EF4444';
     const badge = document.getElementById('wfOverfitBadge');
     badge.textContent = 'Overfit Risk: ' + ovRisk;
     badge.style.background = ovColor + '22';
     badge.style.color = ovColor;
 
     document.getElementById('wfSummaryRow').innerHTML = [
-      ['Avg OOS Return', (s.avg_oos_return_pct>=0?'+':'')+s.avg_oos_return_pct?.toFixed(2)+'%', s.avg_oos_return_pct>=0?'#39d98a':'#ff6b35'],
-      ['Avg OOS Sharpe', s.avg_oos_sharpe?.toFixed(2)||'—', s.avg_oos_sharpe>=0.5?'#39d98a':s.avg_oos_sharpe>=0?'#ccc':'#ff6b35'],
+      ['Avg OOS Return', (s.avg_oos_return_pct>=0?'+':'')+s.avg_oos_return_pct?.toFixed(2)+'%', s.avg_oos_return_pct>=0?'#39d98a':'#EF4444'],
+      ['Avg OOS Sharpe', s.avg_oos_sharpe?.toFixed(2)||'—', s.avg_oos_sharpe>=0.5?'#39d98a':s.avg_oos_sharpe>=0?'#ccc':'#EF4444'],
       ['Profitable Folds', `${s.profitable_folds||0}/${s.total_folds||0}`, '#A8FF53'],
-      ['Consistency', (s.consistency_pct?.toFixed(1)||'0')+'%', s.consistency_pct>=50?'#39d98a':'#ff6b35'],
+      ['Consistency', (s.consistency_pct?.toFixed(1)||'0')+'%', s.consistency_pct>=50?'#39d98a':'#EF4444'],
     ].map(([label,val,color])=>`
       <div class="col-6 col-md-3">
         <div class="stat-card" style="background:${color}0d;border:1px solid ${color}33;padding:10px">
@@ -5152,18 +5121,18 @@ async function runWalkForward() {
 
     // Fold table
     document.getElementById('wfFoldsBody').innerHTML = (d.folds||[]).map(f => {
-      const oosColor = f.oos_return_pct>=0?'#39d98a':'#ff6b35';
+      const oosColor = f.oos_return_pct>=0?'#39d98a':'#EF4444';
       const degVal   = f.degradation==null ? '—' : f.degradation.toFixed(2)+'x';
-      const degColor = f.degradation==null?'#666':f.degradation>=0.75?'#39d98a':f.degradation>=0.4?'#ffc107':'#ff6b35';
+      const degColor = f.degradation==null?'#666':f.degradation>=0.75?'#39d98a':f.degradation>=0.4?'#ffc107':'#EF4444';
       return `<tr>
         <td style="font-family:var(--font-mono)">#${f.fold}</td>
         <td style="color:#A8FF53">${f.optimized_tp_pct}%</td>
-        <td style="color:#ff6b35">${f.optimized_sl_pct}%</td>
-        <td style="color:${f.is_sharpe>=0.5?'#39d98a':f.is_sharpe>=0?'#ccc':'#ff6b35'}">${f.is_sharpe?.toFixed(2)}</td>
-        <td style="color:${f.is_return_pct>=0?'#39d98a':'#ff6b35'}">${f.is_return_pct>=0?'+':''}${f.is_return_pct?.toFixed(2)}%</td>
+        <td style="color:#EF4444">${f.optimized_sl_pct}%</td>
+        <td style="color:${f.is_sharpe>=0.5?'#39d98a':f.is_sharpe>=0?'#ccc':'#EF4444'}">${f.is_sharpe?.toFixed(2)}</td>
+        <td style="color:${f.is_return_pct>=0?'#39d98a':'#EF4444'}">${f.is_return_pct>=0?'+':''}${f.is_return_pct?.toFixed(2)}%</td>
         <td style="color:${oosColor};font-weight:600">${f.oos_return_pct>=0?'+':''}${f.oos_return_pct?.toFixed(2)}%</td>
-        <td style="color:${f.oos_sharpe>=0.5?'#39d98a':f.oos_sharpe>=0?'#ccc':'#ff6b35'}">${f.oos_sharpe?.toFixed(2)}</td>
-        <td style="color:${f.oos_win_rate>=50?'#39d98a':'#ff6b35'}">${f.oos_win_rate}%</td>
+        <td style="color:${f.oos_sharpe>=0.5?'#39d98a':f.oos_sharpe>=0?'#ccc':'#EF4444'}">${f.oos_sharpe?.toFixed(2)}</td>
+        <td style="color:${f.oos_win_rate>=50?'#39d98a':'#EF4444'}">${f.oos_win_rate}%</td>
         <td style="color:${degColor};font-weight:600">${degVal}</td>
       </tr>`;
     }).join('');
@@ -5520,7 +5489,7 @@ const AGENT_SPRITES = {
     ]
   },
   executor: {
-    color: '#ff6b35',
+    color: '#EF4444',
     rows: [
       '..####..',
       '.######.',
