@@ -856,14 +856,14 @@ body { overflow: hidden; }
     <div class="snav-item active" data-section="dashboard" onclick="showSection('dashboard',null)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Dashboard
     </div>
-    <div class="snav-item" data-section="trading" onclick="showSection('trading',null)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>Trading
-    </div>
     <div class="snav-item" data-section="portfolio" onclick="showSection('portfolio',null)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>Portfolio
     </div>
+    <div class="snav-item" data-section="market-analytics" onclick="showSection('market-analytics',null)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg>Market Analytics
+    </div>
     <div class="snav-item" data-section="analytics" onclick="showSection('analytics',null)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>Analytics
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>AI Analytics
     </div>
     <div class="snav-item" data-section="autotrade" onclick="showSection('autotrade',null)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>AI Brain
@@ -997,114 +997,6 @@ body { overflow: hidden; }
             </div>
             <span class="text-muted" style="font-size:0.7rem" id="killSwitchNote">Kill switch immediately stops all new orders. Existing positions remain open.</span>
           </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Market Intelligence Row: Regime + Risk + Patterns -->
-  <div class="row g-3 mb-3" id="marketIntelRow">
-    <!-- Market Regime -->
-    <div class="col-md-4">
-      <div class="card h-100">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-radar me-2"></i>Market Regime</span>
-          <span class="text-muted" style="font-size:0.62rem;font-family:var(--font-mono)" id="regimeUpdated">—</span>
-        </div>
-        <div class="card-body p-2" id="regimePanel">
-          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
-        </div>
-      </div>
-    </div>
-    <!-- Risk Engine -->
-    <div class="col-md-4">
-      <div class="card h-100">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-shield-exclamation me-2"></i>Risk Engine</span>
-          <span id="circuitBadge" style="display:none" class="circuit-open" style="font-size:0.7rem">⚡ CIRCUIT</span>
-        </div>
-        <div class="card-body" id="riskPanel">
-          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
-        </div>
-      </div>
-    </div>
-    <!-- Chart Patterns -->
-    <div class="col-md-4">
-      <div class="card h-100">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-diagram-2 me-2"></i>Chart Patterns</span>
-          <select class="form-select form-select-sm" style="width:auto;font-size:0.7rem" id="patternSymbolSelect" onchange="fetchPatterns(this.value)"></select>
-        </div>
-        <div class="card-body p-2" id="patternPanel">
-          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Correlation Matrix Row -->
-  <div class="row g-3 mb-3" id="correlationRow">
-    <div class="col-12">
-      <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-grid-3x3-gap me-2"></i>Correlation Matrix <span class="text-muted" style="font-size:0.7rem;font-weight:400">: ความสัมพันธ์ของราคา (กันถือเหรียญที่วิ่งทางเดียวกันซ้ำ)</span></span>
-          <span class="text-muted" style="font-size:0.65rem" id="corrUpdated">—</span>
-        </div>
-        <div class="card-body p-2" id="correlationPanel">
-          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Market Narrative Row -->
-  <div class="row g-3 mb-3" id="narrativeRow">
-    <div class="col-12">
-      <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-chat-left-text me-2"></i>Market Narrative
-            <span class="text-muted" style="font-size:0.68rem;font-weight:400;letter-spacing:0;text-transform:none">: สรุปสภาพตลาดภาษาไทย (rule-based · ไม่ใช้ API)</span>
-          </span>
-          <span class="text-muted" style="font-size:0.65rem;font-family:var(--font-mono)" id="narrativeUpdated">—</span>
-        </div>
-        <div class="card-body p-2" id="narrativePanel">
-          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Risk Analytics Row -->
-  <div class="row g-3 mb-3" id="analyticsRow">
-    <div class="col-12">
-      <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-bar-chart-steps me-2"></i>Risk Analytics <span class="text-muted" style="font-size:0.7rem;font-weight:400">: live trades</span></span>
-          <div class="d-flex gap-2 align-items-center">
-            <span class="text-muted" style="font-size:0.65rem" id="analyticsUpdated">—</span>
-            <button class="btn btn-outline-secondary btn-sm" style="padding:1px 8px;font-size:0.7rem" onclick="fetchAnalytics()">↻</button>
-          </div>
-        </div>
-        <div class="card-body p-2" id="analyticsPanel">
-          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Sentiment & On-chain Row -->
-  <div class="row g-3 mb-3" id="sentimentRow">
-    <div class="col-12">
-      <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-emoji-smile me-2"></i>Market Sentiment &amp; On-chain <span class="text-muted" style="font-size:0.7rem;font-weight:400">: Fear &amp; Greed · Funding Rate · Open Interest</span></span>
-          <div class="d-flex gap-2 align-items-center">
-            <span class="text-muted" style="font-size:0.65rem" id="sentimentUpdated">—</span>
-            <button class="btn btn-outline-secondary btn-sm" style="padding:1px 8px;font-size:0.7rem" onclick="fetchSentiment()">↻</button>
-          </div>
-        </div>
-        <div class="card-body p-2" id="sentimentPanel">
-          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
         </div>
       </div>
     </div>
@@ -1259,6 +1151,114 @@ body { overflow: hidden; }
     </div>
   </div>
 </section>
+
+<!-- MARKET ANALYTICS -->
+<section id="sec-market-analytics" class="section">
+  <!-- Market Intelligence Row: Regime + Risk + Patterns -->
+  <div class="row g-3 mb-3" id="marketIntelRow">
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-radar me-2"></i>Market Regime</span>
+          <span class="text-muted" style="font-size:0.62rem;font-family:var(--font-mono)" id="regimeUpdated">—</span>
+        </div>
+        <div class="card-body p-2" id="regimePanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-shield-exclamation me-2"></i>Risk Engine</span>
+          <span id="circuitBadge" style="display:none" class="circuit-open" style="font-size:0.7rem">⚡ CIRCUIT</span>
+        </div>
+        <div class="card-body" id="riskPanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-diagram-2 me-2"></i>Chart Patterns</span>
+          <select class="form-select form-select-sm" style="width:auto;font-size:0.7rem" id="patternSymbolSelect" onchange="fetchPatterns(this.value)"></select>
+        </div>
+        <div class="card-body p-2" id="patternPanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Correlation Matrix -->
+  <div class="row g-3 mb-3" id="correlationRow">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-grid-3x3-gap me-2"></i>Correlation Matrix <span class="text-muted" style="font-size:0.7rem;font-weight:400">: ความสัมพันธ์ของราคา (กันถือเหรียญที่วิ่งทางเดียวกันซ้ำ)</span></span>
+          <span class="text-muted" style="font-size:0.65rem" id="corrUpdated">—</span>
+        </div>
+        <div class="card-body p-2" id="correlationPanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Market Narrative -->
+  <div class="row g-3 mb-3" id="narrativeRow">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-chat-left-text me-2"></i>Market Narrative
+            <span class="text-muted" style="font-size:0.68rem;font-weight:400;letter-spacing:0;text-transform:none">: สรุปสภาพตลาดภาษาไทย (rule-based · ไม่ใช้ API)</span>
+          </span>
+          <span class="text-muted" style="font-size:0.65rem;font-family:var(--font-mono)" id="narrativeUpdated">—</span>
+        </div>
+        <div class="card-body p-2" id="narrativePanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Risk Analytics -->
+  <div class="row g-3 mb-3" id="analyticsRow">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-bar-chart-steps me-2"></i>Risk Analytics <span class="text-muted" style="font-size:0.7rem;font-weight:400">: live trades</span></span>
+          <div class="d-flex gap-2 align-items-center">
+            <span class="text-muted" style="font-size:0.65rem" id="analyticsUpdated">—</span>
+            <button class="btn btn-outline-secondary btn-sm" style="padding:1px 8px;font-size:0.7rem" onclick="fetchAnalytics()">↻</button>
+          </div>
+        </div>
+        <div class="card-body p-2" id="analyticsPanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sentiment & On-chain -->
+  <div class="row g-3 mb-3" id="sentimentRow">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-emoji-smile me-2"></i>Market Sentiment &amp; On-chain <span class="text-muted" style="font-size:0.7rem;font-weight:400">: Fear &amp; Greed · Funding Rate · Open Interest</span></span>
+          <div class="d-flex gap-2 align-items-center">
+            <span class="text-muted" style="font-size:0.65rem" id="sentimentUpdated">—</span>
+            <button class="btn btn-outline-secondary btn-sm" style="padding:1px 8px;font-size:0.7rem" onclick="fetchSentiment()">↻</button>
+          </div>
+        </div>
+        <div class="card-body p-2" id="sentimentPanel">
+          <div class="text-muted text-center small py-2">รอข้อมูล...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section><!-- end sec-market-analytics -->
 
 <!-- TRADING -->
 <section id="sec-trading" class="section">
@@ -2748,6 +2748,7 @@ function showSection(name, el) {
   if (name === 'portfolio') refreshPortfolio();
   if (name === 'trade-history') refreshHistory();
   if (name === 'analytics') { refreshTraining(); refreshLoopStatus(); refreshHourlyTrainer(); }
+  if (name === 'market-analytics') refreshMarketAnalytics();
   if (name === 'autotrade') refreshAutotrade();
   if (name === 'dashboard') { renderAiPairChips(); aiSyncStatus(); }
   if (name === 'settings') { loadSettings(); loadSymbols(); }
@@ -5857,6 +5858,30 @@ async function applySmallBudgetPreset() {
     if (liveBudgetEl) liveBudgetEl.value = budget;
   } catch(e) {
     if (resultEl) { resultEl.innerHTML = `<span class="text-danger">🔴 ${e.message}</span>`; }
+  }
+}
+
+// ============================================================
+// MARKET ANALYTICS — refresh all market data panels
+// ============================================================
+async function refreshMarketAnalytics() {
+  const sym = Object.keys(allPrices)[0] || 'BTC/USDT';
+  await Promise.all([
+    fetchRegimes(),
+    fetchRiskState(),
+    fetchCorrelations(),
+    fetchNarratives(),
+    fetchAnalytics(),
+    fetchSentiment(sym),
+    fetchPatterns(sym),
+  ]);
+  // populate pattern symbol select if empty
+  const sel = document.getElementById('patternSymbolSelect');
+  if (sel && !sel.options.length) {
+    Object.keys(allPrices).forEach(s => {
+      const o = document.createElement('option'); o.value = s; o.textContent = s;
+      sel.appendChild(o);
+    });
   }
 }
 
