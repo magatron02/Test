@@ -2812,6 +2812,8 @@ let allPrices = {};
 let allAnalyses = {};
 let allAttributions = {};
 let charts = {};
+let _chartRange = '1h';
+const _chartRangeLimits = { '1h': 24, '24h': 120, '7d': 336 };
 // Theme toggle
 function toggleTheme() {
   const html = document.documentElement;
@@ -3703,7 +3705,8 @@ function selectSymbol(sym) {
 
 async function fetchTradingChart(sym) {
   try {
-    const r = await fetch(`/api/candles?symbol=${encodeURIComponent(sym)}&limit=80`);
+    const limit = _chartRangeLimits[_chartRange] || 80;
+    const r = await fetch(`/api/candles?symbol=${encodeURIComponent(sym)}&limit=${limit}`);
     const data = await r.json();
     const series = data.map(d => ({ x: new Date(d.t), y: [d.o, d.h, d.l, d.c] }));
     charts.trading.updateSeries([{ name: sym, data: series }]);
@@ -4660,6 +4663,8 @@ document.getElementById('chartSymbolSelect').addEventListener('change', (e) => s
 function setChartRange(range, el) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
+  _chartRange = range;
+  updateTradingChart();
 }
 
 // ============================================================
