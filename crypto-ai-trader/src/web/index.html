@@ -123,7 +123,7 @@ body {
 .pat-pill { font-size: 0.65rem; padding: 2px 7px; border-radius: 100px; font-family: var(--font-mono); font-weight: 600; display: inline-block; margin: 1px 2px; }
 .pat-buy  { background: rgba(57,217,138,0.12); color: #39d98a; border: 1px solid rgba(57,217,138,0.2); }
 .pat-sell { background: rgba(255,107,53,0.12);  color: #ff6b35; border: 1px solid rgba(255,107,53,0.2); }
-.pat-neu  { background: rgba(100,100,100,0.12); color: #888;    border: 1px solid rgba(100,100,100,0.2); }
+.pat-neu  { background: rgba(100,100,100,0.12); color: var(--text-muted); border: 1px solid rgba(100,100,100,0.25); }
 
 /* ── Table ── */
 .table { color: var(--text-main); font-family: var(--font-body); }
@@ -320,6 +320,8 @@ a:hover { color: #C6FF80; }
 h1,h2,h3,h4,h5,h6 { font-family: var(--font-headline); font-weight: 700; }
 .font-headline { font-family: var(--font-headline); }
 .font-mono     { font-family: var(--font-mono); }
+/* Override Bootstrap .text-muted to use our var */
+.text-muted { color: var(--text-muted) !important; }
 
 /* Body text blocks: looser line-height for readability */
 ol.small, ul.small, .small.text-muted,
@@ -1398,7 +1400,7 @@ body { overflow: hidden; }
             <div style="height:6px;background:#1a1a1a;border-radius:3px;overflow:hidden;margin-top:3px">
               <div id="msImbalanceBar" style="height:100%;width:50%;background:linear-gradient(90deg,#3ad98a,#a8ff53);transition:width 0.4s"></div>
             </div>
-            <div class="d-flex justify-content-between" style="font-size:0.6rem;color:#444;margin-top:1px"><span>Sell</span><span>Buy</span></div>
+            <div class="d-flex justify-content-between" style="font-size:0.6rem;color:var(--text-muted);margin-top:1px"><span>Sell</span><span>Buy</span></div>
           </div>
           <!-- Whale Walls -->
           <div class="mb-2" id="msWhaleSection">
@@ -1409,7 +1411,7 @@ body { overflow: hidden; }
             <div id="msWhaleAsk" class="d-none" style="background:rgba(255,107,53,0.08);border:1px solid rgba(255,107,53,0.2);border-radius:5px;padding:4px 8px;font-size:0.7rem;margin-bottom:3px">
               <span style="color:#ff6b35">▼ ASK</span> <span id="msWhaleAskPrice" class="ms-1" style="font-family:var(--font-mono)">—</span> <span class="text-muted ms-1">×</span> <span id="msWhaleAskSize" style="font-family:var(--font-mono)">—</span>
             </div>
-            <div id="msNoWhale" style="font-size:0.7rem;color:#555">ไม่พบ whale wall</div>
+            <div id="msNoWhale" style="font-size:0.7rem;color:var(--text-muted)">ไม่พบ whale wall</div>
           </div>
           <!-- TWAP Alert -->
           <div id="msTwapAlert" class="d-none" style="background:rgba(255,193,7,0.08);border:1px solid rgba(255,193,7,0.2);border-radius:5px;padding:5px 8px;font-size:0.7rem">
@@ -1522,7 +1524,7 @@ body { overflow: hidden; }
       <div class="flex-grow-1">
         <div class="d-flex align-items-center gap-2 mb-1">
           <span class="fw-bold" style="color:var(--accent-green)"><i class="bi bi-lightning-charge-fill me-1"></i>Fast Training Loop</span>
-          <span class="badge" id="loopBadge" style="background:rgba(100,100,100,0.3);color:#8b949e">Idle</span>
+          <span class="badge" id="loopBadge" style="background:rgba(100,100,100,0.2);color:var(--text-muted)">Idle</span>
         </div>
         <div class="d-flex align-items-center gap-2" style="min-width:260px">
           <div class="flex-grow-1 position-relative" style="height:18px">
@@ -2057,7 +2059,7 @@ body { overflow: hidden; }
           <button class="btn btn-outline-secondary w-100 btn-sm" id="wfRunBtn" onclick="runWalkForward()">
             <i class="bi bi-arrow-repeat me-1"></i>Walk-Forward Validation
           </button>
-          <div class="text-center mt-1" style="color:#555;font-size:0.62rem">Jesse-style IS/OOS fold analysis</div>
+          <div class="text-center mt-1" style="color:var(--text-muted);font-size:0.62rem">Jesse-style IS/OOS fold analysis</div>
         </div>
       </div>
     </div>
@@ -3040,8 +3042,8 @@ function showExTab(name, el) {
 // Charts init (all ApexCharts)
 // ============================================================
 const _apex = {
-  chart: { background:'transparent', foreColor:'#444', toolbar:{show:false}, fontFamily:"'Space Mono',monospace", animations:{enabled:false} },
-  grid: { borderColor:'rgba(34,34,34,0.7)', strokeDashArray:3 },
+  chart: { background:'transparent', foreColor:'#9898AE', toolbar:{show:false}, fontFamily:"'Space Mono',monospace", animations:{enabled:false} },
+  grid: { borderColor:'rgba(255,255,255,0.08)', strokeDashArray:3 },
   tooltip: { theme:'dark', style:{fontFamily:"'Space Mono',monospace",fontSize:'11px'} },
   theme: { mode:'dark' },
 };
@@ -3051,8 +3053,8 @@ function initCharts() {
     ..._apex,
     chart: {..._apex.chart, type:'area', height:'100%'},
     series: [{name:'Portfolio (USDT)', data:[]}],
-    xaxis: { categories:[], labels:{style:{colors:'#444',fontSize:'10px'}}, axisBorder:{show:false}, axisTicks:{show:false} },
-    yaxis: { labels:{style:{colors:'#444',fontSize:'10px'}, formatter:v=>'$'+v.toFixed(0)} },
+    xaxis: { categories:[], labels:{style:{colors:'#9898AE',fontSize:'10px'}}, axisBorder:{show:false}, axisTicks:{show:false} },
+    yaxis: { labels:{style:{colors:'#9898AE',fontSize:'10px'}, formatter:v=>'$'+v.toFixed(0)} },
     stroke: { curve:'smooth', width:2 },
     fill: { type:'gradient', gradient:{opacityFrom:0.22,opacityTo:0,stops:[0,100]} },
     dataLabels: { enabled:false },
@@ -3064,14 +3066,14 @@ function initCharts() {
 
   // Candlestick (unchanged)
   charts.trading = new ApexCharts(document.getElementById('tradingChart'), {
-    chart: { type:'candlestick', height:300, background:'transparent', foreColor:'#555555', toolbar:{show:false}, animations:{enabled:false}, zoom:{enabled:false} },
+    chart: { type:'candlestick', height:300, background:'transparent', foreColor:'#9898AE', toolbar:{show:false}, animations:{enabled:false}, zoom:{enabled:false} },
     series: [{data:[]}],
-    xaxis: { type:'datetime', labels:{style:{colors:'#555555',fontSize:'10px'}, datetimeFormatter:{hour:'HH:mm',day:'dd MMM'}} },
-    yaxis: { tooltip:{enabled:true}, labels:{style:{colors:'#555555',fontSize:'10px'}, formatter:v=>formatPrice(v)} },
+    xaxis: { type:'datetime', labels:{style:{colors:'#9898AE',fontSize:'10px'}, datetimeFormatter:{hour:'HH:mm',day:'dd MMM'}} },
+    yaxis: { tooltip:{enabled:true}, labels:{style:{colors:'#9898AE',fontSize:'10px'}, formatter:v=>formatPrice(v)} },
     plotOptions: { candlestick:{ colors:{upward:'#A8FF53',downward:'#ff6b35'}, wick:{useFillColor:true} } },
-    grid: { borderColor:'rgba(34,34,34,0.8)' },
+    grid: { borderColor:'rgba(255,255,255,0.08)' },
     tooltip: { theme:'dark' },
-    noData: { text:'เลือก symbol เพื่อดู chart', style:{color:'#555555'} },
+    noData: { text:'เลือก symbol เพื่อดู chart', style:{color:'#9898AE'} },
   });
   charts.trading.render();
 
@@ -3082,9 +3084,9 @@ function initCharts() {
     series: [100],
     labels: ['USDT'],
     colors: ['#A8FF53'],
-    plotOptions: { pie:{ donut:{ size:'68%', labels:{ show:true, name:{show:false}, total:{ show:true, showAlways:true, label:'Portfolio', color:'#555', fontSize:'11px' }, value:{ show:true, color:'#fff', fontSize:'1.3rem', fontWeight:700, fontFamily:"'Finlandica',sans-serif", formatter:v=>Number(v).toFixed(0) } } } } },
+    plotOptions: { pie:{ donut:{ size:'68%', labels:{ show:true, name:{show:false}, total:{ show:true, showAlways:true, label:'Portfolio', color:'#9898AE', fontSize:'11px' }, value:{ show:true, color:'#F2F2FC', fontSize:'1.3rem', fontWeight:700, fontFamily:"'DM Sans',sans-serif", formatter:v=>Number(v).toFixed(0) } } } } },
     dataLabels: { enabled:false },
-    legend: { position:'bottom', labels:{colors:'#555'}, fontSize:'10px' },
+    legend: { position:'bottom', labels:{colors:'#9898AE'}, fontSize:'10px' },
     stroke: { width:0 },
   });
   charts.allocation.render();
@@ -3094,8 +3096,8 @@ function initCharts() {
     ..._apex,
     chart: {..._apex.chart, type:'bar', height:'100%'},
     series: [{name:'Daily PnL', data:[]}],
-    xaxis: { categories:[], labels:{style:{colors:'#444',fontSize:'9px'}} },
-    yaxis: { labels:{style:{colors:'#444',fontSize:'10px'}, formatter:v=>v.toFixed(1)} },
+    xaxis: { categories:[], labels:{style:{colors:'#9898AE',fontSize:'9px'}} },
+    yaxis: { labels:{style:{colors:'#9898AE',fontSize:'10px'}, formatter:v=>v.toFixed(1)} },
     plotOptions: { bar:{borderRadius:4, columnWidth:'65%'} },
     dataLabels: { enabled:false },
     legend: { show:false },
@@ -3109,8 +3111,8 @@ function initCharts() {
     chart: {..._apex.chart, type:'bar', height:260},
     plotOptions: { bar:{horizontal:true, borderRadius:3, barHeight:'55%', distributed:true} },
     series: [{name:'Importance', data:[0,0,0,0,0,0,0,0]}],
-    xaxis: { categories:['RSI','MACD','BB','ATR','Volume','VWAP','24h chg','EMA'], max:1, labels:{style:{colors:'#444',fontSize:'10px'}}, axisBorder:{show:false} },
-    yaxis: { labels:{style:{colors:'#555',fontSize:'10px'}} },
+    xaxis: { categories:['RSI','MACD','BB','ATR','Volume','VWAP','24h chg','EMA'], max:1, labels:{style:{colors:'#9898AE',fontSize:'10px'}}, axisBorder:{show:false} },
+    yaxis: { labels:{style:{colors:'#9898AE',fontSize:'10px'}} },
     dataLabels: { enabled:false },
     legend: { show:false },
     colors: ['#A8FF53','#A8FF53','#A8FF53','#A8FF53','#A8FF53','#A8FF53','#A8FF53','#A8FF53'],
@@ -4262,14 +4264,14 @@ function updateLoopStats(d) {
 function handleLoopTradeOpened(d) {
   const icon = d.side === 'BUY' ? '🟢' : '🔴';
   const col = d.side === 'BUY' ? '#A8FF53' : '#ff6b35';
-  appendLoopLog(`<span style="color:${col}">${icon} OPEN ${d.side} ${d.symbol} @ ${d.price} | conf:${(d.confidence*100).toFixed(0)}% | <span style="color:#888">${d.regime}</span></span>`);
+  appendLoopLog(`<span style="color:${col}">${icon} OPEN ${d.side} ${d.symbol} @ ${d.price} | conf:${(d.confidence*100).toFixed(0)}% | <span style="color:var(--text-muted)">${d.regime}</span></span>`);
 }
 
 function handleLoopTradeClosed(d) {
   const icon = d.win ? '✅' : '❌';
   const col = d.win ? '#A8FF53' : '#ff6b35';
   const wr = (d.win_rate * 100).toFixed(1);
-  appendLoopLog(`<span style="color:${col}">${icon} CLOSE ${d.symbol} ${d.pnl_pct >= 0 ? '+' : ''}${d.pnl_pct.toFixed(2)}% | WR=${wr}% (${d.wins}/${d.total}) | <span style="color:#888">${d.regime}</span></span>`);
+  appendLoopLog(`<span style="color:${col}">${icon} CLOSE ${d.symbol} ${d.pnl_pct >= 0 ? '+' : ''}${d.pnl_pct.toFixed(2)}% | WR=${wr}% (${d.wins}/${d.total}) | <span style="color:var(--text-muted)">${d.regime}</span></span>`);
   updateLoopStats(d);
 }
 
@@ -4873,9 +4875,9 @@ async function runBacktest() {
         colors: ['#7cb9e8','#ffc107','#39d98a'],
         stroke: {curve:'smooth', width:[1.5,1.5,2.5]},
         xaxis: {categories:xLabels, labels:{show:false}, axisBorder:{show:false}, axisTicks:{show:false}},
-        yaxis: {labels:{style:{colors:'#555',fontSize:'10px'}, formatter:v=>'$'+v.toFixed(0)}},
-        grid: {borderColor:'#1a1a1a', strokeDashArray:3},
-        legend: {labels:{colors:'#888'}, position:'top', fontSize:'11px'},
+        yaxis: {labels:{style:{colors:'#9898AE',fontSize:'10px'}, formatter:v=>'$'+v.toFixed(0)}},
+        grid: {borderColor:'rgba(255,255,255,0.08)', strokeDashArray:3},
+        legend: {labels:{colors:'#9898AE'}, position:'top', fontSize:'11px'},
         dataLabels:{enabled:false}, markers:{size:0},
         theme:{mode:'dark'},
         tooltip:{theme:'dark'},
@@ -4961,9 +4963,9 @@ async function runBacktest() {
         chart: {type:'bar', height:130, background:'transparent', toolbar:{show:false}, animations:{enabled:false}, fontFamily:'var(--font-mono)'},
         series: [{name:'Avg PnL%', data: vals}],
         colors: [({value}) => value >= 0 ? '#39d98a' : '#ff6b35'],
-        xaxis: {categories: hrs, labels:{style:{colors:'#555',fontSize:'9px'}}, title:{text:'UTC Hour', style:{color:'#444',fontSize:'10px'}}},
-        yaxis: {labels:{style:{colors:'#555',fontSize:'9px'}, formatter:v=>v.toFixed(1)+'%'}},
-        grid: {borderColor:'#1a1a1a', strokeDashArray:3},
+        xaxis: {categories: hrs, labels:{style:{colors:'#9898AE',fontSize:'9px'}}, title:{text:'UTC Hour', style:{color:'#9898AE',fontSize:'10px'}}},
+        yaxis: {labels:{style:{colors:'#9898AE',fontSize:'9px'}, formatter:v=>v.toFixed(1)+'%'}},
+        grid: {borderColor:'rgba(255,255,255,0.08)', strokeDashArray:3},
         dataLabels:{enabled:false}, plotOptions:{bar:{columnWidth:'80%'}},
         theme:{mode:'dark'}, tooltip:{theme:'dark',
           custom({dataPointIndex:i}) {
@@ -4992,7 +4994,7 @@ async function runBacktest() {
               <div style="color:${c};font-size:0.95rem;font-weight:700;font-family:var(--font-mono)">${v}</div>
               <div style="color:${c};font-size:0.6rem;margin-top:2px">${pct}%</div>
             </div>
-            <div style="color:#666;font-size:0.6rem;margin-top:4px">${_en[k]||k}</div>
+            <div style="color:var(--text-muted);font-size:0.6rem;margin-top:4px">${_en[k]||k}</div>
           </div>`;
         }).join('');
       document.getElementById('btExitCard').style.display = '';
@@ -5022,7 +5024,7 @@ async function loadShap(btn) {
     document.getElementById('shapBars').innerHTML = feats.length
       ? feats.slice(0,10).map(f => {
           const w = Math.max(2,(f.importance/maxImp*100)).toFixed(0);
-          return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><div style="width:96px;font-size:0.66rem;color:#aaa;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.feature}</div><div style="flex:1;background:#1a1a1a;border-radius:3px;height:14px"><div style="width:${w}%;background:linear-gradient(90deg,#5bc8ff,#A8FF53);height:100%;border-radius:3px"></div></div><div style="width:42px;font-size:0.62rem;color:#5bc8ff;font-family:var(--font-mono)">${f.importance.toFixed(3)}</div></div>`;
+          return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><div style="width:96px;font-size:0.66rem;color:var(--text-muted);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.feature}</div><div style="flex:1;background:#1a1a1a;border-radius:3px;height:14px"><div style="width:${w}%;background:linear-gradient(90deg,#5bc8ff,#A8FF53);height:100%;border-radius:3px"></div></div><div style="width:42px;font-size:0.62rem;color:#5bc8ff;font-family:var(--font-mono)">${f.importance.toFixed(3)}</div></div>`;
         }).join('')
       : '<span class="text-muted" style="font-size:0.72rem">โมเดลยังไม่ได้เทรน (ต้องมี trade ปิดอย่างน้อย 30 รายการ)</span>';
   } catch(e) { showToast('SHAP Error', e.message, 'danger'); }
@@ -5047,7 +5049,7 @@ async function loadCoint(btn) {
     const d = await fetch('/api/pairs/cointegration').then(r=>r.json()).catch(()=>({pairs:[]}));
     const pairs = d.pairs || [];
     document.getElementById('cointList').innerHTML = pairs.length
-      ? pairs.map(p => { const hl = p.half_life ? p.half_life.toFixed(1)+' bars' : '—'; return `<div style="background:rgba(255,193,7,0.08);border:1px solid rgba(255,193,7,0.2);border-radius:5px;padding:5px 7px;margin-bottom:5px"><div style="color:#ffc107;font-weight:600">${p.pair[0]} ↔ ${p.pair[1]}</div><div style="color:#888;font-size:0.64rem">p=${p.p_value.toFixed(4)} | β=${p.hedge_ratio.toFixed(2)} | HL=${hl}</div></div>`; }).join('')
+      ? pairs.map(p => { const hl = p.half_life ? p.half_life.toFixed(1)+' bars' : '—'; return `<div style="background:rgba(255,193,7,0.08);border:1px solid rgba(255,193,7,0.2);border-radius:5px;padding:5px 7px;margin-bottom:5px"><div style="color:#ffc107;font-weight:600">${p.pair[0]} ↔ ${p.pair[1]}</div><div style="color:var(--text-muted);font-size:0.64rem">p=${p.p_value.toFixed(4)} | β=${p.hedge_ratio.toFixed(2)} | HL=${hl}</div></div>`; }).join('')
       : '<span class="text-muted" style="font-size:0.72rem">ไม่พบคู่ cointegrated (p<0.05)</span>';
   } catch(e) { showToast('Cointegration Error', e.message, 'danger'); }
   finally { if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Run'; } }
@@ -5072,7 +5074,7 @@ async function loadQuantLab() {
       ? feats.slice(0,10).map(f => {
           const w = Math.max(2, (f.importance/maxImp*100)).toFixed(0);
           return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-            <div style="width:96px;font-size:0.66rem;color:#aaa;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${f.feature}">${f.feature}</div>
+            <div style="width:96px;font-size:0.66rem;color:var(--text-muted);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${f.feature}">${f.feature}</div>
             <div style="flex:1;background:#1a1a1a;border-radius:3px;height:14px;position:relative">
               <div style="width:${w}%;background:linear-gradient(90deg,#5bc8ff,#A8FF53);height:100%;border-radius:3px"></div>
             </div>
@@ -5102,7 +5104,7 @@ async function loadQuantLab() {
           const hl = p.half_life ? p.half_life.toFixed(1)+' bars' : '—';
           return `<div style="background:rgba(255,193,7,0.08);border:1px solid rgba(255,193,7,0.2);border-radius:5px;padding:5px 7px;margin-bottom:5px">
             <div style="color:#ffc107;font-weight:600">${p.pair[0]} ↔ ${p.pair[1]}</div>
-            <div style="color:#888;font-size:0.64rem">p=${p.p_value.toFixed(4)} | β=${p.hedge_ratio.toFixed(2)} | HL=${hl}</div>
+            <div style="color:var(--text-muted);font-size:0.64rem">p=${p.p_value.toFixed(4)} | β=${p.hedge_ratio.toFixed(2)} | HL=${hl}</div>
           </div>`;
         }).join('')
       : '<span class="text-muted" style="font-size:0.72rem">ไม่พบคู่ cointegrated (p<0.05)</span>';
