@@ -1,7 +1,7 @@
 # ทำต่อที่นี่ (Continue Here)
 
 > อัพเดตล่าสุด: 2026-06-11
-> สถานะ: ✅ Bot รันอยู่บน GCP — demo mode, Binance จริง, ML training 2,492 samples
+> สถานะ: ✅ Bot รันอยู่บน GCP — demo mode, Binance จริง, ML training active
 
 ---
 
@@ -9,62 +9,67 @@
 
 - [x] Clone repo จาก GitHub มาที่ local
 - [x] ตั้งค่า `/quicksave` command สำหรับ sync ระหว่างเครื่อง
-- [x] วิเคราะห์ codebase ด้วย understand-anything → knowledge graph 310 nodes (ภาษาไทย)
-- [x] ศึกษา Lunai: v1.4.0 → v2.0.0 upgrade
-- [x] สร้าง `Dockerfile` + อัพเดต `docker-compose.yml`
+- [x] วิเคราะห์ codebase ด้วย understand-anything → knowledge graph 310 nodes
 - [x] Deploy บน GCP Singapore (asia-southeast1-b, e2-micro, free tier)
-- [x] แก้ bugs ต่างๆ: `_journal`, `_max_var_pct`, `_opt_rsi_oversold`, `_model_bandit`
-- [x] Binance เชื่อมได้ — ราคาจริง, ML training ทำงาน
-- [x] RTK PreToolUse hook ตั้งค่าแล้ว
-- [x] `/impeccable init` → PRODUCT.md + DESIGN.md + .impeccable/design.json
-- [x] `/impeccable critique` → Health score 24/40, 13 findings
-- [x] แก้ side-tab border-left ×3, bounce easing ×2, em dash ×11, reduced-motion support
-- [x] **FINTA bridge** (`src/agent/finta_bridge.py`) — 50+ indicators เสริม
-- [x] **Parquet kline cache** (`src/agent/kline_cache.py`) — backtest ไม่ต้อง fetch API ซ้ำ
-- [x] **F5.3 Champion/Challenger** (`src/agent/champion_challenger.py`) — tournament 5 strategies
-- [x] **F2.4 Optuna optimizer** (`src/agent/param_optimizer.py`) — TPE Bayesian search
-- [x] **F3.1 Pairs Trading** (`_get_pairs_signal()`) — Engle-Granger cointegration + OU z-score
-- [x] **Model Routing** (`src/agent/model_router.py`) — Haiku/Sonnet based on regime
-- [x] **แก้ 6 critical bugs** ใน ai_trader.py (BUG #1-6) — bot เทรดได้แล้ว
-- [x] **Training backfill** — HourlyTrainer LIMIT 500 candles → 2,492 samples (acc 0.556)
-- [x] **Champion/Challenger tournament** ทุก symbol — champion: ichimoku-wide (SOL), smc-aggressive (BTC)
-- [x] **Code review (Opus)** + แก้ findings ทั้งหมด:
-  - CRITICAL: `RegimeResult("RANGING", 0.5)` ขาด 4 args → TypeError ใน `_check_exit_conditions`
-  - BUG: claude path ไม่เรียก `_capture("claude", sig)` → attribution ว่างเสมอ
-  - BUG: `ArbitrageEngine` ไม่ได้รับ config จาก settings
-  - PERF: DB dedup query unbounded → ใช้ `recorded_at >= cutoff` + แทน md5 ด้วย string key
+- [x] แก้ bugs ต่างๆ, Binance เชื่อมได้, ML training ทำงาน
+- [x] **FINTA bridge**, **Parquet kline cache**, **Champion/Challenger**, **Optuna optimizer**, **Pairs Trading**, **Model Routing**
+- [x] **fibonacci_levels()** wired เข้า signal pipeline เป็น confluence filter
+- [x] **Chart range buttons** (1H/24H/7D) แก้แล้ว — refetch candles จริง
+- [x] **Invalid Date** บน ML MODEL card — แก้ Python ISO timestamp guard แล้ว
+- [x] **Design revamp** — Finance aesthetic: DM Sans, #080808 black bg, 16px radius, clean cards
+  - `:root` tokens ใหม่ทั้งหมด (bg/card/border/text/font/radius)
+  - Sidebar: filled pill active, no left-border, clean bg
+  - Cards/buttons/tabs/badges: radius ใหม่ทั้งหมด
+  - AT section: Finlandica/hardcoded #000 → CSS vars ทั้งหมด
+- [x] **Font/readability pass** — body 15px, text-muted #9898AE, border 0.12, stat-label/card-header/regime-badge ใหญ่ขึ้น
+- [x] **Bootstrap .text-muted override** → `var(--text-muted) !important`
+- [x] **Chart colors** — ApexCharts foreColor/labels/grid ทั้งหมด → #9898AE / rgba(255,255,255,0.08)
+- [x] **Hardcoded dark colors** (#444/#555/#666/#888) ใน inline styles และ JS-rendered HTML → var(--text-muted)
+- [x] **Topbar symbol display** — แสดง currentSymbol ที่เลือกอยู่
+- [x] **Opus design audit** — 9 remaining inconsistencies แก้แล้ว:
+  - topbar-slim: remove backdrop-filter, bg → var(--bg-card)
+  - price-card: 14px → var(--radius-card)
+  - #1a1a1a bar tracks → var(--bg-card2) ทั้งหมด
 
 ---
 
 ## สิ่งที่ต้องทำต่อ 🚧
 
-### 1. 🟡 Deploy code review fixes บน server
+### 1. 🟡 ใส่ Anthropic API Key
 ```bash
-gcloud compute ssh kongboonma2@aiterra-server-sg --zone=asia-southeast1-b
-cd ~/AI_Create && git pull
-cd crypto-ai-trader && docker compose up -d --build
-docker compose logs -f --tail=30
-```
-
-### 2. 🟡 ใส่ Anthropic API Key (Claude AI วิเคราะห์ได้)
-```bash
+# SSH เข้า server แล้ว
 nano ~/AI_Create/crypto-ai-trader/config/settings.yml
-# หา: api_key: ""  ใต้ claude:
-# แก้เป็น: api_key: "sk-ant-..."
+# api_key: "sk-ant-..."
 docker compose restart
 ```
 
-### 3. 🟢 Switch เป็น Live Mode (หลังทดสอบ demo ผ่าน)
+### 2. 🟡 Deploy code review fixes (Python files) ยังไม่ได้ rebuild
+```bash
+gcloud compute ssh aiterra-server-sg --zone=asia-southeast1-b
+cd ~/AI_Create && git pull
+cd crypto-ai-trader && docker compose up -d --build
+```
+> หมายเหตุ: HTML deploy ทำผ่าน `docker cp` ได้ไม่ต้อง rebuild แต่ Python ต้อง rebuild
+
+### 3. 🟢 Switch เป็น Live Mode
 ```yaml
 trading:
   mode: "live"
 ```
-หรือใช้ POST /api/mode/swap ผ่าน dashboard
 
-### 4. 🔵 Audit P2/P3 CSS issues (จาก /impeccable audit)
-- Hardcoded `#0a0a0a` บน canvas → `var(--bg-canvas, #0a0a0a)`
-- `z-index:9999` notification → `--z-toast`
+### 4. 🔵 P2/P3 CSS issues ที่เหลือ (minor)
+- `z-index:9999` notification → `var(--z-toast)`
 - Modal `width:360px` → `min(360px, 95vw)`
+
+---
+
+## Deploy Method
+
+| งาน | คำสั่ง |
+|-----|--------|
+| HTML-only (ไม่ restart) | `gcloud compute scp index.html aiterra-server-sg:/tmp/` → `docker cp /tmp/index.html container:/app/src/web/` |
+| Python files | `docker cp file.py container:/app/path/` + `docker restart` |
+| Full rebuild | `git pull` + `docker compose up -d --build` |
 
 ---
 
@@ -72,25 +77,10 @@ trading:
 
 | ค่า | ข้อมูล |
 |-----|--------|
-| Provider | Google Cloud (Free Tier) |
-| Region | asia-southeast1-b (Singapore) |
-| Machine | e2-micro (2 vCPU, 1 GB RAM) |
-| Port | 8888 |
-| Public IP | 34.21.139.179 |
-| Dashboard | http://34.21.139.179:8888 |
-| Path | `~/AI_Create/crypto-ai-trader` |
-| Status | ✅ Running (demo mode, Binance จริง) |
-
----
-
-## ML Training Status
-
-| ค่า | ข้อมูล |
-|-----|--------|
-| total_samples | 2,492 |
-| model_accuracy | 0.556 |
-| HourlyTrainer LIMIT | 500 candles/symbol |
-| next retrain | ทุกชั่วโมงอัตโนมัติ |
+| IP | 34.21.139.179:8888 |
+| Path บน server | ไม่มี git repo — ใช้ docker cp เท่านั้น |
+| Container name | `crypto-ai-trader-aiterra-1` |
+| SSH zone | `asia-southeast1-b` project `winged-poetry-428205-i4` |
 
 ---
 
@@ -104,40 +94,4 @@ trading:
 
 ---
 
-## Lunai v2.0.0 Feature Status
-
-| Feature | สถานะ |
-|---------|--------|
-| F1.x Market Intelligence | ✅ |
-| F2.3 Trade Journal | ✅ |
-| F2.4 Adaptive Meta-Params (Optuna) | ✅ |
-| F3.1 Pairs Trading | ✅ |
-| F5.1 Walk-forward Optimizer | ✅ |
-| F5.3 Champion/Challenger | ✅ |
-| Model Routing (Haiku/Sonnet) | ✅ |
-| Anthropic API Key | ❌ |
-
----
-
-## คำสั่งที่ใช้บ่อย
-
-```bash
-# SSH เข้า server
-gcloud compute ssh kongboonma2@aiterra-server-sg --zone=asia-southeast1-b
-
-# ดู logs
-cd ~/AI_Create/crypto-ai-trader && docker compose logs -f --tail=30
-
-# Restart
-docker compose restart
-
-# Update + rebuild
-cd ~/AI_Create && git pull && cd crypto-ai-trader && docker compose up -d --build
-
-# เช็ค training status
-curl -s http://localhost:8888/api/training/hourly/status | python3 -m json.tool
-```
-
----
-
-*ไฟล์นี้สร้างอัตโนมัติโดย Claude เพื่อบันทึกความคืบหน้า*
+*อัพเดตอัตโนมัติโดย Claude — 2026-06-11*
