@@ -4097,7 +4097,7 @@ async function refreshHourlyTrainer() {
     const r = await fetch('/api/training/hourly/status');
     const d = await r.json();
     if (!d.enabled) return;
-    const fmt = v => v ? new Date(v + 'Z').toLocaleTimeString('th', {hour:'2-digit',minute:'2-digit'}) : '—';
+    const fmt = v => v ? new Date(/[Z+]/.test(v) ? v : v + 'Z').toLocaleTimeString('th', {hour:'2-digit',minute:'2-digit'}) : '—';
     document.getElementById('htLastRun').textContent = fmt(d.last_run);
     document.getElementById('htLastSamples').textContent = d.last_samples ?? '—';
     document.getElementById('htTotalSamples').textContent = d.total_samples ?? '—';
@@ -6184,7 +6184,7 @@ async function atRefreshTrainStatus() {
     // ML Model card
     const samples = htD.total_samples ?? 0;
     const acc = htD.model_accuracy != null ? (htD.model_accuracy*100).toFixed(1)+'%' : '—';
-    const lastRun = htD.last_run ? new Date(htD.last_run+'Z').toLocaleTimeString('th',{hour:'2-digit',minute:'2-digit'}) : '—';
+    const lastRun = htD.last_run ? new Date(/[Z+]/.test(htD.last_run) ? htD.last_run : htD.last_run+'Z').toLocaleTimeString('th',{hour:'2-digit',minute:'2-digit'}) : '—';
     const nextRun = htD.next_run_in ? Math.floor(htD.next_run_in/60)+'m' : '—';
     _setEl('atMLSamples', samples);
     _setEl('atMLAcc', acc);
