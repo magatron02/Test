@@ -1,7 +1,7 @@
 # ทำต่อที่นี่ (Continue Here)
 
 > อัพเดตล่าสุด: 2026-06-11
-> สถานะ: ✅ Bot รันอยู่บน GCP — demo mode, Binance จริง, ML training active
+> สถานะ: ✅ Bot รันอยู่บน GCP — demo mode, Binance จริง, ML training active, deploy ล่าสุด 2026-06-11
 
 ---
 
@@ -45,13 +45,10 @@ nano ~/AI_Create/crypto-ai-trader/config/settings.yml
 docker compose restart
 ```
 
-### 2. 🟡 Deploy code review fixes (Python files) ยังไม่ได้ rebuild
-```bash
-gcloud compute ssh aiterra-server-sg --zone=asia-southeast1-b
-cd ~/AI_Create && git pull
-cd crypto-ai-trader && docker compose up -d --build
-```
-> หมายเหตุ: HTML deploy ทำผ่าน `docker cp` ได้ไม่ต้อง rebuild แต่ Python ต้อง rebuild
+### 2. ✅ Deploy code review fixes — เสร็จแล้ว (2026-06-11)
+- git pull + docker compose up -d --build สำเร็จ
+- Container: `crypto-ai-trader-aiterra-1` Up, port 8888
+- API: `running: true`, `open_trades: 1`
 
 ### 3. 🟢 Switch เป็น Live Mode
 ```yaml
