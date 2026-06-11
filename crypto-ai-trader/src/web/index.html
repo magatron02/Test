@@ -29,6 +29,8 @@
   --font-mono:     'Space Mono', 'Courier New', monospace;
   --font-headline: 'Finlandica', sans-serif;
   --font-body:     'Noto Sans', sans-serif;
+  --bg-canvas:     #0a0a0a;
+  --z-toast:       9999;
 }
 * { box-sizing: border-box; }
 
@@ -199,7 +201,7 @@ body {
 .section { display: none; }
 .section.active { display: block; }
 .chart-container { position: relative; height: 300px; }
-.notification { position: fixed; top: 65px; right: 20px; z-index: 9999; min-width: 280px; }
+.notification { position: fixed; top: 65px; right: 20px; z-index: var(--z-toast); min-width: 280px; }
 .text-success { color: var(--accent-buy) !important; }
 .text-danger  { color: var(--accent-red) !important; }
 .text-warning { color: var(--accent) !important; }
@@ -346,7 +348,7 @@ ol.small, ul.small, .small.text-muted,
 #chatFab:active { transform:scale(0.96); }
 #chatPanel {
   position:fixed; bottom:86px; right:24px; z-index:8999;
-  width:360px; max-height:540px;
+  width:min(360px, 95vw); max-height:540px;
   background:rgba(10,10,10,0.95);
   backdrop-filter:blur(28px); -webkit-backdrop-filter:blur(28px);
   border:1px solid rgba(255,255,255,0.08);
@@ -515,7 +517,7 @@ body { overflow: hidden; }
 .app { display: grid; grid-template-columns: 238px 1fr; height: 100vh; }
 
 .sidebar {
-  background: linear-gradient(180deg, #0a0a0a 0%, #000 100%);
+  background: linear-gradient(180deg, var(--bg-canvas) 0%, #000 100%);
   border-right: 1px solid var(--border);
   display: flex; flex-direction: column;
   padding: 18px 13px; overflow-y: auto; overflow-x: hidden;
@@ -1041,7 +1043,7 @@ body { overflow: hidden; }
           <button class="btn btn-outline-secondary btn-sm" onclick="refreshHeatmap()"><i class="bi bi-arrow-clockwise"></i></button>
         </div>
         <div class="card-body p-2">
-          <canvas id="obHeatmapCanvas" style="width:100%;height:160px;display:block;border-radius:4px;background:#0a0a0a"></canvas>
+          <canvas id="obHeatmapCanvas" style="width:100%;height:160px;display:block;border-radius:4px;background:var(--bg-canvas)"></canvas>
           <div class="d-flex justify-content-between mt-1" style="font-size:0.65rem;color:var(--text-muted)">
             <span>-30 min</span>
             <span style="color:#3ad98a">■ Bid</span>
