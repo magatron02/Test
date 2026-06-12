@@ -10,7 +10,7 @@
 <script src="https://cdn.jsdelivr.net/npm/countup.js@2.8.3/dist/countUp.umd.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;700&family=Noto+Sans+Thai:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
 <script type="module">
   import 'https://esm.run/@material/web/switch/switch.js';
   import 'https://esm.run/@material/web/progress/circular-progress.js';
@@ -41,10 +41,10 @@
   --accent-yellow: #FACC15;
   --accent-purple: #A78BFA;
 
-  /* Typography */
-  --font-mono:     'Geist Mono', 'JetBrains Mono', 'Courier New', monospace;
-  --font-headline: 'Geist', 'Inter', sans-serif;
-  --font-body:     'Geist', 'Inter', sans-serif;
+  /* Typography — Thai fallback เป็น Noto Sans Thai (ไม่มีหัว/loopless) */
+  --font-mono:     'Geist Mono', 'JetBrains Mono', 'Noto Sans Thai', 'Courier New', monospace;
+  --font-headline: 'Geist', 'Noto Sans Thai', 'Inter', sans-serif;
+  --font-body:     'Geist', 'Noto Sans Thai', 'Inter', sans-serif;
 
   /* Radius */
   --radius-card: 16px;
@@ -94,13 +94,16 @@
 }
 * { box-sizing: border-box; }
 
+/* base 17px — สเกลข้อความ rem ทั้งหน้าใหญ่ขึ้น (ตัวไทยอ่านง่ายขึ้น) */
+html { font-size: 17px; }
+
 body {
   background: var(--bg-dark);
   color: var(--text-main);
   font-family: var(--font-body), sans-serif;
   margin: 0;
-  font-size: 16px;
-  line-height: 1.55;
+  font-size: 1rem;
+  line-height: 1.6;
   font-weight: 400;
 }
 
@@ -1572,12 +1575,12 @@ md-circular-progress.spin-inline {
     </div>
   </div>
 
-  <!-- Correlation Matrix -->
+  <!-- Row 2: Correlation Matrix (compact grid) + Market Narrative -->
   <div class="row g-3 mb-3" id="correlationRow">
-    <div class="col-12">
-      <div class="card">
+    <div class="col-lg-5">
+      <div class="card h-100">
         <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-grid-3x3-gap me-2"></i>Correlation Matrix <span class="text-muted" style="font-size:0.7rem;font-weight:400">: ความสัมพันธ์ของราคา (กันถือเหรียญที่วิ่งทางเดียวกันซ้ำ)</span></span>
+          <span><i class="bi bi-grid-3x3-gap me-2"></i>Correlation Matrix <span class="text-muted" style="font-size:0.7rem;font-weight:400">: กันถือเหรียญที่วิ่งทางเดียวกันซ้ำ</span></span>
           <span class="text-muted" style="font-size:0.65rem" id="corrUpdated">—</span>
         </div>
         <div class="card-body p-2" id="correlationPanel">
@@ -1585,12 +1588,8 @@ md-circular-progress.spin-inline {
         </div>
       </div>
     </div>
-  </div>
-
-  <!-- Market Narrative -->
-  <div class="row g-3 mb-3" id="narrativeRow">
-    <div class="col-12">
-      <div class="card">
+    <div class="col-lg-7" id="narrativeRow">
+      <div class="card h-100">
         <div class="card-header d-flex justify-content-between align-items-center">
           <span><i class="bi bi-chat-left-text me-2"></i>Market Narrative
             <span class="text-muted" style="font-size:0.68rem;font-weight:400;letter-spacing:0;text-transform:none">: สรุปสภาพตลาดภาษาไทย (rule-based · ไม่ใช้ API)</span>
@@ -1604,10 +1603,10 @@ md-circular-progress.spin-inline {
     </div>
   </div>
 
-  <!-- Risk Analytics -->
+  <!-- Row 3: Risk Analytics + Sentiment & On-chain -->
   <div class="row g-3 mb-3" id="analyticsRow">
-    <div class="col-12">
-      <div class="card">
+    <div class="col-lg-7">
+      <div class="card h-100">
         <div class="card-header d-flex justify-content-between align-items-center">
           <span><i class="bi bi-bar-chart-steps me-2"></i>Risk Analytics <span class="text-muted" style="font-size:0.7rem;font-weight:400">: live trades</span></span>
           <div class="d-flex gap-2 align-items-center">
@@ -1620,14 +1619,10 @@ md-circular-progress.spin-inline {
         </div>
       </div>
     </div>
-  </div>
-
-  <!-- Sentiment & On-chain -->
-  <div class="row g-3 mb-3" id="sentimentRow">
-    <div class="col-12">
-      <div class="card">
+    <div class="col-lg-5" id="sentimentRow">
+      <div class="card h-100">
         <div class="card-header d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-emoji-smile me-2"></i>Market Sentiment &amp; On-chain <span class="text-muted" style="font-size:0.7rem;font-weight:400">: Fear &amp; Greed · Funding Rate · Open Interest</span></span>
+          <span><i class="bi bi-emoji-smile me-2"></i>Sentiment &amp; On-chain <span class="text-muted" style="font-size:0.7rem;font-weight:400">: F&amp;G · Funding · OI</span></span>
           <div class="d-flex gap-2 align-items-center">
             <span class="text-muted" style="font-size:0.65rem" id="sentimentUpdated">—</span>
             <button class="btn btn-outline-secondary btn-sm" style="padding:1px 8px;font-size:0.7rem" onclick="fetchSentiment()">↻</button>
@@ -1916,6 +1911,62 @@ md-circular-progress.spin-inline {
     </div>
   </div>
 
+  <!-- ═══ Quant Lab (ML for Trading) ═══ -->
+  <div class="card mb-3" style="border-color:rgba(91,200,255,0.25)">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-cpu me-2"></i>Quant Lab <span class="badge ms-1" style="background:rgba(91,200,255,0.15);color:#5bc8ff;font-size:0.6rem">ML4T</span></span>
+      <button class="btn btn-outline-secondary btn-sm" onclick="loadQuantLab()" id="quantLabBtn">
+        <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+      </button>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <!-- SHAP Feature Importance -->
+        <div class="col-md-5">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div style="font-size:0.8rem;color:#5bc8ff;font-weight:600">
+              <i class="bi bi-bar-chart-steps me-1"></i>SHAP Feature Importance
+              <span class="text-muted" style="font-size:0.65rem;font-weight:400" id="shapModelType"></span>
+            </div>
+            <button class="btn btn-sm px-2 py-0" style="font-size:0.65rem;border:1px solid rgba(91,200,255,0.3);color:#5bc8ff;background:rgba(91,200,255,0.06)" onclick="loadShap(this)" title="Recalculate SHAP">
+              <i class="bi bi-arrow-clockwise me-1"></i>Run
+            </button>
+          </div>
+          <div id="shapBars" style="min-height:60px"></div>
+        </div>
+        <!-- HRP Allocation -->
+        <div class="col-md-4">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div style="font-size:0.8rem;color:#00A8E8;font-weight:600">
+              <i class="bi bi-diagram-3 me-1"></i>HRP Allocation
+              <span class="text-muted" style="font-size:0.65rem;font-weight:400">correlation-aware</span>
+            </div>
+            <button class="btn btn-sm px-2 py-0" style="font-size:0.65rem;border:1px solid rgba(0,168,232,0.3);color:#00A8E8;background:rgba(0,168,232,0.06)" onclick="loadHrp(this)" title="Rebalance HRP">
+              <i class="bi bi-arrow-clockwise me-1"></i>Run
+            </button>
+          </div>
+          <table class="table table-dark table-sm mb-0" style="font-size:0.74rem">
+            <thead><tr><th>Symbol</th><th>Weight</th><th title="vs equal weight">×Eq</th><th title="size multiplier">Mult</th></tr></thead>
+            <tbody id="hrpBody"><tr><td colspan="4" class="text-muted text-center">—</td></tr></tbody>
+          </table>
+        </div>
+        <!-- Cointegration Pairs -->
+        <div class="col-md-3">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div style="font-size:0.8rem;color:#ffc107;font-weight:600">
+              <i class="bi bi-link-45deg me-1"></i>Cointegrated Pairs
+              <span class="text-muted" style="font-size:0.65rem;font-weight:400">stat-arb</span>
+            </div>
+            <button class="btn btn-sm px-2 py-0" style="font-size:0.65rem;border:1px solid rgba(255,193,7,0.3);color:#ffc107;background:rgba(255,193,7,0.06)" onclick="loadCoint(this)" title="Re-scan cointegration">
+              <i class="bi bi-arrow-clockwise me-1"></i>Run
+            </button>
+          </div>
+          <div id="cointList" style="font-size:0.74rem"><span class="text-muted">—</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Hourly Real-Data Trainer card -->
   <div class="card mb-3" style="border-color:rgba(0,168,232,0.2)">
     <div class="card-header d-flex justify-content-between align-items-center">
@@ -2029,61 +2080,6 @@ md-circular-progress.spin-inline {
     </div>
   </div>
 
-  <!-- ═══ Quant Lab (ML for Trading) ═══ -->
-  <div class="card mb-3" style="border-color:rgba(91,200,255,0.25)">
-    <div class="card-header d-flex justify-content-between align-items-center">
-      <span><i class="bi bi-cpu me-2"></i>Quant Lab <span class="badge ms-1" style="background:rgba(91,200,255,0.15);color:#5bc8ff;font-size:0.6rem">ML4T</span></span>
-      <button class="btn btn-outline-secondary btn-sm" onclick="loadQuantLab()" id="quantLabBtn">
-        <i class="bi bi-arrow-clockwise me-1"></i>Refresh
-      </button>
-    </div>
-    <div class="card-body">
-      <div class="row g-3">
-        <!-- SHAP Feature Importance -->
-        <div class="col-md-5">
-          <div class="d-flex align-items-center justify-content-between mb-2">
-            <div style="font-size:0.8rem;color:#5bc8ff;font-weight:600">
-              <i class="bi bi-bar-chart-steps me-1"></i>SHAP Feature Importance
-              <span class="text-muted" style="font-size:0.65rem;font-weight:400" id="shapModelType"></span>
-            </div>
-            <button class="btn btn-sm px-2 py-0" style="font-size:0.65rem;border:1px solid rgba(91,200,255,0.3);color:#5bc8ff;background:rgba(91,200,255,0.06)" onclick="loadShap(this)" title="Recalculate SHAP">
-              <i class="bi bi-arrow-clockwise me-1"></i>Run
-            </button>
-          </div>
-          <div id="shapBars" style="min-height:60px"></div>
-        </div>
-        <!-- HRP Allocation -->
-        <div class="col-md-4">
-          <div class="d-flex align-items-center justify-content-between mb-2">
-            <div style="font-size:0.8rem;color:#00A8E8;font-weight:600">
-              <i class="bi bi-diagram-3 me-1"></i>HRP Allocation
-              <span class="text-muted" style="font-size:0.65rem;font-weight:400">correlation-aware</span>
-            </div>
-            <button class="btn btn-sm px-2 py-0" style="font-size:0.65rem;border:1px solid rgba(0,168,232,0.3);color:#00A8E8;background:rgba(0,168,232,0.06)" onclick="loadHrp(this)" title="Rebalance HRP">
-              <i class="bi bi-arrow-clockwise me-1"></i>Run
-            </button>
-          </div>
-          <table class="table table-dark table-sm mb-0" style="font-size:0.74rem">
-            <thead><tr><th>Symbol</th><th>Weight</th><th title="vs equal weight">×Eq</th><th title="size multiplier">Mult</th></tr></thead>
-            <tbody id="hrpBody"><tr><td colspan="4" class="text-muted text-center">—</td></tr></tbody>
-          </table>
-        </div>
-        <!-- Cointegration Pairs -->
-        <div class="col-md-3">
-          <div class="d-flex align-items-center justify-content-between mb-2">
-            <div style="font-size:0.8rem;color:#ffc107;font-weight:600">
-              <i class="bi bi-link-45deg me-1"></i>Cointegrated Pairs
-              <span class="text-muted" style="font-size:0.65rem;font-weight:400">stat-arb</span>
-            </div>
-            <button class="btn btn-sm px-2 py-0" style="font-size:0.65rem;border:1px solid rgba(255,193,7,0.3);color:#ffc107;background:rgba(255,193,7,0.06)" onclick="loadCoint(this)" title="Re-scan cointegration">
-              <i class="bi bi-arrow-clockwise me-1"></i>Run
-            </button>
-          </div>
-          <div id="cointList" style="font-size:0.74rem"><span class="text-muted">—</span></div>
-        </div>
-      </div>
-    </div>
-  </div>
 </section>
 <!-- AI TRAINING inner content end -->
   </div><!-- end anl-training -->
