@@ -10,7 +10,7 @@
 <script src="https://cdn.jsdelivr.net/npm/countup.js@2.8.3/dist/countUp.umd.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
 <script type="module">
   import 'https://esm.run/@material/web/switch/switch.js';
   import 'https://esm.run/@material/web/progress/circular-progress.js';
@@ -42,9 +42,9 @@
   --accent-purple: #A78BFA;
 
   /* Typography */
-  --font-mono:     'JetBrains Mono', 'Courier New', monospace;
-  --font-headline: 'Inter', sans-serif;
-  --font-body:     'Inter', sans-serif;
+  --font-mono:     'Geist Mono', 'JetBrains Mono', 'Courier New', monospace;
+  --font-headline: 'Geist', 'Inter', sans-serif;
+  --font-body:     'Geist', 'Inter', sans-serif;
 
   /* Radius */
   --radius-card: 16px;
@@ -1128,6 +1128,79 @@ md-circular-progress.spin-inline {
   display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
 }
 .risk-model-bar .rmv { color: var(--text-main); font-weight: 700; }
+
+/* ── Tabular nums — all data/money/price elements ── */
+.stat-value, .price-card .fw-bold, .at-metric-num,
+.at-sb-val, .at-sym, .sf-v, .sf-k,
+.table td, .indicator-row, .at-metric-row,
+.at-train-row, .at-attr-pct,
+#totalValue, #cashValue, #winRate, #winRateBottom,
+#avgPnl, #todayPnl, #openPosCount, #totalPnl,
+#maxDrawdown, #sharpeRatio, #pfTotalTrades, #pfTotalPnl,
+#btReturn, #btWinRate, #btSharpe, #btDrawdown {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── ApexCharts — bklit-ui frosted glass tooltip ── */
+.apexcharts-tooltip {
+  background: rgba(13,17,23,0.82) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.55), 0 0 0 0.5px rgba(255,255,255,0.06) !important;
+  overflow: hidden !important;
+}
+.apexcharts-tooltip-title {
+  background: rgba(255,255,255,0.04) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 11px !important;
+  font-variant-numeric: tabular-nums !important;
+  color: rgba(255,255,255,0.45) !important;
+  padding: 6px 12px !important;
+  letter-spacing: 0.02em !important;
+}
+.apexcharts-tooltip-series-group { padding: 5px 12px !important; }
+.apexcharts-tooltip-text,
+.apexcharts-tooltip-text-y-label,
+.apexcharts-tooltip-text-y-value {
+  font-family: var(--font-mono) !important;
+  font-size: 12px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+.apexcharts-tooltip-text-y-value { font-weight: 700 !important; color: rgba(255,255,255,0.87) !important; }
+.apexcharts-tooltip-text-y-label { color: rgba(255,255,255,0.45) !important; }
+.apexcharts-tooltip-marker { width: 8px !important; height: 8px !important; border-radius: 50% !important; }
+
+/* Crosshair */
+.apexcharts-xcrosshairs, .apexcharts-ycrosshairs {
+  stroke: rgba(255,255,255,0.12) !important;
+  stroke-dasharray: 3 3 !important;
+}
+.apexcharts-xaxis-annotation-label,
+.apexcharts-yaxis-annotation-label {
+  font-family: var(--font-mono) !important;
+  font-size: 11px !important;
+}
+
+/* Axis labels */
+.apexcharts-xaxis-label, .apexcharts-yaxis-label {
+  font-family: var(--font-mono) !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+/* Legend */
+.apexcharts-legend-text {
+  font-family: var(--font-body) !important;
+  font-size: 12px !important;
+  color: rgba(255,255,255,0.60) !important;
+}
+
+/* ── Chart area gradient fill helpers ── */
+.apexcharts-area-series .apexcharts-series-markers circle {
+  stroke-width: 2px !important;
+}
 </style>
 </head>
 <body>
@@ -3291,9 +3364,9 @@ function showExTab(name, el) {
 // Charts init (all ApexCharts)
 // ============================================================
 const _apex = {
-  chart: { background:'transparent', foreColor:'rgba(255,255,255,0.55)', toolbar:{show:false}, fontFamily:"'JetBrains Mono',monospace", animations:{enabled:false} },
-  grid: { borderColor:'rgba(255,255,255,0.08)', strokeDashArray:3 },
-  tooltip: { theme:'dark', style:{fontFamily:"'JetBrains Mono',monospace",fontSize:'12px'} },
+  chart: { background:'transparent', foreColor:'rgba(255,255,255,0.50)', toolbar:{show:false}, fontFamily:"'Geist Mono','JetBrains Mono',monospace", animations:{enabled:false} },
+  grid: { borderColor:'rgba(255,255,255,0.07)', strokeDashArray:4 },
+  tooltip: { theme:'dark', style:{fontFamily:"'Geist Mono','JetBrains Mono',monospace",fontSize:'12px'} },
   theme: { mode:'dark' },
 };
 function initCharts() {
@@ -3302,10 +3375,10 @@ function initCharts() {
     ..._apex,
     chart: {..._apex.chart, type:'area', height:'100%'},
     series: [{name:'Portfolio (USDT)', data:[]}],
-    xaxis: { categories:[], labels:{style:{colors:'rgba(255,255,255,0.55)',fontSize:'10px'}}, axisBorder:{show:false}, axisTicks:{show:false} },
-    yaxis: { labels:{style:{colors:'rgba(255,255,255,0.55)',fontSize:'10px'}, formatter:v=>'$'+v.toFixed(0)} },
+    xaxis: { categories:[], labels:{style:{colors:'rgba(255,255,255,0.40)',fontSize:'11px'}}, axisBorder:{show:false}, axisTicks:{show:false} },
+    yaxis: { labels:{style:{colors:'rgba(255,255,255,0.40)',fontSize:'11px'}, formatter:v=>'$'+v.toFixed(0)} },
     stroke: { curve:'smooth', width:2 },
-    fill: { type:'gradient', gradient:{opacityFrom:0.22,opacityTo:0,stops:[0,100]} },
+    fill: { type:'gradient', gradient:{shadeIntensity:1, opacityFrom:0.28, opacityTo:0, stops:[0,80,100]} },
     dataLabels: { enabled:false },
     legend: { show:false },
     colors: ['#00A8E8'],
@@ -3315,10 +3388,10 @@ function initCharts() {
 
   // Candlestick (unchanged)
   charts.trading = new ApexCharts(document.getElementById('tradingChart'), {
-    chart: { type:'candlestick', height:300, background:'transparent', foreColor:'rgba(255,255,255,0.55)', toolbar:{show:false}, animations:{enabled:false}, zoom:{enabled:false} },
+    chart: { type:'candlestick', height:300, background:'transparent', foreColor:'rgba(255,255,255,0.40)', toolbar:{show:false}, animations:{enabled:false}, zoom:{enabled:false}, fontFamily:"'Geist Mono','JetBrains Mono',monospace" },
     series: [{data:[]}],
-    xaxis: { type:'datetime', labels:{style:{colors:'rgba(255,255,255,0.55)',fontSize:'10px'}, datetimeFormatter:{hour:'HH:mm',day:'dd MMM'}} },
-    yaxis: { tooltip:{enabled:true}, labels:{style:{colors:'rgba(255,255,255,0.55)',fontSize:'10px'}, formatter:v=>formatPrice(v)} },
+    xaxis: { type:'datetime', labels:{style:{colors:'rgba(255,255,255,0.40)',fontSize:'11px'}, datetimeFormatter:{hour:'HH:mm',day:'dd MMM'}} },
+    yaxis: { tooltip:{enabled:true}, labels:{style:{colors:'rgba(255,255,255,0.40)',fontSize:'11px'}, formatter:v=>formatPrice(v)} },
     plotOptions: { candlestick:{ colors:{upward:'#00A8E8',downward:'#EF4444'}, wick:{useFillColor:true} } },
     grid: { borderColor:'rgba(255,255,255,0.08)' },
     tooltip: { theme:'dark' },
@@ -3333,9 +3406,9 @@ function initCharts() {
     series: [100],
     labels: ['USDT'],
     colors: ['#00A8E8'],
-    plotOptions: { pie:{ donut:{ size:'68%', labels:{ show:true, name:{show:false}, total:{ show:true, showAlways:true, label:'Portfolio', color:'rgba(255,255,255,0.55)', fontSize:'11px' }, value:{ show:true, color:'#FFFFFF', fontSize:'1.3rem', fontWeight:700, fontFamily:"'Inter',sans-serif", formatter:v=>Number(v).toFixed(0) } } } } },
+    plotOptions: { pie:{ donut:{ size:'68%', labels:{ show:true, name:{show:false}, total:{ show:true, showAlways:true, label:'Portfolio', color:'rgba(255,255,255,0.45)', fontSize:'11px' }, value:{ show:true, color:'#FFFFFF', fontSize:'1.3rem', fontWeight:700, fontFamily:"'Geist','Inter',sans-serif", formatter:v=>Number(v).toFixed(0) } } } } },
     dataLabels: { enabled:false },
-    legend: { position:'bottom', labels:{colors:'rgba(255,255,255,0.55)'}, fontSize:'10px' },
+    legend: { position:'bottom', labels:{colors:'rgba(255,255,255,0.50)'}, fontSize:'11px' },
     stroke: { width:0 },
   });
   charts.allocation.render();
@@ -3345,8 +3418,8 @@ function initCharts() {
     ..._apex,
     chart: {..._apex.chart, type:'bar', height:'100%'},
     series: [{name:'Daily PnL', data:[]}],
-    xaxis: { categories:[], labels:{style:{colors:'rgba(255,255,255,0.55)',fontSize:'9px'}} },
-    yaxis: { labels:{style:{colors:'rgba(255,255,255,0.55)',fontSize:'10px'}, formatter:v=>v.toFixed(1)} },
+    xaxis: { categories:[], labels:{style:{colors:'rgba(255,255,255,0.40)',fontSize:'11px'}} },
+    yaxis: { labels:{style:{colors:'rgba(255,255,255,0.40)',fontSize:'11px'}, formatter:v=>v.toFixed(1)} },
     plotOptions: { bar:{borderRadius:4, columnWidth:'65%'} },
     dataLabels: { enabled:false },
     legend: { show:false },
@@ -3360,8 +3433,8 @@ function initCharts() {
     chart: {..._apex.chart, type:'bar', height:260},
     plotOptions: { bar:{horizontal:true, borderRadius:3, barHeight:'55%', distributed:true} },
     series: [{name:'Importance', data:[0,0,0,0,0,0,0,0]}],
-    xaxis: { categories:['RSI','MACD','BB','ATR','Volume','VWAP','24h chg','EMA'], max:1, labels:{style:{colors:'rgba(255,255,255,0.55)',fontSize:'10px'}}, axisBorder:{show:false} },
-    yaxis: { labels:{style:{colors:'rgba(255,255,255,0.55)',fontSize:'10px'}} },
+    xaxis: { categories:['RSI','MACD','BB','ATR','Volume','VWAP','24h chg','EMA'], max:1, labels:{style:{colors:'rgba(255,255,255,0.40)',fontSize:'11px'}}, axisBorder:{show:false} },
+    yaxis: { labels:{style:{colors:'rgba(255,255,255,0.40)',fontSize:'11px'}} },
     dataLabels: { enabled:false },
     legend: { show:false },
     colors: ['#00A8E8','#00A8E8','#00A8E8','#00A8E8','#00A8E8','#00A8E8','#00A8E8','#00A8E8'],
@@ -5213,9 +5286,9 @@ async function runBacktest() {
         colors: ['#7cb9e8','#ffc107','#39d98a'],
         stroke: {curve:'smooth', width:[1.5,1.5,2.5]},
         xaxis: {categories:xLabels, labels:{show:false}, axisBorder:{show:false}, axisTicks:{show:false}},
-        yaxis: {labels:{style:{colors:'rgba(255,255,255,0.55)',fontSize:'10px'}, formatter:v=>'$'+v.toFixed(0)}},
-        grid: {borderColor:'rgba(255,255,255,0.08)', strokeDashArray:3},
-        legend: {labels:{colors:'rgba(255,255,255,0.55)'}, position:'top', fontSize:'11px'},
+        yaxis: {labels:{style:{colors:'rgba(255,255,255,0.40)',fontSize:'11px'}, formatter:v=>'$'+v.toFixed(0)}},
+        grid: {borderColor:'rgba(255,255,255,0.07)', strokeDashArray:4},
+        legend: {labels:{colors:'rgba(255,255,255,0.50)'}, position:'top', fontSize:'12px'},
         dataLabels:{enabled:false}, markers:{size:0},
         theme:{mode:'dark'},
         tooltip:{theme:'dark'},
@@ -5301,8 +5374,8 @@ async function runBacktest() {
         chart: {type:'bar', height:130, background:'transparent', toolbar:{show:false}, animations:{enabled:false}, fontFamily:'var(--font-mono)'},
         series: [{name:'Avg PnL%', data: vals}],
         colors: [({value}) => value >= 0 ? '#39d98a' : '#EF4444'],
-        xaxis: {categories: hrs, labels:{style:{colors:'rgba(255,255,255,0.55)',fontSize:'9px'}}, title:{text:'UTC Hour', style:{color:'rgba(255,255,255,0.55)',fontSize:'10px'}}},
-        yaxis: {labels:{style:{colors:'rgba(255,255,255,0.55)',fontSize:'9px'}, formatter:v=>v.toFixed(1)+'%'}},
+        xaxis: {categories: hrs, labels:{style:{colors:'rgba(255,255,255,0.40)',fontSize:'11px'}}, title:{text:'UTC Hour', style:{color:'rgba(255,255,255,0.40)',fontSize:'11px'}}},
+        yaxis: {labels:{style:{colors:'rgba(255,255,255,0.40)',fontSize:'11px'}, formatter:v=>v.toFixed(1)+'%'}},
         grid: {borderColor:'rgba(255,255,255,0.08)', strokeDashArray:3},
         dataLabels:{enabled:false}, plotOptions:{bar:{columnWidth:'80%'}},
         theme:{mode:'dark'}, tooltip:{theme:'dark',
