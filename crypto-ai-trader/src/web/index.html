@@ -915,9 +915,50 @@ body { overflow: hidden; }
 .ai-status-pill.stopped .ai-status-dot { background: #dc3545; }
 .ai-status-pill.stopped { color: #dc3545; border-color: rgba(220,53,69,0.3); }
 
+/* ── Stale data alert bar ── */
+#staleDataBar {
+  display: none; position: fixed; top: 0; left: 0; right: 0; z-index: calc(var(--z-toast) + 1);
+  background: rgba(250,204,21,0.10); border-bottom: 1px solid rgba(250,204,21,0.3);
+  padding: 5px 20px; font-family: var(--font-body); font-size: 0.78rem;
+  color: #FACC15; align-items: center; justify-content: center; gap: 8px; transition: opacity 0.3s;
+}
+#staleDataBar.visible { display: flex; }
+
+/* ── Settings section headers ── */
+.settings-sh {
+  display: flex; align-items: center; gap: 8px; padding: 4px 0 8px; margin: 16px 0 4px;
+  font-family: var(--font-headline); font-size: 0.7rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted);
+  border-bottom: 1px solid var(--border2);
+}
+.settings-sh i { color: var(--accent); opacity: 0.75; }
+
+/* ── Danger confirm modal countdown ── */
+.danger-countdown {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--accent-red);
+  font-family: var(--font-mono); font-size: 1.1rem; font-weight: 700; color: var(--accent-red);
+  transition: border-color 0.3s, color 0.3s; flex-shrink: 0;
+}
+.danger-countdown.ready { border-color: var(--accent-buy); color: var(--accent-buy); }
+
+/* ── Risk model explainer ── */
+.risk-model-bar {
+  background: rgba(168,255,83,0.05); border: 1px solid rgba(168,255,83,0.14);
+  border-radius: var(--radius-sm); padding: 7px 10px; margin-bottom: 10px;
+  font-family: var(--font-mono); font-size: 0.69rem; color: var(--text-muted);
+  display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+}
+.risk-model-bar .rmv { color: var(--text-main); font-weight: 700; }
 </style>
 </head>
 <body>
+
+<div id="staleDataBar">
+  <i class="bi bi-exclamation-triangle-fill"></i>
+  <span id="staleDataMsg">ข้อมูลล่าช้า — WebSocket ขาดการเชื่อมต่อ</span>
+  <span id="staleDataAge" class="text-muted" style="font-size:0.7rem"></span>
+</div>
 
 <div class="app">
 
@@ -1028,7 +1069,7 @@ body { overflow: hidden; }
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
           START Autotrade
         </button>
-        <button id="aiStopBtn" class="ai-btn-stop" onclick="aiStopForceClose()">
+        <button id="aiStopBtn" class="ai-btn-stop" onclick="openDangerConfirm('forceSell')" aria-label="หยุดและขาย positions ทั้งหมด — ต้องยืนยัน">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16"/></svg>
           STOP + Force Sell All
         </button>
@@ -1062,7 +1103,7 @@ body { overflow: hidden; }
         </div>
         <div class="card-body py-2 px-3">
           <div class="d-flex flex-wrap gap-3 align-items-center">
-            <button id="killSwitchBtn" class="btn btn-danger btn-sm px-4" onclick="activateKillSwitch()">
+            <button id="killSwitchBtn" class="btn btn-danger btn-sm px-4" onclick="openDangerConfirm('killSwitch')" aria-label="หยุด orders ใหม่ทั้งหมด — ต้องยืนยัน">
               <i class="bi bi-stop-circle me-1"></i>Activate Kill Switch
             </button>
             <button id="resumeTradeBtn" class="btn btn-success btn-sm px-4 d-none" onclick="deactivateKillSwitch()">
@@ -1926,6 +1967,36 @@ body { overflow: hidden; }
 </div>
 
 <!-- LIVE MODE CONFIRMATION MODAL -->
+<div class="modal fade" id="dangerConfirmModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:var(--bg-card);border:1px solid rgba(239,68,68,0.4)">
+      <div class="modal-header" style="border-color:rgba(239,68,68,0.25);background:rgba(239,68,68,0.08)">
+        <h6 class="modal-title text-danger d-flex align-items-center gap-2">
+          <i class="bi bi-exclamation-octagon-fill"></i>
+          <span id="dangerModalTitle">ยืนยันการดำเนินการ</span>
+        </h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p id="dangerModalBody" class="small mb-3" style="color:var(--text-main)"></p>
+        <div class="d-flex align-items-center gap-3 p-3 rounded" style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2)">
+          <div class="danger-countdown" id="dangerCountdown">5</div>
+          <div>
+            <div class="small" style="color:var(--text-main);font-weight:600" id="dangerCountdownLabel">รอ 5 วินาทีเพื่อยืนยัน...</div>
+            <div class="small text-muted">กดปุ่มยืนยันได้เมื่อนับถอยหลังครบ</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-color:var(--border)">
+        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
+        <button class="btn btn-danger btn-sm" id="dangerConfirmBtn" disabled onclick="_dangerConfirmAction()">
+          <i class="bi bi-exclamation-triangle me-1"></i><span id="dangerConfirmLabel">ยืนยัน</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="liveModeModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content" style="background:var(--bg-card);border:1px solid var(--border)">
@@ -1934,9 +2005,20 @@ body { overflow: hidden; }
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <div class="alert alert-warning py-2 small mb-3">
-          ⚠️ ต้องตั้งค่า Exchange API key ใน Settings → Exchange API Keys ก่อน<br>
-          ระบบจะเทรดด้วยเงินจริงทันทีหลังเปิด Live Mode
+        <p class="small mb-2" style="color:var(--text-main)">ตรวจสอบ pre-flight checklist ก่อนเปิด Live Mode:</p>
+        <div class="mb-3" id="livePreflightList">
+          <div class="d-flex align-items-center gap-2 py-1 border-bottom" style="border-color:var(--border2)!important">
+            <i id="pf1Icon" class="bi bi-circle text-muted"></i>
+            <span class="small" id="pf1Label">Exchange API key ตั้งค่าแล้ว</span>
+          </div>
+          <div class="d-flex align-items-center gap-2 py-1 border-bottom" style="border-color:var(--border2)!important">
+            <i id="pf2Icon" class="bi bi-circle text-muted"></i>
+            <span class="small" id="pf2Label">Dry-Run ปิดอยู่ (เทรดจริง)</span>
+          </div>
+          <div class="d-flex align-items-center gap-2 py-1">
+            <i id="pf3Icon" class="bi bi-circle text-muted"></i>
+            <span class="small" id="pf3Label">ตั้งวงเงินสูงสุด (Budget Cap)</span>
+          </div>
         </div>
         <label class="form-label small mb-1">
           วงเงินสูงสุดที่ให้ AI ใช้ได้ <span class="text-muted">(0 = ไม่จำกัด)</span>
@@ -2431,6 +2513,7 @@ body { overflow: hidden; }
     <!-- LEFT COLUMN -->
     <div class="col-md-6">
 
+      <div class="settings-sh"><i class="bi bi-currency-exchange"></i>Trading Setup</div>
       <!-- Trading Pairs -->
       <div class="card mb-3">
         <div class="card-header"><i class="bi bi-currency-exchange me-2"></i>Trading Pairs</div>
@@ -2504,9 +2587,21 @@ body { overflow: hidden; }
         </div>
       </div>
 
+      <div class="settings-sh"><i class="bi bi-shield-check"></i>Risk &amp; Rules</div>
       <div class="card mb-3">
         <div class="card-header"><i class="bi bi-sliders me-2"></i>Trading Parameters</div>
         <div class="card-body">
+          <div class="risk-model-bar" id="riskModelBar">
+            <span>Risk/trade <span class="rmv" id="rmRisk">2%</span></span>
+            <span>×</span>
+            <span>Max trades <span class="rmv" id="rmTrades">3</span></span>
+            <span>=</span>
+            <span>Max exposure <span class="rmv" id="rmExposure">6%</span></span>
+            <span style="margin-left:4px">·</span>
+            <span>Daily stop <span class="rmv" id="rmDailyStop">5%</span></span>
+            <span>·</span>
+            <span>RRR <span class="rmv" id="rmRRR">2.0:1</span></span>
+          </div>
           <div class="row g-2 mb-2">
             <div class="col-6">
               <label class="form-label small mb-1">Take Profit %</label>
@@ -2590,6 +2685,7 @@ body { overflow: hidden; }
         </div>
       </div>
 
+      <div class="settings-sh"><i class="bi bi-cpu"></i>AI Model</div>
       <div class="card mb-3">
         <div class="card-header"><i class="bi bi-cpu me-2"></i>AI Model</div>
         <div class="card-body">
@@ -2618,6 +2714,7 @@ body { overflow: hidden; }
 
     <!-- RIGHT COLUMN -->
     <div class="col-md-6">
+      <div class="settings-sh"><i class="bi bi-key"></i>Exchange &amp; Live</div>
       <div class="card mb-3">
         <div class="card-header d-flex justify-content-between align-items-center">
           <span><i class="bi bi-currency-bitcoin me-2"></i>Exchange API Keys</span>
@@ -2702,6 +2799,7 @@ body { overflow: hidden; }
         </div>
       </div>
 
+      <div class="settings-sh"><i class="bi bi-bell"></i>Notifications</div>
       <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
           <span><i class="bi bi-bell me-2"></i>Notifications</span>
@@ -2834,6 +2932,8 @@ function connectWS() {
   ws.onopen = () => {
     document.getElementById('wsDot').className = 'ws-dot ws-connected';
     if (reconnectTimer) { clearInterval(reconnectTimer); reconnectTimer = null; }
+    _wsMarkFresh();
+    _wsStartStaleWatch();
   };
   ws.onclose = () => {
     document.getElementById('wsDot').className = 'ws-dot ws-disconnected';
@@ -2841,6 +2941,7 @@ function connectWS() {
   };
   ws.onerror = () => ws.close();
   ws.onmessage = (e) => {
+    _wsMarkFresh();
     const msg = JSON.parse(e.data);
     if (msg.event === 'analysis_update') handleAnalysisUpdate(msg.data);
     else if (msg.event === 'trade_executed') handleTradeExecuted(msg.data);
@@ -5628,8 +5729,111 @@ function _applyKillState(killed, dryRun) {
   if (toggle)  toggle.checked = !!dryRun;
 }
 
+// ── Danger Confirm Modal ─────────────────────────────────────────────────────
+let _dangerAction = null;
+let _dangerTimer  = null;
+
+function openDangerConfirm(action) {
+  _dangerAction = action;
+  const titles   = { forceSell: 'STOP + Force Sell All', killSwitch: 'Activate Kill Switch' };
+  const bodies   = {
+    forceSell:  'หยุด Autotrade <strong>ทันที</strong> และขาย positions ที่เปิดอยู่ทั้งหมด<br>ไม่สามารถ undo ได้ — ตรวจสอบให้แน่ใจก่อนยืนยัน',
+    killSwitch: 'หยุด orders ใหม่ทั้งหมดทันที<br>Positions ที่เปิดอยู่ยังคงเปิดต่อไป ไม่มีการขายอัตโนมัติ'
+  };
+  const labels   = { forceSell: 'ยืนยัน Force Sell All', killSwitch: 'ยืนยัน Kill Switch' };
+  document.getElementById('dangerModalTitle').textContent  = titles[action];
+  document.getElementById('dangerModalBody').innerHTML     = bodies[action];
+  document.getElementById('dangerConfirmLabel').textContent = labels[action];
+  const btn  = document.getElementById('dangerConfirmBtn');
+  const cd   = document.getElementById('dangerCountdown');
+  const lbl  = document.getElementById('dangerCountdownLabel');
+  btn.disabled = true; cd.className = 'danger-countdown'; let secs = 5;
+  cd.textContent = secs; lbl.textContent = `รอ ${secs} วินาทีเพื่อยืนยัน...`;
+  if (_dangerTimer) clearInterval(_dangerTimer);
+  _dangerTimer = setInterval(() => {
+    secs--;
+    cd.textContent = secs;
+    if (secs <= 0) {
+      clearInterval(_dangerTimer); _dangerTimer = null;
+      btn.disabled = false; cd.className = 'danger-countdown ready';
+      lbl.textContent = 'พร้อมยืนยันแล้ว';
+    } else { lbl.textContent = `รอ ${secs} วินาทีเพื่อยืนยัน...`; }
+  }, 1000);
+  const m = new bootstrap.Modal(document.getElementById('dangerConfirmModal'));
+  document.getElementById('dangerConfirmModal').addEventListener('hidden.bs.modal', () => {
+    if (_dangerTimer) { clearInterval(_dangerTimer); _dangerTimer = null; }
+    btn.disabled = true; cd.className = 'danger-countdown'; cd.textContent = '5';
+  }, { once: true });
+  m.show();
+}
+
+async function _dangerConfirmAction() {
+  bootstrap.Modal.getInstance(document.getElementById('dangerConfirmModal'))?.hide();
+  if (_dangerAction === 'forceSell')  await aiStopForceClose();
+  else if (_dangerAction === 'killSwitch') await activateKillSwitch();
+  _dangerAction = null;
+}
+
+// ── WS Stale Data Tracker ────────────────────────────────────────────────────
+let _wsLastData = Date.now();
+let _wsStaleTimer = null;
+
+function _wsMarkFresh() {
+  _wsLastData = Date.now();
+  const bar = document.getElementById('staleDataBar');
+  if (bar && bar.classList.contains('visible')) bar.classList.remove('visible');
+}
+
+function _wsStartStaleWatch() {
+  if (_wsStaleTimer) return;
+  _wsStaleTimer = setInterval(() => {
+    const ago = Math.floor((Date.now() - _wsLastData) / 1000);
+    if (ago >= 15) {
+      const bar = document.getElementById('staleDataBar');
+      const age = document.getElementById('staleDataAge');
+      if (bar) bar.classList.add('visible');
+      if (age) age.textContent = `(${ago}s ago)`;
+    }
+  }, 3000);
+}
+
+// ── Risk Model Bar updater ────────────────────────────────────────────────────
+function _updateRiskModelBar() {
+  const tp    = parseFloat(document.getElementById('tpPct')?.value)         || 6;
+  const sl    = parseFloat(document.getElementById('slPct')?.value)         || 3;
+  const risk  = parseFloat(document.getElementById('riskPerTrade')?.value)  || 2;
+  const trades= parseFloat(document.getElementById('maxOpenTrades')?.value) || 3;
+  const daily = parseFloat(document.getElementById('maxDailyLoss')?.value)  || 5;
+  const rrr   = sl > 0 ? (tp / sl).toFixed(1) : '∞';
+  const exp   = (risk * trades).toFixed(1);
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('rmRisk', risk + '%'); set('rmTrades', trades); set('rmExposure', exp + '%');
+  set('rmDailyStop', daily + '%'); set('rmRRR', rrr + ':1');
+}
+
+// ── Live Mode Preflight ───────────────────────────────────────────────────────
+function _updateLivePreflight() {
+  const apiKeyEl = document.getElementById('binance_th_api_key') ||
+                   document.getElementById('binance_api_key');
+  const hasKey   = apiKeyEl && apiKeyEl.value && apiKeyEl.value.length > 8;
+  const dryRun   = document.getElementById('dryRunToggle')?.checked;
+  const budget   = parseFloat(document.getElementById('liveBudgetInput')?.value || '0');
+  const checks   = [
+    { id: 1, ok: hasKey,       label: 'Exchange API key ตั้งค่าแล้ว',      labelFail: 'Exchange API key ยังไม่ได้ใส่ (Settings → Exchange)' },
+    { id: 2, ok: !dryRun,      label: 'Dry-Run ปิดอยู่ (เทรดจริง)',         labelFail: 'Dry-Run ยังเปิดอยู่ — ปิดก่อนใช้ Live Mode' },
+    { id: 3, ok: budget > 0,   label: `วงเงิน cap: ${budget} USDT`,         labelFail: 'ยังไม่ได้ตั้งวงเงิน (ใส่ค่าด้านล่าง)' },
+  ];
+  checks.forEach(c => {
+    const icon  = document.getElementById(`pf${c.id}Icon`);
+    const label = document.getElementById(`pf${c.id}Label`);
+    if (!icon || !label) return;
+    icon.className  = c.ok ? 'bi bi-check-circle-fill text-success' : 'bi bi-x-circle-fill text-danger';
+    label.textContent = c.ok ? c.label : c.labelFail;
+    label.style.color = c.ok ? 'var(--accent-buy)' : 'var(--accent-red)';
+  });
+}
+
 async function activateKillSwitch() {
-  if (!confirm('Activate kill switch? All new trades will be halted immediately.')) return;
   const d = await fetch('/api/trading/kill-switch?action=activate', { method: 'POST' }).then(r => r.json());
   _applyKillState(d.killed, undefined);
   _addNotif({ type: 'warning', message: 'Kill switch activated: trading halted', ts: new Date().toISOString() });
@@ -5654,6 +5858,19 @@ function _addNotif(item) {
 }
 
 init();
+
+// Risk model bar: update on input change
+['tpPct','slPct','riskPerTrade','maxOpenTrades','maxDailyLoss'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', _updateRiskModelBar);
+});
+_updateRiskModelBar();
+
+// Live mode preflight: run when modal opens
+const _lmModal = document.getElementById('liveModeModal');
+if (_lmModal) _lmModal.addEventListener('show.bs.modal', _updateLivePreflight);
+const _liveBudget = document.getElementById('liveBudgetInput');
+if (_liveBudget) _liveBudget.addEventListener('input', _updateLivePreflight);
 </script>
 
 <script src="/static/js/bootstrap.bundle.min.js"></script>
@@ -6130,7 +6347,6 @@ async function aiStartAutotrade() {
 
 async function aiStopForceClose() {
   const btn = document.getElementById('aiStopBtn');
-  if (!confirm('Force-sell all open positions and stop trading?')) return;
   if (btn) { btn.disabled = true; btn.textContent = 'Stopping…'; }
   try {
     await fetch('/api/trading/kill-switch?action=activate', { method: 'POST' });
