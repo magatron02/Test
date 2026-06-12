@@ -1227,14 +1227,18 @@ md-circular-progress.spin-inline {
   stroke-width: 2px !important;
 }
 
-/* ── Chart entrance — fade-in on first render ── */
+/* ── Chart entrance — fade-in ครั้งเดียวตอนหน้าโหลด ──
+   animate ที่ container (ไม่ถูก ApexCharts สร้างใหม่) ไม่ใช่ .apexcharts-canvas
+   ซึ่งถูก recreate ทุกครั้งที่ updateOptions → ทำให้กราฟกระพริบ */
 @keyframes chartIn {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: none; }
 }
-.apexcharts-canvas { animation: chartIn var(--dur-xl) var(--ease-exp-out) both; }
+.chart-container, #allocationChart, #featureChart, #tradingChart {
+  animation: chartIn var(--dur-xl) var(--ease-exp-out) both;
+}
 @media (prefers-reduced-motion: reduce) {
-  .apexcharts-canvas { animation: none; }
+  .chart-container, #allocationChart, #featureChart, #tradingChart { animation: none; }
   .snav-indicator { transition: none; }
 }
 </style>
@@ -4232,6 +4236,7 @@ function updateHoldings(positions, cash, total, cur) {
   body.innerHTML = rows;
 }
 
+let _allocKey = '';
 function updateAllocationChart(positions, cash, cur) {
   const labels = [cur || 'USDT'];
   const data = [cash];
@@ -4242,7 +4247,12 @@ function updateAllocationChart(positions, cash, cur) {
     data.push(p.value);
     colors.push(palette[i % palette.length]);
   });
-  charts.allocation.updateOptions({labels:labels,colors:colors},false,false);
+  // updateOptions ทำ full redraw (donut กระพริบ) — เรียกเฉพาะเมื่อ labels เปลี่ยนจริง
+  const key = labels.join('|');
+  if (key !== _allocKey) {
+    _allocKey = key;
+    charts.allocation.updateOptions({labels:labels,colors:colors},false,false);
+  }
   charts.allocation.updateSeries(data,false);
 }
 
