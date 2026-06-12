@@ -5687,8 +5687,15 @@ function renderDashboardState(d) {
     const ls = d.last_signal;
     const el = document.getElementById('funLastSignal');
     if (el) {
-      const t = ls.ts ? new Date(ls.ts + 'Z').toLocaleTimeString('th-TH', {hour:'2-digit',minute:'2-digit'}) : '';
-      el.textContent = `ล่าสุด: ${ls.symbol} ${ls.action} ${(ls.confidence*100).toFixed(0)}% · ${t}`;
+      // ts อาจเป็น epoch number หรือ ISO string (มี/ไม่มี timezone) — กัน Invalid Date
+      let t = '';
+      if (ls.ts) {
+        const dt = typeof ls.ts === 'number'
+          ? new Date(ls.ts > 1e12 ? ls.ts : ls.ts * 1000)
+          : new Date(/[Z+]/.test(ls.ts) ? ls.ts : ls.ts + 'Z');
+        if (!isNaN(dt)) t = dt.toLocaleTimeString('th-TH', {hour:'2-digit',minute:'2-digit'});
+      }
+      el.textContent = `ล่าสุด: ${ls.symbol} ${ls.action} ${(ls.confidence*100).toFixed(0)}%${t ? ' · ' + t : ''}`;
     }
   }
   // PnL Today
