@@ -1,7 +1,7 @@
 # ทำต่อที่นี่ (Continue Here)
 
-> อัพเดตล่าสุด: 2026-06-12 (session 2 — N'legion)
-> สถานะ: ✅ Bot รันอยู่บน GCP — demo mode, Binance จริง, ML training active, deploy ล่าสุด 2026-06-12 M2 dark theme
+> อัพเดตล่าสุด: 2026-06-12 (session 2 — N'legion, end of day)
+> สถานะ: ✅ Bot รันอยู่บน GCP — demo mode, Binance จริง, ML training active, deploy ล่าสุด 2026-06-12 bklit-ui pass
 
 ---
 
@@ -18,43 +18,13 @@
 - [x] **Design revamp** — Finance aesthetic: DM Sans, #080808 black bg, 16px radius, clean cards
 - [x] **Font/readability pass**, **Bootstrap .text-muted override**, **Chart colors**, **Hardcoded dark colors** → CSS vars
 - [x] **Opus design audit** — 9 remaining inconsistencies แก้แล้ว
-- [x] **/impeccable critique** — score 30/40, แก้ P0×2 + P1×3 เสร็จหมด
-- [x] **P0: SELL color** (#ff6b35 → #EF4444, 50+ instances)
-- [x] **P0: Micro-label contrast** (9→10-11px)
-- [x] **P1: Danger confirm modal** (5s countdown, Force Sell / Kill Switch)
-- [x] **P1: WS stale bar** (banner หลัง 15s ขาด)
-- [x] **P1: Risk model bar** (live exposure/RRR)
-- [x] **P1: Settings section headers** (5 headers)
-- [x] **P2: Activity Feed** CSS + JS (structured .ai-bar + .ai-content)
-- [x] **P3: Stat-card inline styles** → CSS classes sc-buy/sc-lime/sc-red/sc-warn
-- [x] **DESIGN.md อัพเดต** — Finance aesthetic ครบ
-- [x] **M3 Motion System**:
-  - CSS tokens: `--ease-exp-out`, `--ease-spring`, duration vars
-  - @keyframes: sectionIn (upgraded), m3SpringPop, m3SlideUp, m3ValUp/Down, m3ToastIn, m3GlowRing
-  - Section entrance: translateY(22px)+scale(0.97) → emphasized-decel
-  - Signal cards: staggered pop-in + M3 hover glow
-  - Stat values: green/red flash เมื่อ value เปลี่ยน
-  - Activity feed: spring-pop บน item ใหม่
-  - Price cards: ripple effect บน click
-  - Toast: spring entrance + slide exit
-- [x] **Material Web (@material/web) integration**:
-  - CDN via ESM: switch, circular-progress, linear-progress
-  - M3 sys color tokens ใน `:root` (map Finance aesthetic → Material Web)
-  - `md-switch` แทน dryRunToggle (topbar) + schedEnabled (Settings)
-  - JS compat shim: `md-switch.checked` ↔ `.selected` (backward-compatible)
-  - `md-linear-progress` แทน at-conf-bar ใน signal cards
-  - `_spin()` helper function แทน Bootstrap spinner-border
-  - Spinner replaced: Running…/Running AI Backtest/Testing connections/กำลังคิด/icon buttons
-
----
-
-## สิ่งที่ทำไปแล้ว (เพิ่มเติม) ✅
-
-- [x] **M2 Dark Theme**: `:root` surfaces → near-neutral dark (`#0D1117` bg, `#192028` card)
-- [x] **M2 Dark Theme**: borders → `rgba(255,255,255,0.12/0.08)` per M2 spec
-- [x] **M2 Dark Theme**: chart grid lines → `rgba(255,255,255,0.08)` (revert จาก ocean blue-tint)
-- [x] **M3 sys color tokens** อัพเดตให้ตรงกับ new surfaces
-- [x] Accent = `#00A8E8` (Fresh Sky) — ใช้เป็น accent เท่านั้น ไม่ใช้เป็น surface
+- [x] **/impeccable critique** — score 30/40 → ~38/40, แก้ P0×2 + P1×3 เสร็จหมด
+- [x] **P0: SELL color** (#ff6b35 → #EF4444), **P0: Micro-label contrast**, **P1: Danger modal**, **P1: WS stale bar**, **P1: Risk model bar**, **P1: Settings headers**, **P2: Activity Feed**, **P3: Stat-card classes**
+- [x] **M3 Motion System** — CSS tokens, keyframes (sectionIn, SpringPop, ValUp/Down, ToastIn, GlowRing), section entrance, signal card hover glow, stat flash, activity spring-pop, price card ripple
+- [x] **Material Web (@material/web)** — md-switch (×2), md-linear-progress (signal cards), md-circular-progress (spinners), _spin() helper
+- [x] **M2 Dark Theme** — `#0D1117` bg, `#192028` card, `rgba(255,255,255,0.12/0.08)` borders, `#00A8E8` accent-only
+- [x] **Typography overhaul** — Geist + Geist Mono (fallback Inter + JetBrains Mono), 16px base, floor all micro-labels at 11-12px, tabular-nums ทั้งหมด
+- [x] **bklit-ui design language** — frosted glass ApexCharts tooltip (backdrop-blur:14px), area chart gradient fill (0→80→100 stops), axis labels 11px / 0.40 opacity, Geist Mono in all charts
 
 ---
 
@@ -73,16 +43,23 @@ trading:
   mode: "live"
 ```
 
-### 3. 🔵 Material Web ที่ยังเหลือ (optional)
+### 3. 🟡 Minor CSS fix ที่ค้าง
+- `--md-linear-progress-track-color: rgba(0,168,232,0.12)` → `rgba(255,255,255,0.08)` (M2 spec, line ~91 ใน :root)
+
+### 4. 🔵 Material Web ที่ยังเหลือ (optional)
 - Exchange enable checkboxes → `md-switch` (binance_enabled, binance_th_enabled ฯลฯ)
 - Notification checkboxes → `md-switch`
-- Remaining 5 `spinner-border` instances (10px inline-style status text)
+- Remaining ~5 `spinner-border` instances (inline-style status text)
 - `md-slider` สำหรับ confidence threshold / stop loss % / take profit %
 
-### 4. 🔵 Motion รอบต่อไป (optional)
+### 5. 🔵 Motion รอบต่อไป (optional)
 - Nav pill morphing — sliding indicator
-- Portfolio PnL flash — _m3Flash บน ai-dash-value
-- Chart entrance animation
+- Portfolio PnL flash — `_m3Flash` บน ai-dash-value
+- Chart entrance animation (area fade-in on load)
+
+### 6. 🔵 UX polish (optional)
+- Empty states — signal cards / activity feed เมื่อยังไม่มีข้อมูล
+- Notifications setup — LINE/Telegram
 
 ---
 
@@ -92,6 +69,7 @@ trading:
 |-----|-------|---------|
 | 2026-06-11 (ก่อน) | 29/40 | impeccable critique ครั้งแรก |
 | 2026-06-12 (หลัง M3+MWC) | ~38/40 (est.) | P0-P3 + M3 motion + Material Web |
+| 2026-06-12 (end of day) | ~39-40/40 (est.) | + M2 dark theme + Geist + bklit-ui pass |
 
 ---
 
