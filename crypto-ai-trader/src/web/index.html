@@ -11,6 +11,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script type="module">
+  import 'https://esm.run/@material/web/switch/switch.js';
+  import 'https://esm.run/@material/web/progress/circular-progress.js';
+  import 'https://esm.run/@material/web/progress/linear-progress.js';
+</script>
 <style>
 :root {
   /* Backgrounds */
@@ -46,6 +51,45 @@
   --radius-pill: 100px;
 
   --z-toast: 9999;
+
+  /* ── M3 system color tokens (maps Finance aesthetic → Material Web components) ── */
+  --md-sys-color-primary:            #A8FF53;
+  --md-sys-color-on-primary:         #000000;
+  --md-sys-color-primary-container:  rgba(168,255,83,0.14);
+  --md-sys-color-secondary:          #22C55E;
+  --md-sys-color-on-secondary:       #000000;
+  --md-sys-color-tertiary:           #60A5FA;
+  --md-sys-color-error:              #EF4444;
+  --md-sys-color-on-error:           #ffffff;
+  --md-sys-color-background:         #080808;
+  --md-sys-color-on-background:      #F2F2FC;
+  --md-sys-color-surface:            #111111;
+  --md-sys-color-on-surface:         #F2F2FC;
+  --md-sys-color-surface-variant:    #181818;
+  --md-sys-color-on-surface-variant: #9898AE;
+  --md-sys-color-outline:            rgba(255,255,255,0.12);
+  --md-sys-color-outline-variant:    rgba(255,255,255,0.08);
+  --md-sys-shape-corner-medium:      10px;
+  --md-sys-shape-corner-full:        100px;
+  /* Switch */
+  --md-switch-track-color:                     rgba(255,255,255,0.12);
+  --md-switch-track-selected-color:            rgba(168,255,83,0.28);
+  --md-switch-handle-selected-color:           #A8FF53;
+  --md-switch-handle-color:                    #9898AE;
+  --md-switch-selected-icon-color:             #000000;
+  --md-switch-track-height:                    24px;
+  --md-switch-track-width:                     44px;
+  --md-switch-handle-height:                   18px;
+  --md-switch-handle-width:                    18px;
+  --md-switch-selected-handle-height:          22px;
+  --md-switch-selected-handle-width:           22px;
+  /* Circular progress */
+  --md-circular-progress-active-indicator-color: #A8FF53;
+  /* Linear progress */
+  --md-linear-progress-active-indicator-color: #A8FF53;
+  --md-linear-progress-track-color:            rgba(255,255,255,0.08);
+  --md-linear-progress-track-height:           4px;
+  --md-linear-progress-active-indicator-height: 4px;
 }
 * { box-sizing: border-box; }
 
@@ -712,6 +756,38 @@ body { overflow: hidden; }
 .snav-item.active .kbd-hint { opacity: 0.75; }
 .snav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
+/* ── Material Web component overrides ── */
+md-switch {
+  cursor: pointer;
+  flex-shrink: 0;
+}
+md-switch::part(track) {
+  border: 1px solid var(--border);
+}
+md-linear-progress {
+  width: 100%;
+  border-radius: 100px;
+  overflow: hidden;
+}
+/* sell/hold signal card progress tint */
+.at-sig-card.sell md-linear-progress {
+  --md-linear-progress-active-indicator-color: #EF4444;
+}
+.at-sig-card.hold md-linear-progress {
+  --md-linear-progress-active-indicator-color: var(--text-muted);
+}
+/* inline md-circular-progress as spinner */
+md-circular-progress.spin-inline {
+  --md-circular-progress-active-indicator-color: currentColor;
+  vertical-align: middle;
+}
+/* Switch label layout */
+.md-switch-row {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 0.875rem; cursor: pointer; user-select: none;
+}
+.md-switch-row .switch-label { color: var(--text-main); }
+
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
   .section.active, .m3-card-in, .m3-spring-pop, .m3-slide-up,
@@ -1212,10 +1288,10 @@ body { overflow: hidden; }
               <i class="bi bi-play-circle me-1"></i>Resume Trading
             </button>
             <div class="vr"></div>
-            <div class="form-check form-switch mb-0">
-              <input class="form-check-input" type="checkbox" id="dryRunToggle" onchange="toggleDryRun(this.checked)">
-              <label class="form-check-label small" for="dryRunToggle">Paper Trade (Dry-Run)</label>
-            </div>
+            <label class="md-switch-row mb-0">
+              <md-switch id="dryRunToggle" data-compat></md-switch>
+              <span class="switch-label">Paper Trade (Dry-Run)</span>
+            </label>
             <span class="text-muted" style="font-size:0.7rem" id="killSwitchNote">Kill switch immediately stops all new orders. Existing positions remain open.</span>
           </div>
         </div>
@@ -2761,10 +2837,10 @@ body { overflow: hidden; }
       <div class="card mb-3">
         <div class="card-header"><i class="bi bi-clock me-2"></i>Trading Schedule</div>
         <div class="card-body">
-          <div class="form-check form-switch mb-2">
-            <input class="form-check-input" type="checkbox" id="schedEnabled" role="switch">
-            <label class="form-check-label small" for="schedEnabled">เปิดใช้ตารางเวลา (หยุดเปิดออเดอร์ใหม่ตามช่วงเวลา)</label>
-          </div>
+          <label class="md-switch-row mb-2">
+            <md-switch id="schedEnabled" data-compat></md-switch>
+            <span class="switch-label">เปิดใช้ตารางเวลา (หยุดเปิดออเดอร์ใหม่ตามช่วงเวลา)</span>
+          </label>
           <div class="row g-2 mb-2">
             <div class="col-6">
               <label class="form-label small mb-1">ห้ามเทรดตั้งแต่</label>
@@ -3159,7 +3235,7 @@ async function runChampionTournament() {
   const sym = document.getElementById('champSymbol').value;
   const days = parseInt(document.getElementById('champDays').value, 10);
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Running…';
+  btn.innerHTML = `${_spin('me-1')}Running…`;
   status.style.display = '';
   status.textContent = 'Fetching klines and running ' + sym + ' tournament…';
   try {
@@ -4033,6 +4109,31 @@ function updateAllocationChart(positions, cash, cur) {
 // ============================================================
 // Activity Feed
 // ============================================================
+// ── Material Web compat shim ─────────────────────────────────────────────────
+// Makes md-switch[data-compat] respond to .checked like a native input
+function _initMdSwitches() {
+  document.querySelectorAll('md-switch[data-compat]').forEach(sw => {
+    Object.defineProperty(sw, 'checked', {
+      get()  { return this.selected; },
+      set(v) { this.selected = !!v; },
+      configurable: true, enumerable: true
+    });
+    sw.addEventListener('change', () => {
+      if (sw.id === 'dryRunToggle') toggleDryRun(sw.selected);
+    });
+  });
+}
+if (typeof customElements !== 'undefined') {
+  customElements.whenDefined('md-switch').then(_initMdSwitches);
+} else {
+  document.addEventListener('DOMContentLoaded', _initMdSwitches);
+}
+// md-circular-progress spinner helper (replaces Bootstrap spinner-border)
+function _spin(margin = 'me-1', size = 16) {
+  return `<md-circular-progress indeterminate class="spin-inline ${margin}" style="--md-circular-progress-size:${size}px;width:${size}px;height:${size}px"></md-circular-progress>`;
+}
+// ── End Material Web compat ──────────────────────────────────────────────────
+
 // ── M3 Motion Utilities ──────────────────────────────────────────────────────
 const _m3Prev = {};
 function _m3Flash(el, dir) {
@@ -4369,7 +4470,7 @@ async function refreshHourlyTrainer() {
 async function triggerHourlyTrain() {
   const btn = document.getElementById('hourlyRunBtn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Running…';
+  btn.innerHTML = `${_spin('me-1')}Running…`;
   try {
     const r = await fetch('/api/training/hourly/run', {method:'POST'});
     const d = await r.json();
@@ -4693,7 +4794,7 @@ async function saveExchangeKey(exchange) {
 async function testExchanges() {
   const resultEl = document.getElementById('exchangeTestResult');
   resultEl.style.display = '';
-  resultEl.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Testing connections...</div>';
+  resultEl.innerHTML = `<div class="text-muted small">${_spin('me-2')}Testing connections...</div>`;
   try {
     const r = await fetch('/api/exchanges/test');
     const d = await r.json();
@@ -4925,7 +5026,7 @@ function setChartRange(range, el) {
 async function loadMTF() {
   if (!currentSymbol) return;
   const panel = document.getElementById('mtfPanel');
-  panel.innerHTML = '<div class="text-muted text-center small py-2"><div class="spinner-border spinner-border-sm me-2"></div>Loading...</div>';
+  panel.innerHTML = `<div class="text-muted text-center small py-2">${_spin('me-2')}Loading...</div>`;
   try {
     const r = await fetch(`/api/analysis/mtf?symbol=${encodeURIComponent(currentSymbol)}`);
     const d = await r.json();
@@ -5016,7 +5117,7 @@ let _btHourlyChart = null;
 async function runBacktest() {
   const btn = document.getElementById('btRunBtn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Running AI Backtest...';
+  btn.innerHTML = `${_spin('me-2')}Running AI Backtest...`;
   _btHide();
 
   try {
@@ -5251,7 +5352,7 @@ async function runBacktest() {
 
 // Quant Lab: SHAP importance + HRP weights + cointegration pairs (ML4T)
 async function loadShap(btn) {
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm" style="width:10px;height:10px"></span>'; }
+  if (btn) { btn.disabled = true; btn.innerHTML = _spin('', 12); }
   try {
     const d = await fetch('/api/ml/feature-importance').then(r=>r.json()).catch(()=>({features:[]}));
     const feats = d.features || [];
@@ -5269,7 +5370,7 @@ async function loadShap(btn) {
 }
 
 async function loadHrp(btn) {
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm" style="width:10px;height:10px"></span>'; }
+  if (btn) { btn.disabled = true; btn.innerHTML = _spin('', 12); }
   try {
     const d = await fetch('/api/portfolio/hrp').then(r=>r.json()).catch(()=>({weights:[]}));
     const hrp = d.weights || [];
@@ -5281,7 +5382,7 @@ async function loadHrp(btn) {
 }
 
 async function loadCoint(btn) {
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm" style="width:10px;height:10px"></span>'; }
+  if (btn) { btn.disabled = true; btn.innerHTML = _spin('', 12); }
   try {
     const d = await fetch('/api/pairs/cointegration').then(r=>r.json()).catch(()=>({pairs:[]}));
     const pairs = d.pairs || [];
@@ -5294,7 +5395,7 @@ async function loadCoint(btn) {
 
 async function loadQuantLab() {
   const btn = document.getElementById('quantLabBtn');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; }
+  if (btn) { btn.disabled = true; btn.innerHTML = _spin('', 14); }
   try {
     const [shapR, hrpR, ciR] = await Promise.all([
       fetch('/api/ml/feature-importance').then(r=>r.json()).catch(()=>({features:[]})),
@@ -5356,7 +5457,7 @@ async function loadQuantLab() {
 async function runWalkForward() {
   const btn = document.getElementById('wfRunBtn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Running...';
+  btn.innerHTML = `${_spin('me-1')}Running...`;
   document.getElementById('wfCard').style.display = 'none';
   try {
     const symbol = document.getElementById('btSymbol').value;
@@ -5545,7 +5646,7 @@ function _chatTyping(show) {
     const div  = document.createElement('div');
     div.id        = 'chat-typing';
     div.className = 'chat-msg chat-ai';
-    div.innerHTML = `<div class="chat-bubble" style="color:var(--text-muted)"><span class="spinner-border spinner-border-sm me-1" style="width:11px;height:11px;border-width:1.5px"></span>กำลังคิด...</div>`;
+    div.innerHTML = `<div class="chat-bubble" style="color:var(--text-muted)">${_spin('me-1', 12)}กำลังคิด...</div>`;
     msgs.appendChild(div);
     msgs.scrollTop = msgs.scrollHeight;
   } else if (!show && el) {
@@ -6701,7 +6802,7 @@ function renderAtSignalGrid() {
         <span class="at-price">$${price}</span>
         <div class="at-conf-wrap">
           <span class="at-conf-label"><span>Confidence</span><span>${conf}%</span></span>
-          <div class="at-conf-track"><div class="at-conf-bar" style="width:${conf}%"></div></div>
+          <md-linear-progress value="${conf / 100}"></md-linear-progress>
         </div>
         <span class="at-regime-tag">${regime}</span>
       </div>`;
