@@ -1,7 +1,7 @@
 # ทำต่อที่นี่ (Continue Here)
 
-> อัพเดตล่าสุด: 2026-06-11
-> สถานะ: ✅ Bot รันอยู่บน GCP — demo mode, Binance จริง, ML training active, deploy ล่าสุด 2026-06-11
+> อัพเดตล่าสุด: 2026-06-12
+> สถานะ: ✅ Bot รันอยู่บน GCP — demo mode, Binance จริง, ML training active, deploy ล่าสุด 2026-06-12
 
 ---
 
@@ -17,48 +17,58 @@
 - [x] **Chart range buttons** (1H/24H/7D) แก้แล้ว — refetch candles จริง
 - [x] **Invalid Date** บน ML MODEL card — แก้ Python ISO timestamp guard แล้ว
 - [x] **Design revamp** — Finance aesthetic: DM Sans, #080808 black bg, 16px radius, clean cards
-  - `:root` tokens ใหม่ทั้งหมด (bg/card/border/text/font/radius)
-  - Sidebar: filled pill active, no left-border, clean bg
-  - Cards/buttons/tabs/badges: radius ใหม่ทั้งหมด
-  - AT section: Finlandica/hardcoded #000 → CSS vars ทั้งหมด
 - [x] **Font/readability pass** — body 15px, text-muted #9898AE, border 0.12, stat-label/card-header/regime-badge ใหญ่ขึ้น
 - [x] **Bootstrap .text-muted override** → `var(--text-muted) !important`
 - [x] **Chart colors** — ApexCharts foreColor/labels/grid ทั้งหมด → #9898AE / rgba(255,255,255,0.08)
-- [x] **Hardcoded dark colors** (#444/#555/#666/#888) ใน inline styles และ JS-rendered HTML → var(--text-muted)
+- [x] **Hardcoded dark colors** (#444/#555/#666/#888) → var(--text-muted)
 - [x] **Topbar symbol display** — แสดง currentSymbol ที่เลือกอยู่
 - [x] **Opus design audit** — 9 remaining inconsistencies แก้แล้ว
-- [x] **/impeccable critique** — score 29/40, พบ P0×2 + P1×2
-- [x] **P0: SELL color consistency** — แทน `#ff6b35` ทั้งหมด (50+ instances) ด้วย `#EF4444` / `rgba(239,68,68,...)` ทั้งใน CSS, JS, inline styles
-- [x] **P0: Micro-label contrast** — `.at-badge` 9→11px, `.at-train-badge` 9→10px, `.kbd-hint` 9→10px, hover opacity 0.55→0.65
-- [x] **P1: Bottom duplicate stat grid ลบออก** — Win Rate/Avg PnL/Open Positions/Today PnL ที่ซ้ำถูกลบ
-- [x] **DESIGN.md อัพเดต** — เขียนใหม่ทั้งหมดให้ตรงกับ Finance aesthetic ที่ใช้จริงใน code
+- [x] **/impeccable critique** — score 30/40, แก้ P0×2 + P1×3 เสร็จหมด
+- [x] **P0: SELL color** — แทน #ff6b35 ทั้งหมด (50+ instances) → #EF4444
+- [x] **P0: Micro-label contrast** — .at-badge 9→11px, .at-train-badge/kbd-hint 9→10px
+- [x] **P1: Bottom stat grid ลบออก**
+- [x] **P1: Danger confirm modal** — reusable modal พร้อม 5s countdown สำหรับ Force Sell / Kill Switch
+- [x] **P1: WS stale bar** — แสดง banner เมื่อ WebSocket ขาดเกิน 15s
+- [x] **P1: Risk model bar** — live-computed exposure/RRR ใน Trading Parameters
+- [x] **P1: Settings section headers** — 5 section headers ใน Settings page
+- [x] **P2: Activity Feed structured CSS** — .ai-bar color strip + .ai-content layout
+- [x] **P2: Activity Feed JS** — addActivity() render ใช้ .ai-bar + .ai-content structure
+- [x] **P3: Stat-card inline styles** — 12 instances → CSS classes sc-buy/sc-lime/sc-red/sc-warn
+- [x] **DESIGN.md อัพเดต** — เขียนใหม่ทั้งหมดให้ตรงกับ Finance aesthetic
+- [x] **M3 Motion System** — Material Design 3 expressive motion ทั้งระบบ:
+  - CSS tokens: `--ease-exp-out`, `--ease-spring`, duration vars
+  - @keyframes: sectionIn (upgraded), m3SpringPop, m3SlideUp, m3ValUp/Down, m3ToastIn, m3GlowRing, m3Shimmer
+  - Utility classes: .m3-card-in, .m3-spring-pop, .m3-slide-up, .m3-val-up/down, .m3-glow, .m3-skeleton
+  - Section entrance: translateY(22px)+scale(0.97) → emphasized-decel easing
+  - Signal cards: staggered pop-in + M3 hover glow (buy=green, sell=red)
+  - Stat values: green/red flash animation เมื่อ value เปลี่ยน (winRate, avgPnl, totalTrades)
+  - Activity feed: spring-pop animation บน item ใหม่
+  - Price cards: ripple effect บน click
+  - Toast: spring entrance + smooth exit
+  - Reduced-motion: ครอบคลุมทุก class ใหม่
 
 ---
 
 ## สิ่งที่ต้องทำต่อ 🚧
 
-### 1. 🟡 ใส่ Anthropic API Key
+### 1. 🟡 ใส่ Anthropic API Key (ข้ามก่อน — เสียเงิน)
 ```bash
-# SSH เข้า server แล้ว
 nano ~/AI_Create/crypto-ai-trader/config/settings.yml
 # api_key: "sk-ant-..."
 docker compose restart
 ```
 
-### 2. ✅ Deploy code review fixes — เสร็จแล้ว (2026-06-11)
-- git pull + docker compose up -d --build สำเร็จ
-- Container: `crypto-ai-trader-aiterra-1` Up, port 8888
-- API: `running: true`, `open_trades: 1`
-
-### 3. 🟢 Switch เป็น Live Mode
+### 2. 🟢 Switch เป็น Live Mode (เมื่อพร้อม)
 ```yaml
 trading:
   mode: "live"
 ```
 
-### 4. 🔵 P2/P3 CSS issues ที่เหลือ (minor)
-- `z-index:9999` notification → `var(--z-toast)`
-- Modal `width:360px` → `min(360px, 95vw)`
+### 3. 🔵 Motion รอบต่อไป (optional)
+- Nav pill morphing — sliding indicator ที่เลื่อนตาม active item
+- Portfolio PnL flash — _m3Flash บน ai-dash-value เมื่อ PnL เปลี่ยน
+- Chart entrance animation — bars draw in เมื่อ chart โหลด
+- Skeleton loading states บน cards ที่รอ data
 
 ---
 
@@ -67,7 +77,7 @@ trading:
 | วัน | Score | หมายเหตุ |
 |-----|-------|---------|
 | 2026-06-11 (ก่อน) | 29/40 | impeccable critique ครั้งแรก |
-| 2026-06-11 (หลัง) | ~35/40 (est.) | แก้ P0×2 + P1×2 แล้ว |
+| 2026-06-12 (หลัง P0-P3) | ~36/40 (est.) | แก้ P0×2 + P1×3 + P2 + P3 + M3 motion |
 
 ---
 
@@ -75,7 +85,7 @@ trading:
 
 | งาน | คำสั่ง |
 |-----|--------|
-| HTML-only (ไม่ restart) | `gcloud compute scp index.html aiterra-server-sg:/tmp/` → `docker cp /tmp/index.html crypto-ai-trader-aiterra-1:/app/src/web/index.html` |
+| HTML-only (ไม่ restart) | `gcloud compute scp index.html aiterra-server-sg:/tmp/` → `sudo docker cp /tmp/index.html crypto-ai-trader-aiterra-1:/app/src/web/index.html` |
 | Python files | `docker cp file.py container:/app/path/` + `docker restart` |
 | Full rebuild | `git pull` + `docker compose up -d --build` |
 
@@ -102,4 +112,4 @@ trading:
 
 ---
 
-*อัพเดตอัตโนมัติโดย Claude — 2026-06-11*
+*อัพเดตอัตโนมัติโดย Claude — 2026-06-12*
