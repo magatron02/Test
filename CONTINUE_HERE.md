@@ -1,7 +1,7 @@
 # ทำต่อที่นี่ (Continue Here)
 
-> อัพเดตล่าสุด: 2026-06-12 (session 2 — N'legion, end of day)
-> สถานะ: ✅ Bot รันอยู่บน GCP — demo mode, Binance จริง, ML training active, deploy ล่าสุด 2026-06-12 bklit-ui pass
+> อัพเดตล่าสุด: 2026-06-12 (session 3 — polish + bugfix pass)
+> สถานะ: ✅ Bot รันอยู่บน GCP — demo mode, Binance จริง, ML training active, deploy ล่าสุด 2026-06-12 (charts fix + motion)
 
 ---
 
@@ -24,7 +24,15 @@
 - [x] **Material Web (@material/web)** — md-switch (×2), md-linear-progress (signal cards), md-circular-progress (spinners), _spin() helper
 - [x] **M2 Dark Theme** — `#0D1117` bg, `#192028` card, `rgba(255,255,255,0.12/0.08)` borders, `#00A8E8` accent-only
 - [x] **Typography overhaul** — Geist + Geist Mono (fallback Inter + JetBrains Mono), 16px base, floor all micro-labels at 11-12px, tabular-nums ทั้งหมด
-- [x] **bklit-ui design language** — frosted glass ApexCharts tooltip (backdrop-blur:14px), area chart gradient fill (0→80→100 stops), axis labels 11px / 0.40 opacity, Geist Mono in all charts
+- [x] **bklit-ui design language** — frosted glass ApexCharts tooltip (backdrop-blur:14px), area chart gradient fill (0→80→100 stops), Geist Mono in all charts
+- [x] **CRITICAL FIX: 4 charts ไม่แสดง** — Portfolio/DailyPnL/Allocation/Feature mount บน `<canvas>` (เหลือจาก Chart.js) → เปลี่ยนเป็น `<div>` แล้วแสดงปกติ
+- [x] **นาฬิกาเรียลไทม์** topbar — `#topbarClock` เดินทุกวินาที + แยก lastUpdate (data sync time)
+- [x] **Invalid Date ใน Signal Funnel** — รองรับ epoch/ISO timestamp แล้ว
+- [x] **Contrast pass** — bg-card #1B242E, border 0.14, text-main 0.93, text-muted 0.68, chart labels 0.55/12px
+- [x] **Font pass** — stat-value 2.15rem, hero 3rem, AT section 11→12/13px ทั้งชุด, weight 500-700 ตาม hierarchy
+- [x] **Motion #5** — snav sliding indicator (pill morph), PnL flash บน hero, chart entrance fade-in
+- [x] **Empty states #6** — signal grid skeleton + "AI กำลังเฝ้าตลาด" feed + attribution hint
+- [x] **md-linear-progress track** → rgba(255,255,255,0.08) (M2 spec)
 
 ---
 
@@ -43,23 +51,15 @@ trading:
   mode: "live"
 ```
 
-### 3. 🟡 Minor CSS fix ที่ค้าง
-- `--md-linear-progress-track-color: rgba(0,168,232,0.12)` → `rgba(255,255,255,0.08)` (M2 spec, line ~91 ใน :root)
-
-### 4. 🔵 Material Web ที่ยังเหลือ (optional)
+### 3. 🔵 Material Web ที่ยังเหลือ (optional — ข้ามไว้ตามสั่ง)
 - Exchange enable checkboxes → `md-switch` (binance_enabled, binance_th_enabled ฯลฯ)
 - Notification checkboxes → `md-switch`
 - Remaining ~5 `spinner-border` instances (inline-style status text)
 - `md-slider` สำหรับ confidence threshold / stop loss % / take profit %
 
-### 5. 🔵 Motion รอบต่อไป (optional)
-- Nav pill morphing — sliding indicator
-- Portfolio PnL flash — `_m3Flash` บน ai-dash-value
-- Chart entrance animation (area fade-in on load)
-
-### 6. 🔵 UX polish (optional)
-- Empty states — signal cards / activity feed เมื่อยังไม่มีข้อมูล
-- Notifications setup — LINE/Telegram
+### 4. 🔵 UX polish ที่เหลือ (optional)
+- Notifications setup — LINE/Telegram (ต้องใช้ token)
+- DESIGN.md ยัง stale (อธิบาย DM Sans/#A8FF53 แต่โค้ดจริงเป็น M2/Geist/#00A8E8) — ควร regenerate
 
 ---
 
