@@ -1,7 +1,7 @@
 # ทำต่อที่นี่ (Continue Here)
 
-> อัพเดตล่าสุด: 2026-06-12
-> สถานะ: ✅ Bot รันอยู่บน GCP — demo mode, Binance จริง, ML training active, deploy ล่าสุด 2026-06-12
+> อัพเดตล่าสุด: 2026-06-12 (session 2 — N'legion)
+> สถานะ: ✅ Bot รันอยู่บน GCP — demo mode, Binance จริง, ML training active, deploy ล่าสุด 2026-06-12 M2 dark theme
 
 ---
 
@@ -45,6 +45,16 @@
   - `md-linear-progress` แทน at-conf-bar ใน signal cards
   - `_spin()` helper function แทน Bootstrap spinner-border
   - Spinner replaced: Running…/Running AI Backtest/Testing connections/กำลังคิด/icon buttons
+
+---
+
+## สิ่งที่ทำไปแล้ว (เพิ่มเติม) ✅
+
+- [x] **M2 Dark Theme**: `:root` surfaces → near-neutral dark (`#0D1117` bg, `#192028` card)
+- [x] **M2 Dark Theme**: borders → `rgba(255,255,255,0.12/0.08)` per M2 spec
+- [x] **M2 Dark Theme**: chart grid lines → `rgba(255,255,255,0.08)` (revert จาก ocean blue-tint)
+- [x] **M3 sys color tokens** อัพเดตให้ตรงกับ new surfaces
+- [x] Accent = `#00A8E8` (Fresh Sky) — ใช้เป็น accent เท่านั้น ไม่ใช้เป็น surface
 
 ---
 

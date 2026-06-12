@@ -18,19 +18,20 @@
 </script>
 <style>
 :root {
-  /* Backgrounds — Ocean palette */
-  --bg-dark:   #00171F;  /* Ink Black */
-  --bg-card:   #003459;  /* Deep Space Blue */
-  --bg-card2:  #001E30;  /* deep header / input bg */
-  --bg-canvas: #00171F;
+  /* ── Backgrounds — M2 dark theme (neutral dark + ocean tint) ── */
+  /* Elevation via white overlay: bg(0dp) → card(2dp) → card2(4dp) */
+  --bg-dark:   #0D1117;   /* ~#121212 + very subtle ocean tint (base 0dp) */
+  --bg-card:   #192028;   /* base + 7% white overlay (surface 2dp) */
+  --bg-card2:  #131B22;   /* between 0dp and 2dp (sunken/headers 1dp) */
+  --bg-canvas: #0D1117;
 
-  /* Borders */
-  --border:  rgba(0,168,232,0.22);
-  --border2: rgba(0,168,232,0.12);
+  /* Borders — M2: dividers always white-alpha, never color-tinted */
+  --border:  rgba(255,255,255,0.12);
+  --border2: rgba(255,255,255,0.08);
 
-  /* Text */
-  --text-main:  #FFFFFF;
-  --text-muted: rgba(255,255,255,0.55);
+  /* Text — M2 emphasis scale */
+  --text-main:  rgba(255,255,255,0.87);  /* high emphasis */
+  --text-muted: rgba(255,255,255,0.60);  /* medium emphasis */
 
   /* Accents */
   --accent:        #00A8E8;  /* Fresh Sky */
@@ -52,23 +53,23 @@
 
   --z-toast: 9999;
 
-  /* ── M3 system color tokens (Ocean palette → Material Web components) ── */
+  /* ── M3 system color tokens (M2 dark principle → Material Web components) ── */
   --md-sys-color-primary:            #00A8E8;
-  --md-sys-color-on-primary:         #00171F;
+  --md-sys-color-on-primary:         #0D1117;
   --md-sys-color-primary-container:  rgba(0,168,232,0.14);
   --md-sys-color-secondary:          #22C55E;
-  --md-sys-color-on-secondary:       #00171F;
+  --md-sys-color-on-secondary:       #0D1117;
   --md-sys-color-tertiary:           #007EA7;
-  --md-sys-color-error:              #EF4444;
-  --md-sys-color-on-error:           #ffffff;
-  --md-sys-color-background:         #00171F;
-  --md-sys-color-on-background:      #FFFFFF;
-  --md-sys-color-surface:            #003459;
-  --md-sys-color-on-surface:         #FFFFFF;
-  --md-sys-color-surface-variant:    #001E30;
-  --md-sys-color-on-surface-variant: rgba(255,255,255,0.55);
-  --md-sys-color-outline:            rgba(0,168,232,0.22);
-  --md-sys-color-outline-variant:    rgba(0,168,232,0.12);
+  --md-sys-color-error:              #CF6679;
+  --md-sys-color-on-error:           #0D1117;
+  --md-sys-color-background:         #0D1117;
+  --md-sys-color-on-background:      rgba(255,255,255,0.87);
+  --md-sys-color-surface:            #192028;
+  --md-sys-color-on-surface:         rgba(255,255,255,0.87);
+  --md-sys-color-surface-variant:    #131B22;
+  --md-sys-color-on-surface-variant: rgba(255,255,255,0.60);
+  --md-sys-color-outline:            rgba(255,255,255,0.12);
+  --md-sys-color-outline-variant:    rgba(255,255,255,0.08);
   --md-sys-shape-corner-medium:      10px;
   --md-sys-shape-corner-full:        100px;
   /* Switch */
@@ -3292,7 +3293,7 @@ function showExTab(name, el) {
 // ============================================================
 const _apex = {
   chart: { background:'transparent', foreColor:'rgba(255,255,255,0.55)', toolbar:{show:false}, fontFamily:"'Space Mono',monospace", animations:{enabled:false} },
-  grid: { borderColor:'rgba(0,168,232,0.15)', strokeDashArray:3 },
+  grid: { borderColor:'rgba(255,255,255,0.08)', strokeDashArray:3 },
   tooltip: { theme:'dark', style:{fontFamily:"'Space Mono',monospace",fontSize:'11px'} },
   theme: { mode:'dark' },
 };
@@ -3320,7 +3321,7 @@ function initCharts() {
     xaxis: { type:'datetime', labels:{style:{colors:'rgba(255,255,255,0.55)',fontSize:'10px'}, datetimeFormatter:{hour:'HH:mm',day:'dd MMM'}} },
     yaxis: { tooltip:{enabled:true}, labels:{style:{colors:'rgba(255,255,255,0.55)',fontSize:'10px'}, formatter:v=>formatPrice(v)} },
     plotOptions: { candlestick:{ colors:{upward:'#00A8E8',downward:'#EF4444'}, wick:{useFillColor:true} } },
-    grid: { borderColor:'rgba(0,168,232,0.15)' },
+    grid: { borderColor:'rgba(255,255,255,0.08)' },
     tooltip: { theme:'dark' },
     noData: { text:'เลือก symbol เพื่อดู chart', style:{color:'rgba(255,255,255,0.55)'} },
   });
@@ -5214,7 +5215,7 @@ async function runBacktest() {
         stroke: {curve:'smooth', width:[1.5,1.5,2.5]},
         xaxis: {categories:xLabels, labels:{show:false}, axisBorder:{show:false}, axisTicks:{show:false}},
         yaxis: {labels:{style:{colors:'rgba(255,255,255,0.55)',fontSize:'10px'}, formatter:v=>'$'+v.toFixed(0)}},
-        grid: {borderColor:'rgba(0,168,232,0.15)', strokeDashArray:3},
+        grid: {borderColor:'rgba(255,255,255,0.08)', strokeDashArray:3},
         legend: {labels:{colors:'rgba(255,255,255,0.55)'}, position:'top', fontSize:'11px'},
         dataLabels:{enabled:false}, markers:{size:0},
         theme:{mode:'dark'},
@@ -5303,7 +5304,7 @@ async function runBacktest() {
         colors: [({value}) => value >= 0 ? '#39d98a' : '#EF4444'],
         xaxis: {categories: hrs, labels:{style:{colors:'rgba(255,255,255,0.55)',fontSize:'9px'}}, title:{text:'UTC Hour', style:{color:'rgba(255,255,255,0.55)',fontSize:'10px'}}},
         yaxis: {labels:{style:{colors:'rgba(255,255,255,0.55)',fontSize:'9px'}, formatter:v=>v.toFixed(1)+'%'}},
-        grid: {borderColor:'rgba(0,168,232,0.15)', strokeDashArray:3},
+        grid: {borderColor:'rgba(255,255,255,0.08)', strokeDashArray:3},
         dataLabels:{enabled:false}, plotOptions:{bar:{columnWidth:'80%'}},
         theme:{mode:'dark'}, tooltip:{theme:'dark',
           custom({dataPointIndex:i}) {
