@@ -18,51 +18,65 @@
 </script>
 <style>
 :root {
-  /* ── Backgrounds — M2 dark theme (neutral dark + ocean tint) ── */
-  /* Elevation via white overlay: bg(0dp) → card(2dp) → card2(4dp) */
-  --bg-dark:   #0D1117;   /* ~#121212 + very subtle ocean tint (base 0dp) */
-  --bg-card:   #1B242E;   /* base + ~9% white overlay (surface 2dp) — แยกจาก bg ชัด */
-  --bg-card2:  #131B22;   /* between 0dp and 2dp (sunken/headers 1dp) */
-  --bg-canvas: #0D1117;
+  /* ── Luxe dark — pure-black canvas + frosted glass + ambient glow ── */
+  /* Surfaces are translucent: the ambient radial glow shows THROUGH the glass. */
+  --bg-dark:   #060708;                   /* near-black canvas */
+  --bg-deep:   #030304;                   /* deepest well (behind glow) */
+  --bg-card:   rgba(255,255,255,0.055);   /* frosted glass surface (2dp) */
+  --bg-card2:  rgba(255,255,255,0.028);   /* sunken glass (1dp) */
+  --bg-solid:  #0c0e11;                   /* opaque fallback — dropdowns, dense tables */
+  --bg-canvas: #060708;
 
-  /* Borders — M2: dividers always white-alpha, never color-tinted */
-  --border:  rgba(255,255,255,0.14);
-  --border2: rgba(255,255,255,0.09);
+  /* Glass */
+  --glass-blur: 15px;
+  --glass-hi:   rgba(255,255,255,0.13);   /* top-edge highlight */
+  --glass-sat:  140%;
 
-  /* Text — M2 emphasis scale (ยกขึ้นเพื่อ contrast บน card ที่สว่างขึ้น) */
-  --text-main:  rgba(255,255,255,0.93);  /* high emphasis */
-  --text-muted: rgba(255,255,255,0.68);  /* medium emphasis */
+  /* Borders — hairline white-alpha, never color-tinted */
+  --border:  rgba(255,255,255,0.10);
+  --border2: rgba(255,255,255,0.055);
 
-  /* Accents */
-  --accent:        #00A8E8;  /* Fresh Sky */
-  --accent-buy:    #22C55E;  /* keep green — buy signal */
-  --accent-red:    #EF4444;  /* keep red   — sell signal */
-  --accent-blue:   #007EA7;  /* Cerulean */
-  --accent-yellow: #FACC15;
-  --accent-purple: #A78BFA;
+  /* Text — emphasis scale on pure black */
+  --text-main:  rgba(255,255,255,0.95);   /* high emphasis */
+  --text-muted: rgba(255,255,255,0.64);   /* medium emphasis */
+  --text-dim:   rgba(255,255,255,0.50);   /* low emphasis / mono micro-labels (≥4.5:1) */
 
-  /* Typography — Thai fallback เป็น Noto Sans Thai (ไม่มีหัว/loopless) */
+  /* Accents — interactive lead is MONOCHROME white; one luminous cool tone for
+     links/charts/live-pulse; green/red reserved strictly for trade signals. */
+  --ink:           rgba(255,255,255,0.95);  /* primary action surface (white pill) */
+  --on-ink:        #07080a;                 /* text on white surface */
+  --accent:        #9db8b0;  /* glacier — links, focus, chart line, AI-alive */
+  --accent-bright: #c6dad3;
+  --accent-deep:   #4f6b64;
+  --accent-rgb:    157,184,176;
+  --accent-buy:    #34d399;  /* refined green — buy / positive */
+  --accent-red:    #f87171;  /* refined red — sell / negative */
+  --accent-blue:   #5eead4;
+  --accent-yellow: #fbbf24;
+  --accent-purple: #c4b5fd;
+
+  /* Typography — Thai fallback Noto Sans Thai (loopless) */
   --font-mono:     'Geist Mono', 'JetBrains Mono', 'Noto Sans Thai', 'Courier New', monospace;
   --font-headline: 'Geist', 'Noto Sans Thai', 'Inter', sans-serif;
   --font-body:     'Geist', 'Noto Sans Thai', 'Inter', sans-serif;
 
-  /* Radius */
-  --radius-card: 16px;
-  --radius-sm:   10px;
+  /* Radius — softer, more generous (reference uses large radii) */
+  --radius-card: 20px;
+  --radius-sm:   12px;
   --radius-pill: 100px;
 
   --z-toast: 9999;
 
   /* ── M3 system color tokens (M2 dark principle → Material Web components) ── */
-  --md-sys-color-primary:            #00A8E8;
+  --md-sys-color-primary:            #9db8b0;
   --md-sys-color-on-primary:         #0D1117;
-  --md-sys-color-primary-container:  rgba(0,168,232,0.14);
+  --md-sys-color-primary-container:  rgba(157,184,176,0.14);
   --md-sys-color-secondary:          #22C55E;
   --md-sys-color-on-secondary:       #0D1117;
-  --md-sys-color-tertiary:           #007EA7;
+  --md-sys-color-tertiary:           #4f6b64;
   --md-sys-color-error:              #CF6679;
   --md-sys-color-on-error:           #0D1117;
-  --md-sys-color-background:         #0D1117;
+  --md-sys-color-background:         #060708;
   --md-sys-color-on-background:      rgba(255,255,255,0.93);
   --md-sys-color-surface:            #1B242E;
   --md-sys-color-on-surface:         rgba(255,255,255,0.93);
@@ -74,8 +88,8 @@
   --md-sys-shape-corner-full:        100px;
   /* Switch */
   --md-switch-track-color:                     rgba(255,255,255,0.15);
-  --md-switch-track-selected-color:            rgba(0,168,232,0.28);
-  --md-switch-handle-selected-color:           #00A8E8;
+  --md-switch-track-selected-color:            rgba(157,184,176,0.28);
+  --md-switch-handle-selected-color:           #9db8b0;
   --md-switch-handle-color:                    rgba(255,255,255,0.55);
   --md-switch-selected-icon-color:             #00171F;
   --md-switch-track-height:                    24px;
@@ -85,9 +99,9 @@
   --md-switch-selected-handle-height:          22px;
   --md-switch-selected-handle-width:           22px;
   /* Circular progress */
-  --md-circular-progress-active-indicator-color: #00A8E8;
+  --md-circular-progress-active-indicator-color: #9db8b0;
   /* Linear progress */
-  --md-linear-progress-active-indicator-color: #00A8E8;
+  --md-linear-progress-active-indicator-color: #9db8b0;
   --md-linear-progress-track-color:            rgba(255,255,255,0.08);
   --md-linear-progress-track-height:           4px;
   --md-linear-progress-active-indicator-height: 4px;
@@ -98,32 +112,83 @@
 html { font-size: 17px; }
 
 body {
-  background: var(--bg-dark);
+  background:
+    radial-gradient(150% 100% at 50% -10%, #0d1014 0%, #08090b 38%, #050608 65%, #030304 100%),
+    var(--bg-dark);
+  background-size: cover, cover;
   color: var(--text-main);
   font-family: var(--font-body), sans-serif;
   margin: 0;
   font-size: 1rem;
   line-height: 1.6;
   font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  position: relative;
+}
+/* ── Background image (nebula) — fixed, heavily dimmed so it never washes out the UI ── */
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(70% 55% at 62% 6%, rgba(157,184,176,0.05) 0%, transparent 60%),
+    linear-gradient(180deg, rgba(6,7,8,0.72) 0%, rgba(4,4,5,0.84) 100%),
+    radial-gradient(130% 100% at 50% 30%, transparent 46%, rgba(0,0,0,0.7) 100%),
+    url('/static/img/bg-dashboard.jpg') center center / cover no-repeat;
+  background-color: var(--bg-dark);
+}
+/* ── Grain — fine, on the background only ── */
+:root{ --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='0.85'/%3E%3C/svg%3E"); }
+body::after{
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+  opacity:.11; mix-blend-mode:screen;
+  background-image:var(--grain); background-size:130px;
 }
 
-/* ── Top Nav ── */
-.topnav { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 0 28px; height: 62px; display: flex; align-items: center; gap: 20px; position: sticky; top: 0; z-index: 200; }
-.brand-wrap { display: flex; align-items: center; gap: 10px; text-decoration: none; flex-shrink: 0; }
-.brand-icon { width: 34px; height: 34px; background: linear-gradient(135deg, #00A8E8, #007EA7); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; color: #00171F; font-family: var(--font-headline); letter-spacing: 0.5px; }
-.brand-name { font-weight: 700; font-size: 1.1rem; color: var(--text-main); font-family: var(--font-headline); letter-spacing: -0.1px; }
-.brand-name small { color: var(--text-muted); font-size: 0.65em; margin-left: 5px; font-family: var(--font-mono); font-weight: 400; }
-.topnav-pills { display: flex; gap: 3px; background: var(--bg-card); padding: 4px; border-radius: 100px; border: 1px solid var(--border); flex-shrink: 0; }
+@keyframes ambientDrift {
+  0%   { transform: translate3d(0,0,0) scale(1);        opacity: 1; }
+  100% { transform: translate3d(-2%,1.6%,0) scale(1.06); opacity: 0.8; }
+}
+@media (prefers-reduced-motion: reduce) { body::before { animation: none; } }
+/* app chrome rides above the ambient layers */
+.topnav, .main-content, .sidebar, .topbar-slim, #chatFab, #chatPanel, .notification { position: relative; z-index: 1; }
+
+/* ── Top Nav — floating frosted bar ── */
+.topnav {
+  background: rgba(10,12,14,0.55);
+  backdrop-filter: blur(20px) saturate(var(--glass-sat));
+  -webkit-backdrop-filter: blur(20px) saturate(var(--glass-sat));
+  border-bottom: 1px solid var(--border2);
+  padding: 0 28px; height: 64px; display: flex; align-items: center; gap: 20px;
+  position: sticky; top: 0; z-index: 200;
+}
+.brand-wrap { display: flex; align-items: center; gap: 11px; text-decoration: none; flex-shrink: 0; }
+.brand-icon { width: 34px; height: 34px; background: linear-gradient(135deg, #9db8b0, #4f6b64); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; color: #07080a; font-family: var(--font-headline); letter-spacing: 0.5px; box-shadow: 0 0 22px rgba(157,184,176,0.35); }
+.brand-name { font-weight: 600; font-size: 1.1rem; color: var(--text-main); font-family: var(--font-headline); letter-spacing: -0.2px; }
+.brand-name small { color: var(--text-dim); font-size: 0.62em; margin-left: 6px; font-family: var(--font-mono); font-weight: 400; letter-spacing: 0; }
+/* the pill cluster floats, centered, like the reference nav */
+.topnav-pills {
+  display: flex; gap: 2px; padding: 4px;
+  border-radius: 100px;
+  background: rgba(255,255,255,0.045);
+  border: 1px solid var(--border2);
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 6px 24px rgba(0,0,0,0.35);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  flex-shrink: 0; margin: 0 auto;
+}
 .pill-link {
-  padding: 6px 16px; border-radius: 100px;
+  padding: 7px 17px; border-radius: 100px;
   color: var(--text-muted); cursor: pointer;
-  font-size: 0.9rem; font-family: var(--font-headline); font-weight: 500;
-  transition: all 0.15s; white-space: nowrap;
+  font-size: 0.88rem; font-family: var(--font-headline); font-weight: 500;
+  transition: color var(--dur-sm) var(--ease-exp-out), background var(--dur-md) var(--ease-exp-out);
+  white-space: nowrap;
   border: none; background: none; text-decoration: none; display: inline-block;
-  letter-spacing: 0.1px;
+  letter-spacing: -0.1px;
 }
 .pill-link:hover { color: var(--text-main); }
-.pill-link.active { background: var(--text-main); color: #00171F; font-weight: 700; }
+.pill-link.active {
+  background: var(--ink); color: var(--on-ink); font-weight: 600;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.45);
+}
 .topnav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 
 /* ── Layout ── */
@@ -157,7 +222,7 @@ body {
 .regime-badge { font-size: 0.72rem; padding: 2px 8px; border-radius: var(--radius-pill); font-weight: 700; letter-spacing: 0.4px; font-family: var(--font-mono); display: inline-block; }
 .regime-bull   { background: rgba(57,217,138,0.15);  color: #39d98a; border: 1px solid rgba(57,217,138,0.3); }
 .regime-bear   { background: rgba(239,68,68,0.15);  color: #EF4444; border: 1px solid rgba(239,68,68,0.3); }
-.regime-range  { background: rgba(0,168,232,0.10);  color: #00A8E8; border: 1px solid rgba(0,168,232,0.25); }
+.regime-range  { background: rgba(157,184,176,0.10);  color: #9db8b0; border: 1px solid rgba(157,184,176,0.25); }
 .regime-vol    { background: rgba(255,193,7,0.12);   color: #ffc107; border: 1px solid rgba(255,193,7,0.25); }
 .regime-crash  { background: rgba(220,53,69,0.18);   color: #ff4d6d; border: 1px solid rgba(220,53,69,0.4); animation: pulse 1s infinite; }
 
@@ -180,7 +245,7 @@ body {
   text-transform: uppercase; font-size: 0.74rem; letter-spacing: 0.8px;
   font-family: var(--font-mono);
 }
-.table-hover tbody tr:hover td { background: rgba(0,168,232,0.04); }
+.table-hover tbody tr:hover td { background: rgba(157,184,176,0.04); }
 
 /* ── Price cards ── */
 .price-card { border-radius: var(--radius-card); padding: 13px 15px; background: var(--bg-card); border: 1px solid var(--border); cursor: pointer; transition: border-color 0.15s; }
@@ -210,7 +275,7 @@ body {
 .feed-empty .fe-pulse {
   width: 34px; height: 34px; margin: 0 auto 12px; border-radius: 50%;
   display: grid; place-items: center;
-  background: rgba(0,168,232,0.08); border: 1px solid rgba(0,168,232,0.2);
+  background: rgba(157,184,176,0.08); border: 1px solid rgba(157,184,176,0.2);
 }
 .feed-empty .fe-pulse span {
   width: 8px; height: 8px; border-radius: 50%;
@@ -221,13 +286,13 @@ body {
 
 /* ── Stat-card color modifiers ── */
 .stat-card.sc-buy  { background: rgba(57,217,138,0.06);  border-color: rgba(57,217,138,0.18); }
-.stat-card.sc-lime { background: rgba(0,168,232,0.06);  border-color: rgba(0,168,232,0.18); }
+.stat-card.sc-lime { background: rgba(157,184,176,0.06);  border-color: rgba(157,184,176,0.18); }
 .stat-card.sc-red  { background: rgba(239,68,68,0.06);   border-color: rgba(239,68,68,0.18); }
 .stat-card.sc-warn { background: rgba(248,81,73,0.10);   border-color: rgba(248,81,73,0.20); }
 
 /* ── Mode badge ── */
 .mode-badge { padding: 3px 10px; border-radius: var(--radius-pill); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.8px; font-family: var(--font-mono); }
-.mode-demo { background: rgba(0,168,232,0.10); color: var(--accent); border: 1px solid rgba(0,168,232,0.30); }
+.mode-demo { background: rgba(157,184,176,0.10); color: var(--accent); border: 1px solid rgba(157,184,176,0.30); }
 .mode-live { background: rgba(57,217,138,0.1); color: var(--accent-buy); border: 1px solid rgba(57,217,138,0.3); }
 
 /* ── Forms ── */
@@ -238,7 +303,7 @@ body {
 }
 .form-control:focus, .form-select:focus {
   background: var(--bg-card2); border-color: var(--accent);
-  color: var(--text-main); box-shadow: 0 0 0 2px rgba(0,168,232,0.12);
+  color: var(--text-main); box-shadow: 0 0 0 2px rgba(157,184,176,0.12);
 }
 .form-control::placeholder { color: var(--text-muted); }
 .form-label {
@@ -252,12 +317,12 @@ body {
   background: var(--accent); border-color: var(--accent); color: #00171F;
   font-family: var(--font-headline); font-weight: 700; letter-spacing: 0.3px; border-radius: var(--radius-sm);
 }
-.btn-primary:hover { background: #33BDEE; border-color: #33BDEE; color: #00171F; }
+.btn-primary:hover { background: #c6dad3; border-color: #c6dad3; color: #00171F; }
 .btn-outline-secondary {
   border-color: var(--border2); color: var(--text-muted);
   font-family: var(--font-headline); border-radius: var(--radius-sm);
 }
-.btn-outline-secondary:hover { border-color: var(--accent); color: var(--accent); background: rgba(0,168,232,0.06); }
+.btn-outline-secondary:hover { border-color: var(--accent); color: var(--accent); background: rgba(157,184,176,0.06); }
 .btn-success { background: var(--accent-buy); border-color: var(--accent-buy); color: #fff; font-family: var(--font-headline); font-weight: 700; border-radius: var(--radius-sm); }
 .btn-danger  { background: var(--accent-red);  border-color: var(--accent-red);  color: #fff; font-family: var(--font-headline); font-weight: 700; border-radius: var(--radius-sm); }
 .btn-sm { font-size: 0.82rem; padding: 5px 12px; }
@@ -301,9 +366,9 @@ body {
 .border-top   { border-color: var(--border) !important; }
 .border-bottom{ border-color: var(--border) !important; }
 hr { border-color: var(--border); }
-code { color: var(--accent); background: rgba(0,168,232,0.08); padding: 1px 5px; border-radius: 2px; font-family: var(--font-mono); }
+code { color: var(--accent); background: rgba(157,184,176,0.08); padding: 1px 5px; border-radius: 2px; font-family: var(--font-mono); }
 a { color: var(--accent); }
-a:hover { color: #33BDEE; }
+a:hover { color: #c6dad3; }
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: var(--bg-dark); }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10); border-radius: 100px; }
@@ -326,31 +391,85 @@ a:hover { color: #33BDEE; }
 [data-theme="light"] .card-header { background: transparent; border-bottom-color: var(--border); }
 [data-theme="light"] .sidebar { background: #fff !important; border-right-color: var(--border) !important; }
 [data-theme="light"] .snav-item:hover { background: rgba(0,0,0,0.04); }
-[data-theme="light"] .snav-item.active { background: rgba(0,168,232,0.12); }
+[data-theme="light"] .snav-item.active { background: rgba(157,184,176,0.12); }
 [data-theme="light"] .topbar-slim { background: rgba(242,243,248,0.9) !important; border-bottom-color: var(--border); }
 [data-theme="light"] .table { color: var(--text-main); }
 [data-theme="light"] .table td, [data-theme="light"] .table th { border-color: var(--border); }
 [data-theme="light"] .table thead th { background: var(--bg-card2); color: var(--text-muted); }
 [data-theme="light"] .form-control, [data-theme="light"] .form-select { background: #fff; color: #0d0d1a; border-color: var(--border); }
 [data-theme="light"] #themeIcon::before { content: "\f496"; }
+/* light-mode adjustments for the luxe glass/glow system */
+[data-theme="light"] { --ink: #11131a; --on-ink: #ffffff; --text-dim: rgba(0,0,0,0.45); --glass-hi: rgba(255,255,255,0.6); }
+[data-theme="light"] body::before { opacity: 0.32; }
+[data-theme="light"] body::after { display: none; }
+[data-theme="light"] .snav-indicator { background: var(--ink); box-shadow: 0 4px 14px rgba(0,0,0,0.18); }
+[data-theme="light"] .snav-item.active { color: var(--on-ink); }
+[data-theme="light"] .snav-item.active svg { color: var(--on-ink); }
+[data-theme="light"] .snav-item.active .kbd-hint { color: rgba(255,255,255,0.75); background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.28); }
+[data-theme="light"] .price-card, [data-theme="light"] .stat-card { background: #fff !important; }
 
-/* ── Clean Cards (no glassmorphism) ── */
+/* ── Frosted glass cards (reference look — light refracts through the panel) ── */
 .card {
   background: var(--bg-card) !important;
   border: 1px solid var(--border) !important;
   border-radius: var(--radius-card) !important;
   position: relative; overflow: hidden;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 16px 40px rgba(0,0,0,0.42);
 }
-.card::before { display: none; }
+/* top-edge sheen — the highlight that sells the glass */
+.card::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255,255,255,0.075) 0%, transparent 26%);
+}
+.card > * { position: relative; z-index: 1; }
 .stat-card {
   background: var(--bg-card) !important;
   border: 1px solid var(--border) !important;
   border-radius: var(--radius-card) !important;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+  position: relative; overflow: hidden;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 14px 36px rgba(0,0,0,0.40);
 }
+.stat-card::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255,255,255,0.075) 0%, transparent 28%);
+}
+.stat-card > * { position: relative; z-index: 1; }
 .topbar-slim {
+  background: rgba(10,12,14,0.7) !important;
+  backdrop-filter: blur(13px) saturate(var(--glass-sat));
+  -webkit-backdrop-filter: blur(13px) saturate(var(--glass-sat));
+}
+
+/* ── Luxe typography — bigger display, refined tracking, lighter large weights ── */
+body { font-feature-settings: "ss01","cv01","cv11"; letter-spacing: -0.1px; }
+h1,h2,h3 { letter-spacing: -0.6px; text-wrap: balance; }
+.stat-value { font-size: 2.45rem; font-weight: 600; letter-spacing: -1.2px; }
+.stat-value.big, #totalValue { font-size: 2.9rem; font-weight: 600; letter-spacing: -1.6px; }
+.card-header { font-weight: 600; letter-spacing: -0.3px; font-size: 1rem; }
+.stat-label { color: var(--text-dim); letter-spacing: 0.9px; font-weight: 500; }
+.table thead th { color: var(--text-dim); }
+/* mono data: enable tabular figures everywhere it reads as a number */
+.font-mono, .stat-value, .table td, .price-card .fw-bold,
+.indicator-row, .badge-signal, .ai-time { font-variant-numeric: tabular-nums; }
+
+/* price cards float on glass too */
+.price-card {
   background: var(--bg-card) !important;
+  backdrop-filter: blur(16px) saturate(var(--glass-sat));
+  -webkit-backdrop-filter: blur(16px) saturate(var(--glass-sat));
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 8px 22px rgba(0,0,0,0.30);
+}
+
+/* dropdowns / menus must stay opaque over glass */
+.dropdown-menu, .form-select option, select option {
+  background: var(--bg-solid) !important; color: var(--text-main);
+  border: 1px solid var(--border) !important;
 }
 
 /* ── M3 Motion tokens ── */
@@ -393,9 +512,9 @@ a:hover { color: #33BDEE; }
   to   { opacity: 1; transform: translateX(0)    scale(1); }
 }
 @keyframes m3GlowRing {
-  0%  { box-shadow: 0 0 0 0   rgba(0,168,232,0.55); }
-  50% { box-shadow: 0 0 0 7px rgba(0,168,232,0); }
-  100%{ box-shadow: 0 0 0 0   rgba(0,168,232,0); }
+  0%  { box-shadow: 0 0 0 0   rgba(157,184,176,0.55); }
+  50% { box-shadow: 0 0 0 7px rgba(157,184,176,0); }
+  100%{ box-shadow: 0 0 0 0   rgba(157,184,176,0); }
 }
 @keyframes m3Shimmer {
   0%  { background-position: -400px 0; }
@@ -458,21 +577,21 @@ a:hover { color: #33BDEE; }
 .price-card:hover {
   transform: translateY(-3px) scale(1.015);
   border-color: var(--accent) !important;
-  box-shadow: 0 6px 28px rgba(0,168,232,0.13);
+  box-shadow: 0 6px 28px rgba(157,184,176,0.13);
 }
 .price-card.active {
   border-color: var(--accent) !important;
-  box-shadow: 0 0 0 1px rgba(0,168,232,0.25), 0 6px 28px rgba(0,168,232,0.1);
+  box-shadow: 0 0 0 1px rgba(157,184,176,0.25), 0 6px 28px rgba(157,184,176,0.1);
 }
 .stat-card { transition: transform 0.18s, border-color 0.15s, box-shadow 0.2s; }
 .stat-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(0,168,232,0.18) !important;
-  box-shadow: 0 4px 20px rgba(0,168,232,0.07);
+  border-color: rgba(157,184,176,0.18) !important;
+  box-shadow: 0 4px 20px rgba(157,184,176,0.07);
 }
 .btn { transition: transform 0.1s ease, box-shadow 0.15s ease !important; }
 .btn:active { transform: scale(0.96) !important; }
-.btn-primary:hover { box-shadow: 0 0 22px rgba(0,168,232,0.28) !important; }
+.btn-primary:hover { box-shadow: 0 0 22px rgba(157,184,176,0.28) !important; }
 .pill-link { transition: all 0.18s ease !important; }
 .pill-link.active { box-shadow: 0 2px 12px rgba(0,0,0,0.4); }
 .tab-btn { transition: all 0.18s ease; }
@@ -511,11 +630,11 @@ ol.small, ul.small, .small.text-muted,
   background:var(--accent); color:#00171F;
   display:flex; align-items:center; justify-content:center;
   cursor:pointer; font-size:1.3rem;
-  box-shadow:0 4px 20px rgba(0,168,232,0.4);
+  box-shadow:0 4px 20px rgba(157,184,176,0.4);
   transition:transform 0.2s cubic-bezier(0.22,1,0.36,1), box-shadow 0.2s;
   border:none;
 }
-#chatFab:hover { transform:scale(1.1); box-shadow:0 8px 32px rgba(0,168,232,0.55); }
+#chatFab:hover { transform:scale(1.1); box-shadow:0 8px 32px rgba(157,184,176,0.55); }
 #chatFab:active { transform:scale(0.96); }
 #chatPanel {
   position:fixed; bottom:86px; right:24px; z-index:8999;
@@ -529,7 +648,7 @@ ol.small, ul.small, .small.text-muted,
   animation:sectionIn 0.22s cubic-bezier(0.22,1,0.36,1) forwards;
 }
 [data-theme="light"] #chatPanel { background:rgba(255,255,255,0.96); border-color:var(--border); }
-[data-theme="light"] #chatFab { box-shadow:0 4px 20px rgba(0,168,232,0.3); }
+[data-theme="light"] #chatFab { box-shadow:0 4px 20px rgba(157,184,176,0.3); }
 .chat-msg { display:flex; gap:8px; }
 .chat-msg.chat-user { flex-direction:row-reverse; }
 .chat-bubble {
@@ -551,7 +670,7 @@ ol.small, ul.small, .small.text-muted,
   font-size:0.72rem; cursor:pointer; font-family:var(--font-body);
   transition:all 0.15s; white-space:nowrap;
 }
-.chat-quick:hover { background:rgba(0,168,232,0.12); border-color:rgba(0,168,232,0.35); color:var(--accent); }
+.chat-quick:hover { background:rgba(157,184,176,0.12); border-color:rgba(157,184,176,0.35); color:var(--accent); }
 [data-theme="light"] .chat-quick { background:var(--bg-card2); border-color:var(--border); }
 #chatInput {
   flex:1; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1);
@@ -560,7 +679,7 @@ ol.small, ul.small, .small.text-muted,
   transition:border-color 0.15s, outline-color 0.15s;
 }
 #chatInput:focus { outline-color: var(--accent); }
-#chatInput:focus { border-color:rgba(0,168,232,0.5); }
+#chatInput:focus { border-color:rgba(157,184,176,0.5); }
 [data-theme="light"] #chatInput { background:#fff; border-color:var(--border); color:#0d0d0d; }
 
 /* ── AI Agent avatars ── */
@@ -662,8 +781,8 @@ ol.small, ul.small, .small.text-muted,
 /* ── Cache Stats Box ── */
 .cache-stat-box {
   margin-top: 10px; padding: 8px 10px;
-  background: rgba(0,168,232,0.05);
-  border: 1px solid rgba(0,168,232,0.15);
+  background: rgba(157,184,176,0.05);
+  border: 1px solid rgba(157,184,176,0.15);
   border-radius: 8px;
 }
 .cache-hit-bar { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; margin-top: 4px; }
@@ -684,8 +803,10 @@ body { overflow: hidden; }
 .app { display: grid; grid-template-columns: 238px 1fr; height: 100vh; }
 
 .sidebar {
-  background: var(--bg-card);
-  border-right: 1px solid var(--border);
+  background: rgba(16,19,23,0.55);
+  backdrop-filter: blur(15px) saturate(var(--glass-sat));
+  -webkit-backdrop-filter: blur(15px) saturate(var(--glass-sat));
+  border-right: 1px solid var(--border2);
   display: flex; flex-direction: column;
   padding: 20px 14px; overflow-y: auto; overflow-x: hidden;
 }
@@ -698,7 +819,7 @@ body { overflow: hidden; }
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-buy) 100%);
   display: grid; place-items: center;
   font-weight: 800; font-size: 12px; color: #00171F; font-family: var(--font-mono);
-  box-shadow: 0 4px 16px -4px rgba(0,168,232,0.40);
+  box-shadow: 0 4px 16px -4px rgba(157,184,176,0.40);
 }
 .sb-title { font-family: var(--font-headline); font-weight: 700; font-size: 16px; color: var(--text-main); }
 .sb-sub   { font-size: 11.5px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 1px; }
@@ -707,8 +828,9 @@ body { overflow: hidden; }
 /* sliding active indicator — morphs between nav items */
 .snav-indicator {
   position: absolute; left: 0; width: 100%; top: 0; height: 0;
-  background: rgba(0,168,232,0.13); border-radius: 12px;
-  transition: transform 0.32s var(--ease-exp-out), height 0.32s var(--ease-exp-out), opacity 0.2s;
+  background: var(--ink); border-radius: 12px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.5);
+  transition: transform 0.38s var(--ease-exp-out), height 0.38s var(--ease-exp-out), opacity 0.2s;
   pointer-events: none; opacity: 0; will-change: transform;
 }
 .snav-indicator.ready { opacity: 1; }
@@ -725,11 +847,12 @@ body { overflow: hidden; }
 .snav-item:hover svg { opacity: 1; }
 .snav-item { position: relative; z-index: 1; }
 .snav-item.active {
-  color: var(--accent);
+  color: var(--on-ink);
   font-weight: 600;
 }
+.snav-item.active svg { color: var(--on-ink); }
 /* fallback bg เมื่อ indicator ยังไม่ ready (no-JS / first paint) */
-.snav:not(:has(.snav-indicator.ready)) .snav-item.active { background: rgba(0,168,232,0.13); }
+.snav:not(:has(.snav-indicator.ready)) .snav-item.active { background: var(--ink); color: var(--on-ink); }
 .snav-item.active svg { opacity: 1; }
 .snav-item.active::before { display: none; }
 .snav-sep { height: 1px; background: var(--border); margin: 10px 4px; }
@@ -777,7 +900,7 @@ body { overflow: hidden; }
   pointer-events: none; white-space: nowrap;
 }
 .snav:hover .snav-item .kbd-hint { opacity: 0.65; }
-.snav-item.active .kbd-hint { opacity: 0.75; }
+.snav-item.active .kbd-hint { opacity: 0.85; color: rgba(0,0,0,0.55); background: rgba(0,0,0,0.07); border-color: rgba(0,0,0,0.12); }
 .snav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 /* ── Material Web component overrides ── */
@@ -838,7 +961,7 @@ md-circular-progress.spin-inline {
 }
 .at-scan {
   position: absolute; inset: 0; pointer-events: none; opacity: 0;
-  background: linear-gradient(90deg, transparent 0%, rgba(0,168,232,0.05) 50%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(157,184,176,0.05) 50%, transparent 100%);
   transition: opacity 0.3s;
 }
 .at-statusbar.at-active .at-scan { opacity: 1; animation: atScanLine 2.4s linear infinite; }
@@ -847,12 +970,12 @@ md-circular-progress.spin-inline {
   width: 8px; height: 8px; border-radius: 50%;
   background: var(--border); flex-shrink: 0; transition: background 0.3s;
 }
-.at-statusbar.at-active .at-state-dot { background: #00A8E8; box-shadow: 0 0 6px rgba(0,168,232,0.6); }
+.at-statusbar.at-active .at-state-dot { background: #9db8b0; box-shadow: 0 0 6px rgba(157,184,176,0.6); }
 .at-state-label {
   font-family: var(--font-mono); font-size: 13px; font-weight: 500;
   letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); transition: color 0.3s;
 }
-.at-statusbar.at-active .at-state-label { color: #00A8E8; }
+.at-statusbar.at-active .at-state-label { color: #9db8b0; }
 .at-sb-div { width: 1px; height: 24px; background: var(--border); flex-shrink: 0; }
 .at-sb-field { display: flex; flex-direction: column; gap: 2px; }
 .at-sb-key {
@@ -860,7 +983,7 @@ md-circular-progress.spin-inline {
   text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted);
 }
 .at-sb-val { font-family: var(--font-mono); font-size: 15px; font-weight: 500; color: var(--text-main); }
-.at-sb-val.lime { color: #00A8E8; }
+.at-sb-val.lime { color: #9db8b0; }
 .at-sb-count {
   margin-left: auto; font-family: var(--font-mono);
   font-size: 12px; color: var(--text-muted);
@@ -893,9 +1016,9 @@ md-circular-progress.spin-inline {
   cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s;
 }
 .at-sig-card:hover { border-color: rgba(255,255,255,0.14); box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
-.at-sig-card.buy  { border-color: rgba(0,168,232,0.25); }
+.at-sig-card.buy  { border-color: rgba(157,184,176,0.25); }
 .at-sig-card.sell { border-color: rgba(239,68,68,0.25); }
-.at-sig-card.at-selected { outline: 2px solid rgba(0,168,232,0.5); }
+.at-sig-card.at-selected { outline: 2px solid rgba(157,184,176,0.5); }
 .at-sig-row1 { display: flex; align-items: center; justify-content: space-between; }
 .at-sym { font-family: var(--font-mono); font-size: 14.5px; font-weight: 700; color: var(--text-main); }
 .at-badge {
@@ -903,7 +1026,7 @@ md-circular-progress.spin-inline {
   letter-spacing: 0.05em; padding: 2px 8px; line-height: 1.5;
   border-radius: var(--radius-pill);
 }
-.at-badge.buy  { background: rgba(0,168,232,0.15); color: #00A8E8; }
+.at-badge.buy  { background: rgba(157,184,176,0.15); color: #9db8b0; }
 .at-badge.sell { background: rgba(239,68,68,0.15); color: #EF4444; }
 .at-badge.hold { background: var(--border); color: var(--text-muted); }
 .at-price { font-family: var(--font-mono); font-size: 13px; color: var(--text-muted); }
@@ -913,7 +1036,7 @@ md-circular-progress.spin-inline {
   color: var(--text-muted); display: flex; justify-content: space-between;
 }
 .at-conf-track { height: 3px; background: var(--border2); overflow: hidden; border-radius: 100px; }
-.at-conf-bar { height: 100%; background: #00A8E8; transition: width 0.4s ease-out; border-radius: 100px; }
+.at-conf-bar { height: 100%; background: #9db8b0; transition: width 0.4s ease-out; border-radius: 100px; }
 .at-sig-card.sell .at-conf-bar { background: #EF4444; }
 .at-sig-card.hold .at-conf-bar { background: var(--text-muted); }
 .at-regime-tag {
@@ -933,7 +1056,7 @@ md-circular-progress.spin-inline {
   color: var(--text-muted); width: 80px; flex-shrink: 0;
 }
 .at-attr-track { flex: 1; height: 3px; background: var(--border2); overflow: hidden; border-radius: 100px; }
-.at-attr-fill { height: 100%; background: #00A8E8; transition: width 0.4s ease-out; border-radius: 100px; }
+.at-attr-fill { height: 100%; background: #9db8b0; transition: width 0.4s ease-out; border-radius: 100px; }
 .at-attr-pct {
   font-family: var(--font-mono); font-size: 12px;
   color: var(--text-muted); width: 34px; text-align: right;
@@ -957,13 +1080,13 @@ md-circular-progress.spin-inline {
   text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 12px;
 }
 .at-metric-num { font-family: var(--font-mono); font-size: 32px; font-weight: 500; color: var(--text-main); line-height: 1; margin-bottom: 4px; }
-.at-metric-num .lime { color: #00A8E8; }
+.at-metric-num .lime { color: #9db8b0; }
 .at-metric-sub { font-family: var(--font-headline); font-size: 13px; color: var(--text-muted); margin-bottom: 14px; }
 .at-metric-rows { display: flex; flex-direction: column; gap: 7px; }
 .at-metric-row { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 12px; }
 .at-metric-row-k { color: var(--text-muted); }
 .at-metric-row-v { color: var(--text-main); }
-.at-metric-row-v.lime { color: #00A8E8; }
+.at-metric-row-v.lime { color: #9db8b0; }
 
 /* Training Zone */
 .at-train-zone { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
@@ -986,16 +1109,16 @@ md-circular-progress.spin-inline {
   background: var(--border); color: var(--text-muted);
   border-radius: var(--radius-pill);
 }
-.at-train-badge.ready { background: rgba(0,168,232,0.12); color: #00A8E8; }
+.at-train-badge.ready { background: rgba(157,184,176,0.12); color: #9db8b0; }
 .at-train-badge.training { background: rgba(250,204,21,0.12); color: #FACC15; }
 .at-train-badge.error { background: rgba(239,68,68,0.12); color: #EF4444; }
-.at-badge-auto.on { background: rgba(0,168,232,0.12); color: #00A8E8; }
+.at-badge-auto.on { background: rgba(157,184,176,0.12); color: #9db8b0; }
 
 .at-train-rows { display: flex; flex-direction: column; gap: 5px; }
 .at-train-row { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 12px; }
 .at-train-row span:first-child { color: var(--text-muted); }
 .at-train-row span:last-child { color: var(--text-main); }
-.at-train-row .lime { color: #00A8E8; }
+.at-train-row .lime { color: #9db8b0; }
 
 /* Requirements checklist */
 .at-req-block { display: flex; flex-direction: column; gap: 5px; }
@@ -1008,26 +1131,26 @@ md-circular-progress.spin-inline {
   display: flex; align-items: center; gap: 7px;
   font-family: var(--font-headline); font-size: 13px; color: var(--text-muted);
 }
-.at-req-row.ok { color: #00A8E8; }
+.at-req-row.ok { color: #9db8b0; }
 .at-req-dot {
   width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
   background: var(--border);
 }
-.at-req-row.ok .at-req-dot { background: #00A8E8; box-shadow: 0 0 6px rgba(0,168,232,0.5); }
+.at-req-row.ok .at-req-dot { background: #9db8b0; box-shadow: 0 0 6px rgba(157,184,176,0.5); }
 
 /* Train button */
 .at-train-btn {
   display: flex; align-items: center; gap: 6px; justify-content: center;
   font-family: var(--font-mono); font-size: 12px; font-weight: 700;
-  letter-spacing: 0.04em; padding: 9px 12px; border: 1px solid rgba(0,168,232,0.3);
-  background: rgba(0,168,232,0.07); color: #00A8E8; cursor: pointer;
+  letter-spacing: 0.04em; padding: 9px 12px; border: 1px solid rgba(157,184,176,0.3);
+  background: rgba(157,184,176,0.07); color: #9db8b0; cursor: pointer;
   transition: all 0.15s; width: 100%; border-radius: var(--radius-sm);
 }
-.at-train-btn:hover { background: rgba(0,168,232,0.15); border-color: #00A8E8; }
+.at-train-btn:hover { background: rgba(157,184,176,0.15); border-color: #9db8b0; }
 .at-train-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .at-train-btn-auto { border-color: var(--border); color: var(--text-muted); background: transparent; }
 .at-train-btn-auto:hover { border-color: rgba(255,255,255,0.2); color: var(--text-main); background: rgba(255,255,255,0.04); }
-.at-train-btn-auto.active { border-color: rgba(0,168,232,0.4); color: #00A8E8; background: rgba(0,168,232,0.08); }
+.at-train-btn-auto.active { border-color: rgba(157,184,176,0.4); color: #9db8b0; background: rgba(157,184,176,0.08); }
 
 @media (prefers-reduced-motion: reduce) {
   .at-scan { animation: none !important; }
@@ -1113,7 +1236,7 @@ md-circular-progress.spin-inline {
   background: var(--text-muted); flex-shrink: 0;
 }
 .ai-status-pill.running .ai-status-dot { background: var(--accent); box-shadow: 0 0 5px var(--accent); }
-.ai-status-pill.running { color: var(--accent); border-color: rgba(0,168,232,0.3); }
+.ai-status-pill.running { color: var(--accent); border-color: rgba(157,184,176,0.3); }
 .ai-status-pill.stopped .ai-status-dot { background: #dc3545; }
 .ai-status-pill.stopped { color: #dc3545; border-color: rgba(220,53,69,0.3); }
 
@@ -1146,7 +1269,7 @@ md-circular-progress.spin-inline {
 
 /* ── Risk model explainer ── */
 .risk-model-bar {
-  background: rgba(0,168,232,0.05); border: 1px solid rgba(0,168,232,0.14);
+  background: rgba(157,184,176,0.05); border: 1px solid rgba(157,184,176,0.14);
   border-radius: var(--radius-sm); padding: 7px 10px; margin-bottom: 10px;
   font-family: var(--font-mono); font-size: 0.69rem; color: var(--text-muted);
   display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
@@ -1167,8 +1290,8 @@ md-circular-progress.spin-inline {
 
 /* ── ApexCharts — bklit-ui frosted glass tooltip ── */
 .apexcharts-tooltip {
-  background: rgba(13,17,23,0.82) !important;
-  backdrop-filter: blur(14px) !important;
+  background: rgba(8,10,12,0.80) !important;
+  backdrop-filter: blur(16px) saturate(140%) !important;
   -webkit-backdrop-filter: blur(14px) !important;
   border: 1px solid rgba(255,255,255,0.10) !important;
   border-radius: 12px !important;
@@ -1815,7 +1938,7 @@ md-circular-progress.spin-inline {
 <section id="sec-ai-training" class="section active" style="display:block">
 
   <!-- Fast Training Loop Banner -->
-  <div class="card mb-3" id="loopBanner" style="background:rgba(0,168,232,0.04);border:1px solid rgba(57,217,138,0.25)">
+  <div class="card mb-3" id="loopBanner" style="background:rgba(157,184,176,0.04);border:1px solid rgba(57,217,138,0.25)">
     <div class="card-body py-2 d-flex align-items-center gap-3 flex-wrap">
       <div class="flex-grow-1">
         <div class="d-flex align-items-center gap-2 mb-1">
@@ -1937,11 +2060,11 @@ md-circular-progress.spin-inline {
         <!-- HRP Allocation -->
         <div class="col-md-4">
           <div class="d-flex align-items-center justify-content-between mb-2">
-            <div style="font-size:0.8rem;color:#00A8E8;font-weight:600">
+            <div style="font-size:0.8rem;color:#9db8b0;font-weight:600">
               <i class="bi bi-diagram-3 me-1"></i>HRP Allocation
               <span class="text-muted" style="font-size:0.65rem;font-weight:400">correlation-aware</span>
             </div>
-            <button class="btn btn-sm px-2 py-0" style="font-size:0.65rem;border:1px solid rgba(0,168,232,0.3);color:#00A8E8;background:rgba(0,168,232,0.06)" onclick="loadHrp(this)" title="Rebalance HRP">
+            <button class="btn btn-sm px-2 py-0" style="font-size:0.65rem;border:1px solid rgba(157,184,176,0.3);color:#9db8b0;background:rgba(157,184,176,0.06)" onclick="loadHrp(this)" title="Rebalance HRP">
               <i class="bi bi-arrow-clockwise me-1"></i>Run
             </button>
           </div>
@@ -1968,9 +2091,9 @@ md-circular-progress.spin-inline {
   </div>
 
   <!-- Hourly Real-Data Trainer card -->
-  <div class="card mb-3" style="border-color:rgba(0,168,232,0.2)">
+  <div class="card mb-3" style="border-color:rgba(157,184,176,0.2)">
     <div class="card-header d-flex justify-content-between align-items-center">
-      <span><i class="bi bi-clock-history me-2"></i>Hourly Real-Data Training <span class="badge ms-1" style="background:rgba(0,168,232,0.15);color:var(--accent);font-size:0.6rem">LIVE BINANCE</span></span>
+      <span><i class="bi bi-clock-history me-2"></i>Hourly Real-Data Training <span class="badge ms-1" style="background:rgba(157,184,176,0.15);color:var(--accent);font-size:0.6rem">LIVE BINANCE</span></span>
       <button class="btn btn-outline-secondary btn-sm" onclick="triggerHourlyTrain()" id="hourlyRunBtn">
         <i class="bi bi-play-fill me-1"></i>Run Now
       </button>
@@ -2546,7 +2669,7 @@ md-circular-progress.spin-inline {
           <div class="card-body">
             <div class="d-flex align-items-center justify-content-between mb-3">
               <h6 class="mb-0 fw-bold" style="color:var(--accent)">Current Champion</h6>
-              <span class="badge" id="champPromotedBadge" style="display:none;background:rgba(0,168,232,0.15);color:var(--accent);border:1px solid rgba(0,168,232,0.3)">New</span>
+              <span class="badge" id="champPromotedBadge" style="display:none;background:rgba(157,184,176,0.15);color:var(--accent);border:1px solid rgba(157,184,176,0.3)">New</span>
             </div>
             <div id="champNone" class="text-muted small">No tournament run yet. Run a tournament to find the best strategy.</div>
             <div id="champInfo" style="display:none">
@@ -3439,7 +3562,7 @@ function initCharts() {
     fill: { type:'gradient', gradient:{shadeIntensity:1, opacityFrom:0.28, opacityTo:0, stops:[0,80,100]} },
     dataLabels: { enabled:false },
     legend: { show:false },
-    colors: ['#00A8E8'],
+    colors: ['#9db8b0'],
     markers: { size:0 },
   });
   charts.portfolio.render();
@@ -3450,7 +3573,7 @@ function initCharts() {
     series: [{data:[]}],
     xaxis: { type:'datetime', labels:{style:{colors:'rgba(255,255,255,0.55)',fontSize:'12px'}, datetimeFormatter:{hour:'HH:mm',day:'dd MMM'}} },
     yaxis: { tooltip:{enabled:true}, labels:{style:{colors:'rgba(255,255,255,0.55)',fontSize:'12px'}, formatter:v=>formatPrice(v)} },
-    plotOptions: { candlestick:{ colors:{upward:'#00A8E8',downward:'#EF4444'}, wick:{useFillColor:true} } },
+    plotOptions: { candlestick:{ colors:{upward:'#9db8b0',downward:'#EF4444'}, wick:{useFillColor:true} } },
     grid: { borderColor:'rgba(255,255,255,0.08)' },
     tooltip: { theme:'dark' },
     noData: { text:'เลือก symbol เพื่อดู chart', style:{color:'rgba(255,255,255,0.55)'} },
@@ -3463,7 +3586,7 @@ function initCharts() {
     chart: {..._apex.chart, type:'donut', height:220},
     series: [100],
     labels: ['USDT'],
-    colors: ['#00A8E8'],
+    colors: ['#9db8b0'],
     plotOptions: { pie:{ donut:{ size:'68%', labels:{ show:true, name:{show:false}, total:{ show:true, showAlways:true, label:'Portfolio', color:'rgba(255,255,255,0.60)', fontSize:'12px' }, value:{ show:true, color:'#FFFFFF', fontSize:'1.3rem', fontWeight:700, fontFamily:"'Geist','Inter',sans-serif", formatter:v=>Number(v).toFixed(0) } } } } },
     dataLabels: { enabled:false },
     legend: { position:'bottom', labels:{colors:'rgba(255,255,255,0.65)'}, fontSize:'12px' },
@@ -3481,7 +3604,7 @@ function initCharts() {
     plotOptions: { bar:{borderRadius:4, columnWidth:'65%'} },
     dataLabels: { enabled:false },
     legend: { show:false },
-    colors: ['#00A8E8'],
+    colors: ['#9db8b0'],
   });
   charts.dailyPnl.render();
 
@@ -3495,7 +3618,7 @@ function initCharts() {
     yaxis: { labels:{style:{colors:'rgba(255,255,255,0.55)',fontSize:'12px'}} },
     dataLabels: { enabled:false },
     legend: { show:false },
-    colors: ['#00A8E8','#00A8E8','#00A8E8','#00A8E8','#00A8E8','#00A8E8','#00A8E8','#00A8E8'],
+    colors: ['#9db8b0','#9db8b0','#9db8b0','#9db8b0','#9db8b0','#9db8b0','#9db8b0','#9db8b0'],
     fill: { opacity:0.72 },
   });
   charts.features.render();
@@ -3606,7 +3729,7 @@ function _corrCell(v) {
   const isDiag = v === 1.0;
   let bg, color;
   if (isDiag) {
-    bg = 'rgba(0,168,232,0.15)'; color = 'var(--accent)';
+    bg = 'rgba(157,184,176,0.15)'; color = 'var(--accent)';
   } else if (v >= 0) {
     bg = `rgba(239,68,68,${(a * 0.9).toFixed(2)})`; color = a > 0.45 ? '#fff' : 'var(--text-muted)';
   } else {
@@ -4122,7 +4245,7 @@ function updateIndicatorPanel(sym) {
   const d = allPrices[sym];
   const a = allAnalyses[sym];
   if (!d) return;
-  const rsiColor = d.rsi < 30 ? '#00A8E8' : d.rsi > 70 ? '#EF4444' : '#555555';
+  const rsiColor = d.rsi < 30 ? '#9db8b0' : d.rsi > 70 ? '#EF4444' : '#555555';
   const panel = document.getElementById('indicatorPanel');
   panel.innerHTML = `
     <div class="indicator-row"><span>RSI(14)</span><span style="color:${rsiColor}">${(d.rsi||0).toFixed(1)}</span></div>
@@ -4130,7 +4253,7 @@ function updateIndicatorPanel(sym) {
       <span class="badge-signal ${d.signal==='BUY'?'signal-buy':d.signal==='SELL'?'signal-sell':'signal-hold'}">${d.signal}</span></div>
     <div class="indicator-row"><span>Confidence</span>
       <span>${((d.signal_strength||0)*100).toFixed(0)}%
-        <span class="indicator-bar"><span class="indicator-fill" style="width:${(d.signal_strength||0)*100}%;background:#00A8E8"></span></span>
+        <span class="indicator-bar"><span class="indicator-fill" style="width:${(d.signal_strength||0)*100}%;background:#9db8b0"></span></span>
       </span></div>
     <div class="indicator-row"><span>24h Change</span>
       <span class="${d.change_24h>=0?'price-up':'price-down'}">${d.change_24h>=0?'+':''}${d.change_24h.toFixed(2)}%</span></div>
@@ -4146,7 +4269,7 @@ function updateAIPanel(sym) {
 
   // Narrative block
   const narrativeBlock = a.narrative
-    ? `<div class="mb-3 p-2" style="background:rgba(0,168,232,0.06);border:1px solid rgba(0,168,232,0.18);border-radius:4px;line-height:1.55">
+    ? `<div class="mb-3 p-2" style="background:rgba(157,184,176,0.06);border:1px solid rgba(157,184,176,0.18);border-radius:4px;line-height:1.55">
          <div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-mono);margin-bottom:3px">Market Narrative</div>
          <span class="small">${a.narrative}</span>
        </div>`
@@ -4232,8 +4355,8 @@ let _allocKey = '';
 function updateAllocationChart(positions, cash, cur) {
   const labels = [cur || 'USDT'];
   const data = [cash];
-  const colors = ['#00A8E8'];
-  const palette = ['#39d98a','#EF4444','#d29922','#00A8E8','#00A8E8','#00A8E8'];
+  const colors = ['#9db8b0'];
+  const palette = ['#39d98a','#EF4444','#d29922','#9db8b0','#9db8b0','#9db8b0'];
   positions.forEach((p, i) => {
     labels.push(p.symbol.split('/')[0]);
     data.push(p.value);
@@ -4357,7 +4480,7 @@ function handleAnalysisUpdate(d) {
   if (document.getElementById('sec-autotrade').classList.contains('active')) updateAutotrade(d);
   if (document.getElementById('sec-dashboard').classList.contains('active')) renderAiPairChips();
   if (d.signal !== 'HOLD') {
-    const c = d.signal === 'BUY' ? '#00A8E8' : '#EF4444';
+    const c = d.signal === 'BUY' ? '#9db8b0' : '#EF4444';
     addActivity(d.signal === 'BUY' ? '▲' : '▼', `${d.symbol} ${d.signal} (conf: ${(d.confidence*100).toFixed(0)}%)`, c);
   }
   if (document.getElementById('sec-dashboard').classList.contains('active')) renderPriceCards();
@@ -4489,7 +4612,7 @@ function renderHeatmap(ctx, canvas, snaps) {
     const mid = (last.bids[0][0] + last.asks[0][0]) / 2;
     const bin = (mid - minP) / priceStep;
     const y = H - (bin + 0.5) * rowH;
-    ctx.strokeStyle = 'rgba(0,168,232,0.7)';
+    ctx.strokeStyle = 'rgba(157,184,176,0.7)';
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 3]);
     ctx.beginPath();
@@ -4502,7 +4625,7 @@ function renderHeatmap(ctx, canvas, snaps) {
 
 function handleTradeExecuted(d) {
   if (d.signal_attribution) allAttributions[d.symbol] = d.signal_attribution;
-  const c = d.side === 'BUY' ? '#00A8E8' : '#EF4444';
+  const c = d.side === 'BUY' ? '#9db8b0' : '#EF4444';
   addActivity(d.side === 'BUY' ? '🟢' : '🔴',
     `${d.mode.toUpperCase()} ${d.side} ${d.symbol} @ $${formatPrice(d.price)}`, c);
   showToast(`${d.side} ${d.symbol}`, `@ $${formatPrice(d.price)} | ${d.strategy}`, d.side === 'BUY' ? 'success' : 'danger');
@@ -4511,7 +4634,7 @@ function handleTradeExecuted(d) {
 function handleTradeClosed(d) {
   const win = d.pnl >= 0;
   addActivity(win ? '✅' : '❌',
-    `${d.symbol} closed: ${d.pnl_pct >= 0 ? '+' : ''}${d.pnl_pct.toFixed(2)}% (${d.reason})`, win ? '#00A8E8' : '#EF4444');
+    `${d.symbol} closed: ${d.pnl_pct >= 0 ? '+' : ''}${d.pnl_pct.toFixed(2)}% (${d.reason})`, win ? '#9db8b0' : '#EF4444');
   showToast('Trade Closed', `${d.symbol}: ${d.pnl_pct >= 0 ? '+' : ''}${d.pnl_pct.toFixed(2)}%`, win ? 'success' : 'warning');
 }
 
@@ -4602,7 +4725,7 @@ async function refreshHourlyTrainer() {
     const symsEl = document.getElementById('htSymbols');
     if (d.symbols_ok && d.symbols_ok.length) {
       symsEl.innerHTML = d.symbols_ok.map(s =>
-        `<span class="badge" style="background:rgba(0,168,232,0.12);color:var(--accent);font-family:var(--font-mono);font-size:0.65rem">${s}</span>`
+        `<span class="badge" style="background:rgba(157,184,176,0.12);color:var(--accent);font-family:var(--font-mono);font-size:0.65rem">${s}</span>`
       ).join('');
     }
     if (d.error) document.getElementById('htSymbols').innerHTML += `<span class="text-danger small ms-2">${d.error}</span>`;
@@ -4695,7 +4818,7 @@ function updateLoopButtons(running) {
   if (running) {
     badge.textContent = '● Running';
     badge.style.background = 'rgba(57,217,138,0.25)';
-    badge.style.color = '#00A8E8';
+    badge.style.color = '#9db8b0';
   } else {
     badge.textContent = 'Idle';
     badge.style.background = 'rgba(100,100,100,0.3)';
@@ -4724,7 +4847,7 @@ function updateLoopStats(d) {
   document.getElementById('loopWrBar').style.background =
     wr >= target ? 'linear-gradient(90deg,#39d98a,#1a7f37)' : 'var(--accent)';
   document.getElementById('loopWrBig').textContent = (wr * 100).toFixed(1) + '%';
-  document.getElementById('loopWrBig').style.color = wr >= target ? '#00A8E8' : 'var(--accent-green)';
+  document.getElementById('loopWrBig').style.color = wr >= target ? '#9db8b0' : 'var(--accent-green)';
   document.getElementById('loopTotalBig').textContent = total;
   document.getElementById('loopWrTarget').textContent = Math.round(target * 100);
   if (d.accuracy) document.getElementById('loopAccuracy').textContent = (d.accuracy * 100).toFixed(1) + '%';
@@ -4734,7 +4857,7 @@ function updateLoopStats(d) {
     document.getElementById('trainStatus').textContent = d.completed ? '🎯 Done!' : d.running ? '⚡ Running' : 'Idle';
   }
   if (d.last_regime && Object.keys(d.last_regime).length) {
-    const colors = {BULL:'#00A8E8', BEAR:'#EF4444', RANGE:'#00A8E8', VOLATILE:'#f0883e'};
+    const colors = {BULL:'#9db8b0', BEAR:'#EF4444', RANGE:'#9db8b0', VOLATILE:'#f0883e'};
     document.getElementById('regimesBadges').innerHTML = Object.entries(d.last_regime)
       .map(([sym, r]) => `<span class="badge" style="background:${colors[r]||'#888'}22;color:${colors[r]||'#888'};border:1px solid ${colors[r]||'#888'}44;font-size:11px">${sym.split('/')[0]}:${r}</span>`)
       .join('');
@@ -4743,20 +4866,20 @@ function updateLoopStats(d) {
 
 function handleLoopTradeOpened(d) {
   const icon = d.side === 'BUY' ? '🟢' : '🔴';
-  const col = d.side === 'BUY' ? '#00A8E8' : '#EF4444';
+  const col = d.side === 'BUY' ? '#9db8b0' : '#EF4444';
   appendLoopLog(`<span style="color:${col}">${icon} OPEN ${d.side} ${d.symbol} @ ${d.price} | conf:${(d.confidence*100).toFixed(0)}% | <span style="color:var(--text-muted)">${d.regime}</span></span>`);
 }
 
 function handleLoopTradeClosed(d) {
   const icon = d.win ? '✅' : '❌';
-  const col = d.win ? '#00A8E8' : '#EF4444';
+  const col = d.win ? '#9db8b0' : '#EF4444';
   const wr = (d.win_rate * 100).toFixed(1);
   appendLoopLog(`<span style="color:${col}">${icon} CLOSE ${d.symbol} ${d.pnl_pct >= 0 ? '+' : ''}${d.pnl_pct.toFixed(2)}% | WR=${wr}% (${d.wins}/${d.total}) | <span style="color:var(--text-muted)">${d.regime}</span></span>`);
   updateLoopStats(d);
 }
 
 function handleLoopModelUpdated(d) {
-  appendLoopLog(`<span style="color:#00A8E8">🧠 Model retrained, accuracy: ${d.accuracy ? (d.accuracy*100).toFixed(1)+'%' : 'N/A'} | trades: ${d.total}</span>`);
+  appendLoopLog(`<span style="color:#9db8b0">🧠 Model retrained, accuracy: ${d.accuracy ? (d.accuracy*100).toFixed(1)+'%' : 'N/A'} | trades: ${d.total}</span>`);
   if (d.accuracy) document.getElementById('loopAccuracy').textContent = (d.accuracy * 100).toFixed(1) + '%';
 }
 
@@ -4765,7 +4888,7 @@ function handleLoopProgress(d) {
   if (d.log && d.log.length) {
     const log = document.getElementById('loopLog');
     log.innerHTML = d.log.map(l => {
-      const col = l.includes('✅') ? '#00A8E8' : l.includes('❌') ? '#EF4444' : l.includes('🧠') ? '#00A8E8' : l.includes('🎯') ? '#f0883e' : '#555555';
+      const col = l.includes('✅') ? '#9db8b0' : l.includes('❌') ? '#EF4444' : l.includes('🧠') ? '#9db8b0' : l.includes('🎯') ? '#f0883e' : '#555555';
       return `<div style="color:${col}">${l}</div>`;
     }).join('');
   }
@@ -4971,7 +5094,7 @@ function renderSymbolTags(syms) {
   if (!syms.length) { wrap.innerHTML = '<span class="text-muted small">ยังไม่มี symbol</span>'; return; }
   wrap.innerHTML = syms.map(s => `
     <span class="badge d-inline-flex align-items-center gap-1 px-2 py-1"
-      style="background:rgba(0,168,232,0.1);border:1px solid rgba(0,168,232,0.25);color:var(--accent);font-family:var(--font-mono);font-size:0.75rem;border-radius:6px">
+      style="background:rgba(157,184,176,0.1);border:1px solid rgba(157,184,176,0.25);color:var(--accent);font-family:var(--font-mono);font-size:0.75rem;border-radius:6px">
       ${s}
       <button type="button" onclick="removeSymbol('${s}')"
         style="background:none;border:none;padding:0;line-height:1;color:var(--text-muted);font-size:0.85rem;cursor:pointer"
@@ -5172,7 +5295,7 @@ async function loadMTF() {
   try {
     const r = await fetch(`/api/analysis/mtf?symbol=${encodeURIComponent(currentSymbol)}`);
     const d = await r.json();
-    const sigColor = s => s === 'BUY' ? '#00A8E8' : s === 'SELL' ? '#EF4444' : '#555555';
+    const sigColor = s => s === 'BUY' ? '#9db8b0' : s === 'SELL' ? '#EF4444' : '#555555';
     const sigCls = s => s === 'BUY' ? 'signal-buy' : s === 'SELL' ? 'signal-sell' : 'signal-hold';
     const tfRows = Object.entries(d.timeframes).map(([tf, a]) => `
       <div class="indicator-row">
@@ -5210,14 +5333,14 @@ async function refreshAdvancedStats() {
     const sr = document.getElementById('sharpeRatio');
     if (sr) {
       sr.textContent = d.sharpe.toFixed(2);
-      sr.style.color = d.sharpe >= 1 ? '#00A8E8' : d.sharpe >= 0 ? '#d29922' : '#EF4444';
+      sr.style.color = d.sharpe >= 1 ? '#9db8b0' : d.sharpe >= 0 ? '#d29922' : '#EF4444';
     }
 
     if (d.daily_pnl && d.daily_pnl.length) {
       const labels = d.daily_pnl.map(x => x.date);
       const values = d.daily_pnl.map(x => x.pnl);
       const colors = values.map(v => v >= 0 ? 'rgba(46,160,67,0.7)' : 'rgba(248,81,73,0.7)');
-      const _pColors = values.map(v => v >= 0 ? '#00A8E8' : '#EF4444');
+      const _pColors = values.map(v => v >= 0 ? '#9db8b0' : '#EF4444');
       charts.dailyPnl.updateOptions({xaxis:{categories:labels},colors:_pColors,plotOptions:{bar:{distributed:true,borderRadius:4,columnWidth:'65%'}}},false,false);
       charts.dailyPnl.updateSeries([{name:'Daily PnL',data:values}],false);
     }
@@ -5237,7 +5360,7 @@ async function refreshPortfolio() {
     const pp = document.getElementById('pfTotalPnl');
     if (pp) {
       pp.textContent = (d.total_pnl >= 0 ? '+' : '') + d.total_pnl.toFixed(2) + ' USDT';
-      pp.style.color = d.total_pnl >= 0 ? '#00A8E8' : '#EF4444';
+      pp.style.color = d.total_pnl >= 0 ? '#9db8b0' : '#EF4444';
     }
   } catch {}
 }
@@ -5280,7 +5403,7 @@ async function runBacktest() {
 
     // ── Primary metrics (autotrade) ────────────────────────────────
     const aiRet = d.total_return_pct;
-    const retColor = aiRet >= 0 ? '#00A8E8' : '#EF4444';
+    const retColor = aiRet >= 0 ? '#9db8b0' : '#EF4444';
     document.getElementById('btReturn').textContent  = (aiRet >= 0 ? '+' : '') + aiRet.toFixed(2) + '%';
     document.getElementById('btReturn').style.color  = retColor;
     document.getElementById('btWinRate').textContent  = d.win_rate.toFixed(1) + '%';
@@ -5291,7 +5414,7 @@ async function runBacktest() {
     // ── 3-way comparison table (full analytics) ───────────────────
     if (d.comparison) {
       const cmp = d.comparison;
-      const fmtRet = (v) => `<span style="color:${v>=0?'#00A8E8':'#EF4444'}">${v>=0?'+':''}${v.toFixed(2)}%</span>`;
+      const fmtRet = (v) => `<span style="color:${v>=0?'#9db8b0':'#EF4444'}">${v>=0?'+':''}${v.toFixed(2)}%</span>`;
       const fmtN   = (v, dec=2, suffix='') => v == null ? '—' : v.toFixed(dec) + suffix;
       const fmtPF  = (v) => v == null ? '—' : (v >= 99 ? '∞' : v.toFixed(2));
       const pfColor = (v) => v >= 1.5 ? '#39d98a' : v >= 1 ? '#ccc' : '#EF4444';
@@ -5380,7 +5503,7 @@ async function runBacktest() {
     const regStats = d.regime_stats || {};
     const patStats = d.pattern_stats || {};
     const regimeMeta = {BULL_TREND:'↑ BULL',BEAR_TREND:'↓ BEAR',RANGING:'↔ RANGE',VOLATILE:'⚡ VOL',CRASH:'⚠ CRASH'};
-    const regimeColor= {BULL_TREND:'#39d98a',BEAR_TREND:'#EF4444',RANGING:'#00A8E8',VOLATILE:'#ffc107',CRASH:'#ff4d6d'};
+    const regimeColor= {BULL_TREND:'#39d98a',BEAR_TREND:'#EF4444',RANGING:'#9db8b0',VOLATILE:'#ffc107',CRASH:'#ff4d6d'};
     if (Object.keys(regStats).length) {
       document.getElementById('btRegimeBody').innerHTML =
         Object.entries(regStats).sort((a,b)=>b[1].trades-a[1].trades).map(([rn, rs]) => {
@@ -5410,7 +5533,7 @@ async function runBacktest() {
     if (d.trades && d.trades.length) {
       document.getElementById('btTradeCount').textContent = d.total_trades + ' total trades';
       const _exitLabel = {take_profit:'TP',roi_table:'ROI',trailing_stop:'Trail',stop_loss:'SL',end_of_period:'EoP'};
-      const _exitColor = {take_profit:'#39d98a',roi_table:'#00A8E8',trailing_stop:'#5bc8ff',stop_loss:'#EF4444',end_of_period:'#666'};
+      const _exitColor = {take_profit:'#39d98a',roi_table:'#9db8b0',trailing_stop:'#5bc8ff',stop_loss:'#EF4444',end_of_period:'#666'};
       document.getElementById('btTradesBody').innerHTML = d.trades.map(t => {
         const pats = (t.patterns||[]).map(p => `<span class="regime-badge regime-range" style="font-size:0.55rem">${p}</span>`).join(' ');
         const er = t.exit_reason||'';
@@ -5462,7 +5585,7 @@ async function runBacktest() {
     // ── Exit reason breakdown ──────────────────────────────────────
     const exitStats = d.exit_reason_stats || {};
     const exitTotal = Object.values(exitStats).reduce((s,v)=>s+v,0) || 1;
-    const _ec = {take_profit:'#39d98a',roi_table:'#00A8E8',trailing_stop:'#5bc8ff',stop_loss:'#EF4444',end_of_period:'#555'};
+    const _ec = {take_profit:'#39d98a',roi_table:'#9db8b0',trailing_stop:'#5bc8ff',stop_loss:'#EF4444',end_of_period:'#555'};
     const _en = {take_profit:'Take Profit',roi_table:'ROI Table',trailing_stop:'Trailing SL',stop_loss:'Stop Loss',end_of_period:'End of Period'};
     if (Object.keys(exitStats).length) {
       document.getElementById('btExitBars').innerHTML =
@@ -5504,7 +5627,7 @@ async function loadShap(btn) {
     document.getElementById('shapBars').innerHTML = feats.length
       ? feats.slice(0,10).map(f => {
           const w = Math.max(2,(f.importance/maxImp*100)).toFixed(0);
-          return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><div style="width:96px;font-size:0.66rem;color:var(--text-muted);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.feature}</div><div style="flex:1;background:var(--bg-card2);border-radius:3px;height:14px"><div style="width:${w}%;background:linear-gradient(90deg,#5bc8ff,#00A8E8);height:100%;border-radius:3px"></div></div><div style="width:42px;font-size:0.62rem;color:#5bc8ff;font-family:var(--font-mono)">${f.importance.toFixed(3)}</div></div>`;
+          return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><div style="width:96px;font-size:0.66rem;color:var(--text-muted);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.feature}</div><div style="flex:1;background:var(--bg-card2);border-radius:3px;height:14px"><div style="width:${w}%;background:linear-gradient(90deg,#5bc8ff,#9db8b0);height:100%;border-radius:3px"></div></div><div style="width:42px;font-size:0.62rem;color:#5bc8ff;font-family:var(--font-mono)">${f.importance.toFixed(3)}</div></div>`;
         }).join('')
       : '<span class="text-muted" style="font-size:0.72rem">โมเดลยังไม่ได้เทรน (ต้องมี trade ปิดอย่างน้อย 30 รายการ)</span>';
   } catch(e) { showToast('SHAP Error', e.message, 'danger'); }
@@ -5556,7 +5679,7 @@ async function loadQuantLab() {
           return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
             <div style="width:96px;font-size:0.66rem;color:var(--text-muted);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${f.feature}">${f.feature}</div>
             <div style="flex:1;background:var(--bg-card2);border-radius:3px;height:14px;position:relative">
-              <div style="width:${w}%;background:linear-gradient(90deg,#5bc8ff,#00A8E8);height:100%;border-radius:3px"></div>
+              <div style="width:${w}%;background:linear-gradient(90deg,#5bc8ff,#9db8b0);height:100%;border-radius:3px"></div>
             </div>
             <div style="width:42px;font-size:0.62rem;color:#5bc8ff;font-family:var(--font-mono)">${f.importance.toFixed(3)}</div>
           </div>`;
@@ -5622,7 +5745,7 @@ async function runWalkForward() {
     document.getElementById('wfSummaryRow').innerHTML = [
       ['Avg OOS Return', (s.avg_oos_return_pct>=0?'+':'')+s.avg_oos_return_pct?.toFixed(2)+'%', s.avg_oos_return_pct>=0?'#39d98a':'#EF4444'],
       ['Avg OOS Sharpe', s.avg_oos_sharpe?.toFixed(2)||'—', s.avg_oos_sharpe>=0.5?'#39d98a':s.avg_oos_sharpe>=0?'#ccc':'#EF4444'],
-      ['Profitable Folds', `${s.profitable_folds||0}/${s.total_folds||0}`, '#00A8E8'],
+      ['Profitable Folds', `${s.profitable_folds||0}/${s.total_folds||0}`, '#9db8b0'],
       ['Consistency', (s.consistency_pct?.toFixed(1)||'0')+'%', s.consistency_pct>=50?'#39d98a':'#EF4444'],
     ].map(([label,val,color])=>`
       <div class="col-6 col-md-3">
@@ -5639,7 +5762,7 @@ async function runWalkForward() {
       const degColor = f.degradation==null?'#666':f.degradation>=0.75?'#39d98a':f.degradation>=0.4?'#ffc107':'#EF4444';
       return `<tr>
         <td style="font-family:var(--font-mono)">#${f.fold}</td>
-        <td style="color:#00A8E8">${f.optimized_tp_pct}%</td>
+        <td style="color:#9db8b0">${f.optimized_tp_pct}%</td>
         <td style="color:#EF4444">${f.optimized_sl_pct}%</td>
         <td style="color:${f.is_sharpe>=0.5?'#39d98a':f.is_sharpe>=0?'#ccc':'#EF4444'}">${f.is_sharpe?.toFixed(2)}</td>
         <td style="color:${f.is_return_pct>=0?'#39d98a':'#EF4444'}">${f.is_return_pct>=0?'+':''}${f.is_return_pct?.toFixed(2)}%</td>
@@ -5978,7 +6101,7 @@ function _syncMobileMenuActive(name) {
 // Stroke icons (Lucide-style, สไตล์เดียวกับ sidebar nav) — แทน pixel sprites เดิม
 const AGENT_ICONS = {
   analyzer: {   // radar — สแกนตลาด
-    color: '#00A8E8',
+    color: '#9db8b0',
     svg: '<path d="M19.07 4.93A10 10 0 0 0 6.99 3.34"/><path d="M4 6h.01"/><path d="M2.29 9.62a10 10 0 1 0 19.02-1.27"/><path d="M16.24 7.76a6 6 0 1 0-8.01 8.91"/><path d="M12 18h.01"/><path d="M17.99 11.66a6 6 0 0 1-2.22 4.58"/><circle cx="12" cy="12" r="2"/><path d="m13.41 10.59 5.66-5.66"/>'
   },
   strategist: { // git-branch — วางแผนแตกกิ่งกลยุทธ์
@@ -6305,7 +6428,7 @@ if (_liveBudget) _liveBudget.addEventListener('input', _updateLivePreflight);
   <div style="padding:10px 12px;border-top:1px solid rgba(255,255,255,0.05);display:flex;gap:8px;flex-shrink:0;align-items:center;">
     <input id="chatInput" type="text" placeholder="พิมพ์คำสั่ง..." autocomplete="off"
       onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}">
-    <button onclick="sendChat()" style="background:var(--accent);color:#00171F;border:none;border-radius:10px;padding:9px 14px;cursor:pointer;font-weight:700;flex-shrink:0;transition:transform 0.1s,box-shadow 0.15s" onmouseenter="this.style.boxShadow='0 0 16px rgba(0,168,232,0.4)'" onmouseleave="this.style.boxShadow='none'">
+    <button onclick="sendChat()" style="background:var(--accent);color:#00171F;border:none;border-radius:10px;padding:9px 14px;cursor:pointer;font-weight:700;flex-shrink:0;transition:transform 0.1s,box-shadow 0.15s" onmouseenter="this.style.boxShadow='0 0 16px rgba(157,184,176,0.4)'" onmouseleave="this.style.boxShadow='none'">
       <i class="bi bi-send-fill"></i>
     </button>
   </div>
@@ -6828,7 +6951,7 @@ function _setReq(id, ok) {
   if (!row) return;
   row.classList.toggle('ok', ok);
   const dot = row.querySelector('.at-req-dot');
-  if (dot) dot.style.background = ok ? '#00A8E8' : 'rgba(255,255,255,0.15)';
+  if (dot) dot.style.background = ok ? '#9db8b0' : 'rgba(255,255,255,0.15)';
 }
 
 async function atRunMLTrain(btn) {

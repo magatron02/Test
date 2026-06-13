@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aiterra — Crypto trading run by an AI that shows its work</title>
+<meta name="description" content="Aiterra reads the market across Binance, OKX and Bitkub, decides with trained models, and prints the reasoning behind every BUY and SELL.">
+<meta name="theme-color" content="#060708">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script>document.documentElement.className = 'js';</script>
+<style>
+:root{
+  --bg:#060708; --deep:#030304;
+  --glass:rgba(255,255,255,0.055); --glass2:rgba(255,255,255,0.03);
+  --hi:rgba(255,255,255,0.13);
+  --bd:rgba(255,255,255,0.10); --bd2:rgba(255,255,255,0.055);
+  --tx:rgba(255,255,255,0.95); --tm:rgba(255,255,255,0.64); --td:rgba(255,255,255,0.46);
+  --ink:rgba(255,255,255,0.96); --on-ink:#07080a;
+  --accent:#9db8b0; --accent-bright:#c6dad3; --accent-deep:#4f6b64;
+  --buy:#34d399; --sell:#f87171;
+  --sans:'Geist','Noto Sans Thai',system-ui,sans-serif;
+  --mono:'Geist Mono',ui-monospace,monospace;
+  --ease:cubic-bezier(.05,.7,.1,1);
+  --maxw:1180px;
+  --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='0.85'/%3E%3C/svg%3E");
+}
+/* grain — fine, on the background only */
+body::after{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  opacity:.11;mix-blend-mode:screen;
+  background-image:var(--grain);background-size:130px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{
+  background:
+    radial-gradient(150% 100% at 50% -10%, #0d1014 0%, #08090b 38%, #050608 65%, #030304 100%),
+    var(--bg);
+  background-size: cover, cover;
+  color:var(--tx);
+  font-family:var(--sans); font-size:17px; line-height:1.6; font-weight:400;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  overflow-x:hidden; position:relative;
+}
+/* background image (line-art poster) — fixed, dimmed for legibility */
+body::before{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(60% 50% at 72% 8%, rgba(157,184,176,.06) 0%, transparent 60%),
+    linear-gradient(180deg, rgba(6,7,8,.40) 0%, rgba(6,7,8,.56) 100%),
+    radial-gradient(120% 95% at 50% 34%, transparent 50%, rgba(0,0,0,.66) 100%),
+    url('/static/img/bg-landing.jpg') center center / cover no-repeat;
+  background-color: var(--bg);
+}
+@keyframes drift{0%{transform:translate3d(0,0,0) scale(1);opacity:1}100%{transform:translate3d(-2%,1.6%,0) scale(1.06);opacity:.82}}
+@media (prefers-reduced-motion:reduce){body::before{animation:none}}
+.wrap{position:relative;z-index:1;max-width:var(--maxw);margin:0 auto;padding:0 26px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+a{color:inherit;text-decoration:none}
+
+/* ── nav ── */
+header.nav{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;justify-content:center;padding:18px 26px;}
+.navbar{
+  display:flex;align-items:center;gap:18px;width:100%;max-width:var(--maxw);
+}
+.brand{display:flex;align-items:center;gap:11px;font-weight:600;letter-spacing:-.3px;font-size:1.05rem}
+.brand .dot{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--accent),#4f6b64);display:grid;place-items:center;box-shadow:0 0 22px rgba(157,184,176,.4);font-family:var(--mono);font-weight:600;font-size:11px;color:#07080a}
+.brand small{color:var(--td);font-family:var(--mono);font-size:.6em;font-weight:400}
+.navlinks{
+  display:flex;gap:2px;margin:0 auto;padding:5px;border-radius:100px;
+  background:rgba(255,255,255,.045);border:1px solid var(--bd2);
+  box-shadow:inset 0 1px 0 var(--hi),0 6px 24px rgba(0,0,0,.35);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+}
+.navlinks a{padding:7px 16px;border-radius:100px;color:var(--tm);font-size:.9rem;font-weight:500;letter-spacing:-.1px;transition:color .2s var(--ease),background .25s var(--ease)}
+.navlinks a:hover{color:var(--tx)}
+.nav-cta{padding:9px 18px;border-radius:100px;background:var(--ink);color:var(--on-ink);font-weight:600;font-size:.9rem;flex-shrink:0;transition:transform .15s var(--ease),box-shadow .2s}
+.nav-cta:hover{transform:translateY(-1px);box-shadow:0 8px 26px rgba(255,255,255,.16)}
+@media(max-width:860px){.navlinks{display:none}}
+
+/* ── hero ── */
+.hero{min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:164px 26px 96px;position:relative}
+/* soft scrim so the type lifts off the busy line-art background */
+.hero::after{content:'';position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(46% 44% at 50% 44%, rgba(5,6,8,.72) 0%, rgba(5,6,8,.42) 40%, rgba(5,6,8,0) 70%);}
+.hero .constellation{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.hero .constellation svg{width:100%;height:100%;}
+.eyebrow{display:inline-flex;align-items:center;gap:9px;padding:7px 14px 7px 11px;border-radius:100px;background:var(--glass2);border:1px solid var(--bd2);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);font-family:var(--mono);font-size:.74rem;color:var(--tm);margin-bottom:30px;position:relative;z-index:2}
+.eyebrow .live{width:7px;height:7px;border-radius:50%;background:var(--buy);box-shadow:0 0 9px var(--buy);animation:pulse 2s infinite}
+.eyebrow b{color:var(--accent-bright);font-weight:600}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+h1.head{position:relative;z-index:2;font-weight:600;font-size:clamp(2.1rem,5vw,4.1rem);line-height:1.07;letter-spacing:-.035em;max-width:19ch;text-wrap:balance;margin-bottom:28px;text-shadow:0 2px 30px rgba(0,0,0,.55)}
+h1.head .soft{color:rgba(255,255,255,.74)}
+h1.head .tagline{display:block;font-size:.4em;font-weight:500;letter-spacing:0;color:var(--accent-bright);margin-top:22px;text-wrap:balance;text-shadow:0 1px 16px rgba(0,0,0,.5)}
+.sub{position:relative;z-index:2;color:rgba(255,255,255,.7);font-size:clamp(1.02rem,1.55vw,1.18rem);line-height:1.65;max-width:50ch;text-wrap:pretty;margin:0 auto 40px;text-shadow:0 1px 18px rgba(0,0,0,.5)}
+.cta-row{position:relative;z-index:2;display:flex;gap:13px;flex-wrap:wrap;justify-content:center}
+.btn{display:inline-flex;align-items:center;gap:9px;padding:14px 26px;border-radius:100px;font-weight:600;font-size:1rem;cursor:pointer;border:1px solid transparent;transition:transform .15s var(--ease),box-shadow .2s,background .2s}
+.btn-primary{background:var(--ink);color:var(--on-ink)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 14px 40px rgba(255,255,255,.18)}
+.btn-ghost{background:var(--glass2);color:var(--tx);border-color:var(--bd);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.btn-ghost:hover{transform:translateY(-2px);border-color:rgba(157,184,176,.4);box-shadow:0 12px 34px rgba(0,0,0,.4)}
+.hero-foot{position:relative;z-index:2;margin-top:64px;display:flex;align-items:center;gap:10px;color:var(--td);font-family:var(--mono);font-size:.76rem}
+.hero-foot .k{color:var(--tm)}
+
+/* ── markets strip ── */
+.markets{padding:18px 26px 72px;text-align:center;position:relative;z-index:1}
+.markets p{color:var(--td);font-size:.82rem;letter-spacing:.02em;margin-bottom:22px}
+.market-row{display:flex;flex-wrap:wrap;justify-content:center;gap:12px 30px;align-items:center}
+.market-row span{font-weight:600;font-size:1.05rem;color:var(--tm);opacity:.7;transition:opacity .2s,color .2s;display:inline-flex;align-items:center;gap:8px}
+.market-row span:hover{opacity:1;color:var(--tx)}
+.market-row .mk{width:8px;height:8px;border-radius:2px}
+
+/* ── section frame ── */
+section.band{padding:clamp(70px,9vw,120px) 0;position:relative;z-index:1}
+.lead{max-width:var(--maxw);margin:0 auto 54px;padding:0 26px}
+.lead h2{font-weight:600;font-size:clamp(1.9rem,3.6vw,3rem);letter-spacing:-.03em;line-height:1.08;text-wrap:balance;max-width:18ch}
+.lead p{color:var(--tm);font-size:1.08rem;line-height:1.6;max-width:56ch;margin-top:16px;text-wrap:pretty}
+
+/* glass card base */
+.glass{
+  position:relative;background:var(--glass);border:1px solid var(--bd);border-radius:22px;
+  backdrop-filter:blur(15px) saturate(140%);-webkit-backdrop-filter:blur(15px) saturate(140%);
+  box-shadow:inset 0 1px 0 var(--hi),0 18px 44px rgba(0,0,0,.42);overflow:hidden;
+}
+.glass::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(180deg,rgba(255,255,255,.07) 0%,transparent 24%)}
+.glass>*{position:relative;z-index:1}
+
+/* ── bento ── */
+.bento{max-width:var(--maxw);margin:0 auto;padding:0 26px;display:grid;gap:18px;grid-template-columns:repeat(6,1fr)}
+.bento .c{padding:26px}
+.b-funnel{grid-column:span 4}
+.b-train{grid-column:span 2}
+.b-risk{grid-column:span 2}
+.b-book{grid-column:span 4}
+@media(max-width:820px){.bento{grid-template-columns:1fr}.b-funnel,.b-train,.b-risk,.b-book{grid-column:span 1}}
+.c h3{font-size:1.18rem;font-weight:600;letter-spacing:-.02em;margin-bottom:9px}
+.c p{color:var(--tm);font-size:.96rem;line-height:1.55}
+.c .tag{font-family:var(--mono);font-size:.7rem;color:var(--td);text-transform:uppercase;letter-spacing:.12em;margin-bottom:16px;display:block}
+
+/* funnel viz */
+.funnel{display:flex;align-items:center;gap:14px;margin-top:22px;flex-wrap:wrap}
+.fstep{flex:1;min-width:96px;background:var(--glass2);border:1px solid var(--bd2);border-radius:14px;padding:15px 14px}
+.fstep .n{font-family:var(--mono);font-size:1.7rem;font-weight:600;letter-spacing:-.04em}
+.fstep .l{font-size:.74rem;color:var(--td);text-transform:uppercase;letter-spacing:.08em;margin-top:3px}
+.fstep.approve .n{color:var(--buy)}
+.fstep.reject .n{color:var(--sell)}
+.farrow{color:var(--td);font-family:var(--mono);font-size:1.1rem}
+@media(max-width:520px){.farrow{display:none}}
+
+/* train stat */
+.bignum{font-family:var(--mono);font-size:3rem;font-weight:600;letter-spacing:-.05em;line-height:1;margin:18px 0 4px}
+.bignum .pct{color:var(--accent)}
+.subnum{font-family:var(--mono);font-size:.82rem;color:var(--td)}
+.spark{margin-top:18px;width:100%;height:46px;display:block}
+
+/* risk gauge */
+.gaugewrap{display:flex;align-items:center;gap:18px;margin-top:20px}
+.gauge{width:84px;height:84px;flex-shrink:0}
+.risk-list{font-family:var(--mono);font-size:.8rem;color:var(--tm);line-height:1.9}
+.risk-list .ok{color:var(--buy)}
+
+/* book chart */
+.areachart{margin-top:20px;width:100%;height:120px;display:block}
+
+/* ── steps ── */
+.steps{max-width:var(--maxw);margin:0 auto;padding:0 26px;display:grid;gap:18px;grid-template-columns:repeat(3,1fr)}
+@media(max-width:820px){.steps{grid-template-columns:1fr}}
+.step{padding:30px 26px}
+.step .num{font-family:var(--mono);font-size:.8rem;color:var(--accent);letter-spacing:.1em;margin-bottom:20px;display:flex;align-items:center;gap:10px}
+.step .num::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(157,184,176,.4),transparent)}
+.step h3{font-size:1.3rem;font-weight:600;letter-spacing:-.02em;margin-bottom:10px}
+.step p{color:var(--tm);font-size:.96rem;line-height:1.6}
+
+/* ── signal showcase ── */
+.show{max-width:var(--maxw);margin:0 auto;padding:0 26px;display:grid;grid-template-columns:1.05fr .95fr;gap:18px;align-items:stretch}
+@media(max-width:820px){.show{grid-template-columns:1fr}}
+.sigcard{padding:0;overflow:hidden}
+.sigcard .top{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--bd2)}
+.sigcard .pair{font-family:var(--mono);font-weight:600;font-size:1.05rem;letter-spacing:.02em}
+.sigcard .pair .ex{color:var(--td);font-weight:400;font-size:.78rem;margin-left:8px}
+.badge{font-family:var(--mono);font-weight:600;font-size:.78rem;letter-spacing:.08em;padding:5px 13px;border-radius:100px}
+.badge.buy{background:rgba(52,211,153,.13);color:var(--buy);border:1px solid rgba(52,211,153,.3)}
+.sigcard .body{padding:22px 24px}
+.conf{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
+.conf .v{font-family:var(--mono);font-size:2.4rem;font-weight:600;letter-spacing:-.04em;color:var(--buy)}
+.conf .l{color:var(--td);font-size:.82rem}
+.confbar{height:6px;border-radius:100px;background:rgba(255,255,255,.08);overflow:hidden;margin:12px 0 22px}
+.confbar i{display:block;height:100%;width:80%;border-radius:100px;background:linear-gradient(90deg,#4f6b64,var(--buy))}
+.factors{display:flex;flex-direction:column;gap:1px}
+.factor{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--bd2);font-size:.92rem}
+.factor:last-child{border-bottom:none}
+.factor .name{color:var(--tm)}
+.factor .val{font-family:var(--mono);font-size:.82rem;color:var(--tx)}
+.factor .val.pos{color:var(--buy)}
+.show .chartcard{padding:24px;display:flex;flex-direction:column}
+.show .chartcard h3{font-size:1.05rem;font-weight:600;margin-bottom:4px}
+.show .chartcard .tag{font-family:var(--mono);font-size:.72rem;color:var(--td);margin-bottom:auto}
+.pricechart{width:100%;height:220px;margin-top:18px;display:block}
+
+/* ── final cta ── */
+.final{max-width:var(--maxw);margin:0 auto;padding:0 26px}
+.final .panel{padding:clamp(44px,7vw,80px) 40px;text-align:center;border-radius:28px}
+.final h2{font-weight:600;font-size:clamp(2rem,4.5vw,3.4rem);letter-spacing:-.035em;line-height:1.05;text-wrap:balance;max-width:16ch;margin:0 auto 18px}
+.final p{color:var(--tm);font-size:1.1rem;max-width:46ch;margin:0 auto 34px;text-wrap:pretty}
+
+/* ── footer ── */
+footer{position:relative;z-index:1;border-top:1px solid var(--bd2);margin-top:clamp(70px,9vw,120px)}
+.foot{max-width:var(--maxw);margin:0 auto;padding:34px 26px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;color:var(--td);font-size:.86rem}
+.foot .l{display:flex;align-items:center;gap:11px}
+.foot .r{display:flex;gap:22px;font-family:var(--mono);font-size:.78rem}
+.foot a:hover{color:var(--tx)}
+
+/* reveal */
+.js .reveal{opacity:0;transform:translateY(22px)}
+.js .reveal.in{opacity:1;transform:none;transition:opacity .7s var(--ease),transform .7s var(--ease)}
+@media (prefers-reduced-motion:reduce){.js .reveal{opacity:1!important;transform:none!important}}
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <nav class="navbar">
+    <a class="brand" href="#top"><span class="dot">Ai</span> Aiterra <small>v2.0</small></a>
+    <div class="navlinks">
+      <a href="#how">How it works</a>
+      <a href="#intel">Intelligence</a>
+      <a href="#signal">Signals</a>
+      <a href="#markets">Markets</a>
+    </div>
+    <a class="nav-cta" href="/">Open dashboard</a>
+  </nav>
+</header>
+
+<main id="top">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="constellation" aria-hidden="true">
+      <svg viewBox="0 0 1200 760" preserveAspectRatio="xMidYMid slice">
+        <defs>
+          <radialGradient id="core" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#cfdcd6" stop-opacity="0.9"/>
+            <stop offset="40%" stop-color="#9db8b0" stop-opacity="0.4"/>
+            <stop offset="100%" stop-color="#9db8b0" stop-opacity="0"/>
+          </radialGradient>
+          <filter id="soft"><feGaussianBlur stdDeviation="0.6"/></filter>
+        </defs>
+        <g stroke="rgba(255,255,255,0.10)" stroke-width="1" fill="none">
+          <path d="M180,250 C360,210 460,300 600,360"/>
+          <path d="M1020,230 C860,210 720,300 600,360"/>
+          <path d="M210,540 C360,520 470,440 600,360"/>
+          <path d="M1010,560 C860,520 740,430 600,360"/>
+          <path d="M600,360 L600,150"/>
+        </g>
+        <!-- nodes -->
+        <g class="cnode" font-family="Geist Mono" font-size="13">
+          <g transform="translate(180,250)">
+            <circle r="5" fill="#9db8b0"/><circle r="14" fill="none" stroke="rgba(157,184,176,0.3)"/>
+            <text x="18" y="-2" fill="rgba(255,255,255,0.85)">Binance</text>
+            <text x="18" y="15" fill="rgba(255,255,255,0.4)">BTC · ETH</text>
+          </g>
+          <g transform="translate(1020,230)">
+            <circle r="5" fill="#34d399"/><circle r="14" fill="none" stroke="rgba(52,211,153,0.3)"/>
+            <text x="18" y="-2" fill="rgba(255,255,255,0.85)">OKX</text>
+            <text x="18" y="15" fill="rgba(255,255,255,0.4)">SOL · BNB</text>
+          </g>
+          <g transform="translate(210,540)">
+            <circle r="5" fill="#9db8b0"/><circle r="14" fill="none" stroke="rgba(157,184,176,0.3)"/>
+            <text x="18" y="-2" fill="rgba(255,255,255,0.85)">Bitkub</text>
+            <text x="18" y="15" fill="rgba(255,255,255,0.4)">THB pairs</text>
+          </g>
+          <g transform="translate(1010,560)">
+            <circle r="5" fill="#c4b5fd"/><circle r="14" fill="none" stroke="rgba(196,181,253,0.3)"/>
+            <text x="18" y="-2" fill="rgba(255,255,255,0.85)">SET</text>
+            <text x="18" y="15" fill="rgba(255,255,255,0.4)">Thai equities</text>
+          </g>
+        </g>
+        <!-- central AI core -->
+        <circle cx="600" cy="360" r="120" fill="url(#core)" class="pulse"/>
+        <circle cx="600" cy="360" r="7" fill="#fff"/>
+      </svg>
+    </div>
+
+    <div class="eyebrow"><span class="live"></span> Last signal <b>ETH/USDT&nbsp;BUY&nbsp;80%</b> · 12:18</div>
+    <h1 class="head">Meet Aiterra <span class="soft">— an AI that doesn't just signal, it acts.</span><span class="tagline">Full autotrade, full transparency.</span></h1>
+    <p class="sub">Aiterra watches the market across Binance, OKX and Bitkub, decides with models it retrains every hour, and prints the reasoning behind every BUY and SELL. Run it live, or watch it trade paper money first.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="/">Open the dashboard →</a>
+      <a class="btn btn-ghost" href="#signal">See a live signal</a>
+    </div>
+    <div class="hero-foot"><span class="k mono">5</span>&nbsp;markets &nbsp;·&nbsp; <span class="k mono">24/7</span>&nbsp;execution &nbsp;·&nbsp; <span class="k mono">demo</span>&nbsp;mode by default</div>
+  </section>
+
+  <!-- MARKETS STRIP -->
+  <div class="markets" id="markets">
+    <p>Reads and trades across</p>
+    <div class="market-row">
+      <span><i class="mk" style="background:#9db8b0"></i>Binance</span>
+      <span><i class="mk" style="background:#34d399"></i>OKX</span>
+      <span><i class="mk" style="background:#9db8b0"></i>Bitkub</span>
+      <span><i class="mk" style="background:#c6dad3"></i>Binance TH</span>
+      <span><i class="mk" style="background:#c4b5fd"></i>SET</span>
+    </div>
+  </div>
+
+  <!-- INTELLIGENCE / BENTO -->
+  <section class="band" id="intel">
+    <div class="lead reveal">
+      <h2>The whole decision, on one screen.</h2>
+      <p>Most bots give you a verdict. Aiterra gives you the path it took to get there, from raw candles to the order it sent.</p>
+    </div>
+    <div class="bento">
+      <div class="c b-funnel glass reveal">
+        <span class="tag">Signal engine</span>
+        <h3>Every signal, traced end to end</h3>
+        <p>Indicators, pattern matches, a model vote, then a risk check. Each step is logged, so a rejected trade tells you exactly where it died.</p>
+        <div class="funnel">
+          <div class="fstep"><div class="n mono">305</div><div class="l">Analyzed</div></div>
+          <div class="farrow">→</div>
+          <div class="fstep"><div class="n mono">7</div><div class="l">Signals</div></div>
+          <div class="farrow">→</div>
+          <div class="fstep approve"><div class="n mono">3</div><div class="l">Approved</div></div>
+          <div class="farrow">→</div>
+          <div class="fstep reject"><div class="n mono">4</div><div class="l">Rejected</div></div>
+        </div>
+      </div>
+
+      <div class="c b-train glass reveal">
+        <span class="tag">Online training</span>
+        <h3>Models that keep learning</h3>
+        <p>Hourly retraining on live outcomes.</p>
+        <div class="bignum mono"><span class="pct">64%</span></div>
+        <div class="subnum">accuracy · 4,083 samples</div>
+        <svg class="spark" viewBox="0 0 240 46" preserveAspectRatio="none" aria-hidden="true">
+          <polyline fill="none" stroke="#9db8b0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+            points="2,38 26,34 50,36 74,28 98,30 122,22 146,24 170,16 194,18 218,10 238,8"/>
+          <polyline fill="url(#fade)" stroke="none" points="2,38 26,34 50,36 74,28 98,30 122,22 146,24 170,16 194,18 218,10 238,8 238,46 2,46"/>
+          <defs><linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9db8b0" stop-opacity=".28"/><stop offset="1" stop-color="#9db8b0" stop-opacity="0"/></linearGradient></defs>
+        </svg>
+      </div>
+
+      <div class="c b-risk glass reveal">
+        <span class="tag">Risk engine</span>
+        <h3>Risk that interrupts</h3>
+        <div class="gaugewrap">
+          <svg class="gauge" viewBox="0 0 100 100" aria-hidden="true">
+            <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="9"/>
+            <circle cx="50" cy="50" r="40" fill="none" stroke="#34d399" stroke-width="9" stroke-linecap="round"
+              stroke-dasharray="251" stroke-dashoffset="248" transform="rotate(-90 50 50)"/>
+            <text x="50" y="48" text-anchor="middle" font-family="Geist Mono" font-size="17" font-weight="600" fill="#fff">0.0%</text>
+            <text x="50" y="63" text-anchor="middle" font-family="Geist Mono" font-size="8" fill="rgba(255,255,255,0.5)">DRAWDOWN</text>
+          </svg>
+          <div class="risk-list">
+            <div><span class="ok">●</span> Circuit breaker armed</div>
+            <div><span class="ok">●</span> Position sizing on</div>
+            <div><span class="ok">●</span> Kill switch ready</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="c b-book glass reveal">
+        <span class="tag">Portfolio</span>
+        <h3>One view of the whole book</h3>
+        <p>Open positions, realized and floating PnL, and exposure across every connected exchange in a single dark room.</p>
+        <svg class="areachart" viewBox="0 0 600 120" preserveAspectRatio="none" aria-hidden="true">
+          <defs><linearGradient id="ar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9db8b0" stop-opacity=".26"/><stop offset="1" stop-color="#9db8b0" stop-opacity="0"/></linearGradient></defs>
+          <path d="M0,86 C60,80 100,70 150,72 C210,74 250,52 310,50 C370,48 410,60 470,44 C520,32 560,30 600,22" fill="none" stroke="#9db8b0" stroke-width="2.5"/>
+          <path d="M0,86 C60,80 100,70 150,72 C210,74 250,52 310,50 C370,48 410,60 470,44 C520,32 560,30 600,22 L600,120 L0,120 Z" fill="url(#ar)"/>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="band" id="how">
+    <div class="lead reveal">
+      <h2>How a signal is born.</h2>
+      <p>Three stages between a tick on the wire and an order on the book. Nothing skips a stage.</p>
+    </div>
+    <div class="steps">
+      <div class="step glass reveal">
+        <div class="num mono">01&nbsp; INGEST</div>
+        <h3>Read the tape</h3>
+        <p>Streams candles and order books, computes the indicator stack, and labels the current regime as trend, range or volatile.</p>
+      </div>
+      <div class="step glass reveal">
+        <div class="num mono">02&nbsp; REASON</div>
+        <h3>Weigh the evidence</h3>
+        <p>A champion and a challenger model vote. Pattern detection and Fibonacci confluence filter the noise before anything is acted on.</p>
+      </div>
+      <div class="step glass reveal">
+        <div class="num mono">03&nbsp; EXECUTE</div>
+        <h3>Size it and send</h3>
+        <p>The order is risk checked, sized to the book, and routed to the exchange. In paper mode the same path runs on virtual money.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- SIGNAL SHOWCASE -->
+  <section class="band" id="signal">
+    <div class="lead reveal">
+      <h2>A signal you can argue with.</h2>
+      <p>This is the output, in full. Not a green arrow, but the confidence, the factors that moved it, and the chart it read.</p>
+    </div>
+    <div class="show">
+      <div class="sigcard glass reveal">
+        <div class="top">
+          <div class="pair">ETH/USDT <span class="ex">Binance · 12:18:04</span></div>
+          <div class="badge buy">BUY</div>
+        </div>
+        <div class="body">
+          <div class="conf"><span class="v mono">80%</span><span class="l">confidence</span></div>
+          <div class="confbar"><i></i></div>
+          <div class="factors">
+            <div class="factor"><span class="name">Regime</span><span class="val pos">Bull trend</span></div>
+            <div class="factor"><span class="name">RSI (14)</span><span class="val">31.2 · oversold</span></div>
+            <div class="factor"><span class="name">MACD</span><span class="val pos">Bullish cross</span></div>
+            <div class="factor"><span class="name">Pattern</span><span class="val">Double bottom</span></div>
+            <div class="factor"><span class="name">Model vote</span><span class="val pos">4 / 5 long</span></div>
+            <div class="factor"><span class="name">Risk check</span><span class="val pos">Passed</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="chartcard glass reveal">
+        <h3>ETH/USDT · 1H</h3>
+        <span class="tag">entry marked at the model's trigger</span>
+        <svg class="pricechart" viewBox="0 0 460 220" preserveAspectRatio="none" aria-hidden="true">
+          <defs><linearGradient id="pf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34d399" stop-opacity=".22"/><stop offset="1" stop-color="#34d399" stop-opacity="0"/></linearGradient></defs>
+          <g stroke="rgba(255,255,255,0.05)"><line x1="0" y1="55" x2="460" y2="55"/><line x1="0" y1="110" x2="460" y2="110"/><line x1="0" y1="165" x2="460" y2="165"/></g>
+          <path d="M0,150 C40,148 70,160 110,158 C150,156 175,170 210,168 C240,166 255,150 290,140 C330,128 350,96 390,78 C420,64 440,52 460,40" fill="none" stroke="#34d399" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M0,150 C40,148 70,160 110,158 C150,156 175,170 210,168 C240,166 255,150 290,140 C330,128 350,96 390,78 C420,64 440,52 460,40 L460,220 L0,220 Z" fill="url(#pf)"/>
+          <circle cx="210" cy="168" r="5.5" fill="#34d399"/><circle cx="210" cy="168" r="11" fill="none" stroke="rgba(52,211,153,0.4)"/>
+          <text x="218" y="190" font-family="Geist Mono" font-size="11" fill="rgba(255,255,255,0.6)">BUY 1,664.28</text>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- FINAL CTA -->
+  <section class="band">
+    <div class="final">
+      <div class="panel glass reveal">
+        <h2>Put it on your second screen.</h2>
+        <p>Start in demo mode with virtual money. Connect an exchange when you trust what you see.</p>
+        <div class="cta-row" style="justify-content:center">
+          <a class="btn btn-primary" href="/">Open the dashboard →</a>
+          <a class="btn btn-ghost" href="#how">Read how it decides</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="foot">
+    <div class="l"><span class="dot" style="width:24px;height:24px;border-radius:7px;background:linear-gradient(135deg,#9db8b0,#4f6b64);display:inline-grid;place-items:center;font-family:var(--mono);font-size:9px;color:#07080a;font-weight:600">Ai</span> Aiterra v2.0.0 · personal trading system</div>
+    <div class="r">
+      <a href="/">Dashboard</a>
+      <a href="#how">How it works</a>
+      <a href="#signal">Signals</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+// scroll reveal — enhances an already-visible default; no-op without JS or with reduced motion
+(function(){
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var els = document.querySelectorAll('.reveal');
+  if (!('IntersectionObserver' in window)) { els.forEach(function(e){e.classList.add('in')}); return; }
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(en){ if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); } });
+  }, {threshold:.16, rootMargin:'0px 0px -8% 0px'});
+  els.forEach(function(e){ io.observe(e); });
+})();
+// nav background after scroll
+addEventListener('scroll', function(){
+  document.querySelector('.navlinks').style.boxShadow = scrollY>40
+    ? 'inset 0 1px 0 var(--hi),0 10px 34px rgba(0,0,0,.5)'
+    : 'inset 0 1px 0 var(--hi),0 6px 24px rgba(0,0,0,.35)';
+}, {passive:true});
+</script>
+</body>
+</html>

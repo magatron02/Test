@@ -1,7 +1,28 @@
 # ทำต่อที่นี่ (Continue Here)
 
-> อัพเดตล่าสุด: 2026-06-12 (session 3 — polish + bugfix pass)
-> สถานะ: ✅ Bot รันอยู่บน GCP — demo mode, Binance จริง, ML training active, deploy ล่าสุด 2026-06-12 (charts fix + motion)
+> อัพเดตล่าสุด: 2026-06-13 (session 4 — DeFi luxe redesign + landing page)
+> สถานะ: ✅ Bot รันอยู่บน GCP — demo mode, Binance จริง, ML training active, deploy ล่าสุด 2026-06-13 (UI overhaul + landing + bg images)
+
+---
+
+## Session 4 — DeFi Luxe Redesign + Landing (2026-06-13) ✅
+
+- [x] **Reskin dashboard** ตาม DeFi Landing reference (dribbble 24287189) — pure black + frosted glass + ambient glow
+- [x] **Palette → monochrome sage-silver** — ทิ้ง glacier cyan `#00A8E8`/`#5ad2e6` → `#9db8b0`; interactive lead = white pill; BUY เขียว `#34d399` / SELL แดง `#f87171` เท่านั้น
+- [x] **Frosted glass cards** — `backdrop-filter: blur(15px)` + top sheen + radius 20px; sidebar = white sliding-indicator pill (dark text)
+- [x] **Landing page** — `landing.html` standalone, route `/landing` ใน `main.py` (เพิ่มแล้ว, ต้อง restart). Sections: hero constellation, markets, bento, how-it-works (3 steps), signal showcase, CTA, footer
+- [x] **Hero headline** = "Meet Aiterra — an AI that doesn't just signal, it acts. Full autotrade, full transparency." + scrim หลังหัวข้อให้แยกจาก bg
+- [x] **Background images** — `static/img/bg-landing.jpg` (line-art poster) + `static/img/bg-dashboard.jpg` (nebula, dim หนัก "ไม่สว่าง"). เสิร์ฟผ่าน `/static/img/`
+- [x] **Grain** — fine (`baseFrequency 1.1`, 130px tile), screen blend, **บนพื้นหลังอย่างเดียว** (ไม่ใส่ card/ปุ่ม)
+- [x] **Perf fix** — ลบ animated blur filter + `background-attachment:fixed`, ลด backdrop-blur 26→15px → scroll/transition กลับมาลื่น
+- [x] **DESIGN.md** regenerate ตรงระบบใหม่ทั้งหมด
+
+### Deploy images (ถ้าแก้รูป)
+```
+gcloud compute scp <img> aiterra-server-sg:/tmp/ --zone=asia-southeast1-b
+docker exec ... mkdir -p /app/src/web/static/img
+docker cp /tmp/<img> crypto-ai-trader-aiterra-1:/app/src/web/static/img/<img>
+```
 
 ---
 

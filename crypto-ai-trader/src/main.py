@@ -71,6 +71,12 @@ async def index():
     return FileResponse(WEB_DIR / "index.html")
 
 
+@app.get("/landing", response_class=FileResponse)
+@app.get("/landing.html", response_class=FileResponse)
+async def landing():
+    return FileResponse(WEB_DIR / "landing.html")
+
+
 
 @app.websocket("/ws")
 async def ws_endpoint(websocket: WebSocket):
