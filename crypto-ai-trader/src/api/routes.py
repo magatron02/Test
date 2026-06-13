@@ -265,6 +265,22 @@ async def ml_granger(symbol: Optional[str] = None, max_lag: int = 3):
         return {"error": str(exc), "tests": []}
 
 
+@router.get("/agents/panel")
+async def agents_panel():
+    """Current multi-agent panel votes (Technical + Sentiment + Risk) with consensus."""
+    if not _trader:
+        raise HTTPException(503, "Trader not running")
+    panel = getattr(_trader, "_last_panel", {})
+    if not panel:
+        return {
+            "action": "—", "confidence": 0.0, "weighted_score": 0.0,
+            "agree": False, "veto": None,
+            "votes": [],
+            "message": "No analysis run yet — waiting for first market cycle",
+        }
+    return panel
+
+
 @router.get("/portfolio/hrp")
 async def portfolio_hrp():
     """Hierarchical Risk Parity weights across tracked symbols (ML4T Ch.13)."""

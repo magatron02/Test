@@ -105,7 +105,13 @@ class AITrader:
             "executor":   {"status": "idle", "detail": "พร้อมทำงาน", "ts": None},
             "trainer":    {"status": "idle", "detail": "พร้อมทำงาน", "ts": None},
             "risk":       {"status": "idle", "detail": "พร้อมทำงาน", "ts": None},
+            "panel":      {"status": "idle", "detail": "รอการวิเคราะห์", "ts": None},
         }
+
+        # Phase 2 — Multi-agent consensus panel (Technical + Sentiment + Risk)
+        from .agent_panel import AgentPanel as _AgentPanel
+        self._panel = _AgentPanel()
+        self._last_panel: dict = {}
 
         # Walk-forward optimizer overrides — None until _apply_opt_params() runs
         self._opt_min_conf:       Optional[float] = None
@@ -603,6 +609,27 @@ class AITrader:
                 entry["strategy"] = strategy
             components[name] = entry
 
+        # Phase 2 — Multi-agent panel pre-flight vote
+        _risk_snap: dict = {}
+        try:
+            _rs = getattr(self._risk, "_state", None)
+            if _rs:
+                _risk_snap = {
+                    "portfolio_heat":    float(getattr(_rs, "portfolio_heat_pct", 0.0) or 0.0),
+                    "current_drawdown":  float(getattr(_rs, "current_drawdown_pct", 0.0) or 0.0),
+                }
+        except Exception:
+            pass
+        _panel_result = self._panel.vote(
+            features   = analysis.features or {},
+            risk_state = _risk_snap,
+            regime     = regime.regime if regime else "RANGING",
+        )
+        self._last_panel = self._panel.to_dict(_panel_result)
+        self._set_agent("panel", "active",
+            f"Panel: {_panel_result.action} ({_panel_result.confidence:.0%})" +
+            (" | VETO" if _panel_result.veto else ""))
+
         if ai_model in ("ml", "hybrid") and settings.get("ai", "ml", "enabled", default=True):
             ml_signal = self._trainer.predict(analysis.features)
             _capture("ml", ml_signal)
@@ -672,6 +699,14 @@ class AITrader:
                     sig.stop_loss_pct, sig.take_profit_pct,
                 )
 
+        # Phase 2 — Panel veto gate: Risk RED overrides directional trade to HOLD
+        if _panel_result.veto and sig.action in ("BUY", "SELL"):
+            sig = TradingSignal(
+                "HOLD", sig.confidence * 0.5, sig.strategy,
+                f"Agent panel VETO: {_panel_result.veto}",
+                sig.stop_loss_pct, sig.take_profit_pct,
+            )
+
         # Base confidence bar. The walk-forward optimizer (F5.1) may only
         # *tighten* the gate — it can raise min_conf above the configured
         # default but never loosen it below, so auto-tuning can't make the
@@ -725,7 +760,7 @@ class AITrader:
                 price=analysis.price,
             ))
 
-        self._signal_attribution = {**components, "chosen": chosen}
+        self._signal_attribution = {**components, "chosen": chosen, "panel": self._last_panel}
         return final_sig
 
     # ── Trade execution ───────────────────────────────────────────────────

@@ -1101,6 +1101,62 @@ md-circular-progress.spin-inline {
 .at-train-zone { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 @media (max-width: 720px) { .at-train-zone { grid-template-columns: 1fr; } }
 
+/* Agent Panel Zone */
+.ap-zone {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 12px; overflow: hidden;
+}
+.ap-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,0.02);
+}
+.ap-head-title { font-size: 0.72rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.ap-head-right { display: flex; align-items: center; gap: 8px; }
+.ap-consensus {
+  font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 20px;
+  letter-spacing: 0.04em;
+}
+.ap-consensus.ap-buy  { color: #4ade80; background: rgba(74,222,128,0.12); border: 1px solid rgba(74,222,128,0.25); }
+.ap-consensus.ap-sell { color: #f87171; background: rgba(248,113,113,0.12); border: 1px solid rgba(248,113,113,0.25); }
+.ap-consensus.ap-hold { color: #facc15; background: rgba(250,204,21,0.10); border: 1px solid rgba(250,204,21,0.2); }
+.ap-veto-badge  { font-size: 0.62rem; font-weight: 700; color: #f87171; background: rgba(248,113,113,0.12); border: 1px solid rgba(248,113,113,0.3); border-radius: 4px; padding: 1px 6px; letter-spacing: 0.06em; }
+.ap-agree-badge { font-size: 0.62rem; font-weight: 700; color: #4ade80; background: rgba(74,222,128,0.10); border: 1px solid rgba(74,222,128,0.25); border-radius: 4px; padding: 1px 6px; letter-spacing: 0.06em; }
+.ap-refresh-btn { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--text-muted); font-size: 0.72rem; padding: 1px 8px; cursor: pointer; line-height: 1.6; }
+.ap-refresh-btn:hover { color: var(--teal); border-color: var(--teal); }
+.ap-body { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; }
+@media (max-width: 720px) { .ap-body { grid-template-columns: 1fr; } }
+.ap-empty-msg { grid-column: 1/-1; padding: 22px; text-align: center; color: var(--text-muted); font-size: 0.72rem; }
+.ap-agent-col {
+  padding: 12px 14px; border-right: 1px solid var(--border);
+}
+.ap-agent-col:last-child { border-right: none; }
+.ap-agent-label { font-size: 0.63rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 8px; }
+.ap-agent-label.ap-tech { color: #60a5fa; }
+.ap-agent-label.ap-sent { color: #c084fc; }
+.ap-agent-label.ap-risk { color: #fb923c; }
+.ap-vote-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.ap-vote-badge {
+  font-size: 0.65rem; font-weight: 700; padding: 1px 7px; border-radius: 4px;
+  letter-spacing: 0.04em; white-space: nowrap;
+}
+.ap-vote-badge.buy,.ap-vote-badge.bullish,.ap-vote-badge.green {
+  color: #4ade80; background: rgba(74,222,128,0.12); border: 1px solid rgba(74,222,128,0.25);
+}
+.ap-vote-badge.sell,.ap-vote-badge.bearish,.ap-vote-badge.red {
+  color: #f87171; background: rgba(248,113,113,0.12); border: 1px solid rgba(248,113,113,0.25);
+}
+.ap-vote-badge.hold,.ap-vote-badge.neutral,.ap-vote-badge.yellow {
+  color: #facc15; background: rgba(250,204,21,0.09); border: 1px solid rgba(250,204,21,0.2);
+}
+.ap-bar-wrap { flex: 1; height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; }
+.ap-bar { height: 100%; border-radius: 2px; transition: width 0.4s ease; }
+.ap-bar.tech { background: linear-gradient(90deg,#3b82f6,#60a5fa); }
+.ap-bar.sent { background: linear-gradient(90deg,#a855f7,#c084fc); }
+.ap-bar.risk { background: linear-gradient(90deg,#f97316,#fb923c); }
+.ap-conf { font-size: 0.65rem; color: var(--text-muted); white-space: nowrap; }
+.ap-sigs { font-size: 0.60rem; color: var(--text-muted); line-height: 1.5; margin-top: 2px; }
+
 .at-train-card {
   background: var(--bg-card); border: 1px solid var(--border);
   border-radius: var(--radius-card);
@@ -2883,6 +2939,25 @@ md-circular-progress.spin-inline {
           <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" stroke="currentColor" stroke-width="2" fill="none"/></svg>
           Enable Auto Train
         </button>
+      </div>
+    </div>
+
+    <!-- Zone 1.7: Agent Panel -->
+    <div class="ap-zone" id="apZone">
+      <div class="ap-head">
+        <span class="ap-head-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
+          Agent Panel
+        </span>
+        <div class="ap-head-right">
+          <span id="apConsensusLabel" class="ap-consensus ap-hold">—</span>
+          <span id="apVetoLabel" class="ap-veto-badge" style="display:none">VETO</span>
+          <span id="apAgreeLabel" class="ap-agree-badge" style="display:none">UNANIMOUS</span>
+          <button class="ap-refresh-btn" onclick="fetchAgentPanel(this)">↻</button>
+        </div>
+      </div>
+      <div class="ap-body" id="apBody">
+        <div class="ap-empty-msg">Waiting for first analysis cycle…</div>
       </div>
     </div>
 
@@ -5782,6 +5857,61 @@ async function loadGranger(btn) {
   }
 }
 
+// ── Agent Panel ──────────────────────────────────────────────────────────────
+const _AP_AGENT_CLASS = { Technical: 'tech', Sentiment: 'sent', Risk: 'risk' };
+const _AP_VOTE_NORM   = v => (v||'').toLowerCase().replace(/\s+/g,'');
+
+async function fetchAgentPanel(btn) {
+  if (btn) btn.style.opacity = '0.4';
+  try {
+    const d = await fetch('/api/agents/panel').then(r => r.json());
+    renderAgentPanel(d);
+  } catch(e) {
+    const b = document.getElementById('apBody');
+    if (b) b.innerHTML = `<div class="ap-empty-msg" style="color:#f87171">${e.message}</div>`;
+  } finally {
+    if (btn) btn.style.opacity = '';
+  }
+}
+
+function renderAgentPanel(d) {
+  const body  = document.getElementById('apBody');
+  const label = document.getElementById('apConsensusLabel');
+  const vetoB = document.getElementById('apVetoLabel');
+  const agrB  = document.getElementById('apAgreeLabel');
+  if (!body) return;
+
+  const action = (d.action || '—').toUpperCase();
+  const cls = action === 'BUY' ? 'ap-buy' : action === 'SELL' ? 'ap-sell' : 'ap-hold';
+  if (label) {
+    label.textContent = `${action}  ${d.confidence ? (d.confidence*100).toFixed(0)+'%' : ''}`;
+    label.className = `ap-consensus ${cls}`;
+  }
+  if (vetoB) vetoB.style.display = d.veto ? '' : 'none';
+  if (agrB)  agrB.style.display  = d.agree ? '' : 'none';
+
+  if (!d.votes || !d.votes.length) {
+    body.innerHTML = `<div class="ap-empty-msg">${d.message || 'No data'}</div>`;
+    return;
+  }
+
+  body.innerHTML = d.votes.map(v => {
+    const cls2   = _AP_AGENT_CLASS[v.agent] || 'tech';
+    const vcls   = _AP_VOTE_NORM(v.vote);
+    const pct    = Math.round((v.confidence || 0) * 100);
+    const sigs   = (v.signals || []).join(' · ') || '—';
+    return `<div class="ap-agent-col">
+      <div class="ap-agent-label ap-${cls2}">${v.agent}</div>
+      <div class="ap-vote-row">
+        <span class="ap-vote-badge ${vcls}">${v.vote}</span>
+        <div class="ap-bar-wrap"><div class="ap-bar ${cls2}" style="width:${pct}%"></div></div>
+        <span class="ap-conf">${pct}%</span>
+      </div>
+      <div class="ap-sigs">${sigs}</div>
+    </div>`;
+  }).join('');
+}
+
 // Walk-Forward Validation (Jesse-style)
 async function runWalkForward() {
   const btn = document.getElementById('wfRunBtn');
@@ -6949,7 +7079,7 @@ let _atSelectedSym = null;
 async function refreshAutotrade() {
   renderAtSignalGrid();
   renderAtStatusBar();
-  await Promise.all([fetchAtRouterStats(), fetchAtTrainingStats(), fetchAtChampion(), atRefreshTrainStatus()]);
+  await Promise.all([fetchAtRouterStats(), fetchAtTrainingStats(), fetchAtChampion(), atRefreshTrainStatus(), fetchAgentPanel()]);
 }
 
 async function atRefreshTrainStatus() {
