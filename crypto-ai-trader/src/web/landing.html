@@ -48,17 +48,32 @@ body{
   -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
   overflow-x:hidden; position:relative;
 }
-/* background image (line-art poster) — fixed, dimmed for legibility */
+/* background — pure CSS "deep cosmos" (no image file) */
 body::before{
   content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  animation:drift 24s ease-in-out infinite alternate;
   background:
-    radial-gradient(60% 50% at 72% 8%, rgba(157,184,176,.05) 0%, transparent 60%),
-    linear-gradient(180deg, rgba(6,7,8,.68) 0%, rgba(6,7,8,.82) 100%),
-    radial-gradient(120% 95% at 50% 34%, transparent 40%, rgba(0,0,0,.80) 100%),
-    url('/static/img/bg-landing.jpg') center center / cover no-repeat;
-  background-color: var(--bg);
+    /* teal nebula — upper right (brand accent) */
+    radial-gradient(ellipse 58% 48% at 76% -2%, rgba(157,184,176,.22) 0%, rgba(79,107,100,.09) 38%, transparent 65%),
+    /* indigo depth — lower left */
+    radial-gradient(ellipse 48% 52% at 4% 92%, rgba(67,56,202,.08) 0%, transparent 55%),
+    /* warm ember — lower right accent */
+    radial-gradient(ellipse 28% 28% at 96% 80%, rgba(251,191,36,.05) 0%, transparent 60%),
+    /* edge vignette — pulls focus inward */
+    radial-gradient(ellipse 98% 88% at 50% 42%, transparent 16%, rgba(0,0,0,.84) 100%),
+    /* legibility overlay */
+    linear-gradient(160deg, rgba(3,3,4,.55) 0%, rgba(6,7,8,.12) 50%, rgba(3,3,4,.55) 100%),
+    /* micro grid — data/cosmos texture */
+    repeating-linear-gradient(0deg, transparent 0px, transparent 59px, rgba(255,255,255,.020) 60px),
+    repeating-linear-gradient(90deg, transparent 0px, transparent 59px, rgba(255,255,255,.012) 60px),
+    /* base canvas */
+    radial-gradient(ellipse 140% 110% at 48% -6%, #0e1318 0%, #080a0d 32%, #050608 62%, #030304 100%);
+  background-color:#030304;
 }
-@keyframes drift{0%{transform:translate3d(0,0,0) scale(1);opacity:1}100%{transform:translate3d(-2%,1.6%,0) scale(1.06);opacity:.82}}
+@keyframes drift{
+  0%  {transform:translate3d(0,0,0) scale(1);    opacity:1}
+  100%{transform:translate3d(-1.5%,1.2%,0) scale(1.04); opacity:.88}
+}
 @media (prefers-reduced-motion:reduce){body::before{animation:none}}
 .wrap{position:relative;z-index:1;max-width:var(--maxw);margin:0 auto;padding:0 26px}
 .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}

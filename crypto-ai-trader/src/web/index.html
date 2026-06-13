@@ -127,14 +127,23 @@ body {
   text-rendering: optimizeLegibility;
   position: relative;
 }
-/* ── Background image (nebula) — fixed, heavily dimmed so it never washes out the UI ── */
+/* ── Background — pure CSS "midnight tech" (no image file) ── */
 body::before {
   content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
   background:
-    radial-gradient(70% 55% at 62% 6%, rgba(157,184,176,0.05) 0%, transparent 60%),
+    /* brand teal accent — upper right */
+    radial-gradient(ellipse 50% 38% at 80% 0%, rgba(157,184,176,0.11) 0%, transparent 62%),
+    /* cool teal hint — lower left */
+    radial-gradient(ellipse 35% 40% at 2% 88%, rgba(94,234,212,0.05) 0%, transparent 55%),
+    /* edge vignette — keeps UI readable */
+    radial-gradient(ellipse 100% 85% at 50% 35%, transparent 22%, rgba(0,0,0,0.70) 100%),
+    /* UI legibility overlay */
     linear-gradient(180deg, rgba(6,7,8,0.72) 0%, rgba(4,4,5,0.84) 100%),
-    radial-gradient(130% 100% at 50% 30%, transparent 46%, rgba(0,0,0,0.7) 100%),
-    url('/static/img/bg-dashboard.jpg') center center / cover no-repeat;
+    /* micro grid — circuit/data texture */
+    repeating-linear-gradient(0deg, transparent 0px, transparent 39px, rgba(255,255,255,0.014) 40px),
+    repeating-linear-gradient(90deg, transparent 0px, transparent 39px, rgba(255,255,255,0.009) 40px),
+    /* base canvas */
+    radial-gradient(ellipse 145% 105% at 50% 25%, #0a0d12 0%, #070809 38%, #050607 100%);
   background-color: var(--bg-dark);
 }
 /* ── Grain — fine, on the background only ── */
