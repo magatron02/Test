@@ -1,7 +1,7 @@
 # ทำต่อที่นี่ (Continue Here)
 
-> อัพเดตล่าสุด: 2026-06-13 (session 4 — DeFi luxe redesign + landing page)
-> สถานะ: ✅ Bot รันอยู่บน GCP — demo mode, Binance จริง, ML training active, deploy ล่าสุด 2026-06-13 (UI overhaul + landing + bg images)
+> อัพเดตล่าสุด: 2026-06-13 (session 4 — DeFi luxe redesign + landing → v2.1.0)
+> สถานะ: ✅ Bot รันอยู่บน GCP — demo mode, Binance จริง, ML training active, deploy ล่าสุด 2026-06-13 (v2.1.0: UI overhaul + landing + bg images + perf/a11y pass)
 
 ---
 
