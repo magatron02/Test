@@ -90,7 +90,8 @@ header.nav{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;justify-c
   display:flex;align-items:center;gap:18px;width:100%;max-width:var(--maxw);
 }
 .brand{display:flex;align-items:center;gap:11px;font-weight:600;letter-spacing:-.3px;font-size:1.05rem}
-.brand .dot{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--accent),#4f6b64);display:grid;place-items:center;box-shadow:0 0 22px rgba(157,184,176,.4);font-family:var(--mono);font-weight:600;font-size:11px;color:#07080a}
+.brand .dot{width:30px;height:30px;display:grid;place-items:center;filter:drop-shadow(0 0 8px rgba(157,184,176,.55))}
+.brand .dot img{width:30px;height:30px;display:block}
 .brand small{color:var(--td);font-family:var(--mono);font-size:.6em;font-weight:400}
 .navlinks{
   display:flex;gap:2px;margin:0 auto;padding:5px;border-radius:100px;
@@ -247,7 +248,7 @@ footer{position:relative;z-index:1;border-top:1px solid var(--bd2);margin-top:cl
 
 <header class="nav">
   <nav class="navbar">
-    <a class="brand" href="#top"><span class="dot">Ai</span> Aiterra <small>v2.1</small></a>
+    <a class="brand" href="#top"><span class="dot"><img src="/static/img/logo.svg" alt="" aria-hidden="true"></span> Aiterra <small>v2.1</small></a>
     <div class="navlinks">
       <a href="#how">How it works</a>
       <a href="#intel">Intelligence</a>
