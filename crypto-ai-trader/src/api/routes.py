@@ -266,19 +266,33 @@ async def ml_granger(symbol: Optional[str] = None, max_lag: int = 3):
 
 
 @router.get("/agents/panel")
-async def agents_panel():
-    """Current multi-agent panel votes (Technical + Sentiment + Risk) with consensus."""
+async def agents_panel(symbol: Optional[str] = None):
+    """Current multi-agent panel votes (Technical + Sentiment + Risk) with consensus.
+
+    Optionally pass ?symbol=BTC/USDT to get a specific symbol's panel.
+    Without symbol, returns the panel for the most recent non-HOLD signal, or the last symbol.
+    """
     if not _trader:
         raise HTTPException(503, "Trader not running")
-    panel = getattr(_trader, "_last_panel", {})
-    if not panel:
+    panel_map: dict = getattr(_trader, "_last_panel", {})
+    if not panel_map:
         return {
             "action": "—", "confidence": 0.0, "weighted_score": 0.0,
-            "agree": False, "veto": None,
-            "votes": [],
+            "agree": False, "veto": None, "votes": [],
             "message": "No analysis run yet — waiting for first market cycle",
         }
-    return panel
+    if symbol:
+        panel = panel_map.get(symbol)
+        if not panel:
+            raise HTTPException(404, f"No panel data for {symbol!r}")
+        panel["symbol"] = symbol
+        return panel
+    # Return the most recent non-HOLD panel, else last entry
+    non_hold = {s: p for s, p in panel_map.items() if p.get("action") not in ("HOLD", "—")}
+    chosen_sym, chosen = (list(non_hold.items()) or list(panel_map.items()))[-1]
+    chosen["symbol"] = chosen_sym
+    chosen["all_symbols"] = list(panel_map.keys())
+    return chosen
 
 
 @router.get("/portfolio/hrp")
@@ -992,6 +1006,100 @@ async def manual_trade(request: Request, data: Dict[str, Any]):
                 "price": round(analysis.price, 6), "amount": round(amount, 6),
                 "amount_usdt": round(amt_usdt, 2)}
     return {"ok": False, "reason": "execute returned False (risk limit / existing position / demo error)"}
+
+
+# ── TradingView Webhook (Phase 3) ─────────────────────────────────────────────
+_last_tv_event: Dict[str, dict] = {}   # symbol → last alert metadata (for dashboard)
+
+@router.post("/webhook/tradingview")
+async def tradingview_webhook(request: Request):
+    """TradingView Pine Script alert → execute trade.
+
+    Pine Script alert message (JSON format):
+      {"token":"<secret>","action":"buy|sell|close","symbol":"BTCUSDT",
+       "confidence":0.85,"strategy":"MyStrategy","sl_pct":0.025,"tp_pct":0.05}
+
+    Set webhook URL in TradingView to: http://<server>:8888/api/webhook/tradingview
+    Configure token in settings.yml: notifications.tradingview_webhook_token
+    """
+    try:
+        data = await request.json()
+    except Exception:
+        raise HTTPException(400, "Invalid JSON body")
+
+    # Token auth (skip check if no token configured → open mode for local testing)
+    expected_token = settings.get("notifications", "tradingview_webhook_token", default="")
+    if expected_token and data.get("token") != expected_token:
+        logger.warning("TradingView webhook: rejected — invalid token")
+        raise HTTPException(403, "Invalid webhook token")
+
+    if not _trader:
+        raise HTTPException(503, "Trader not running")
+
+    raw_action = (data.get("action") or "").lower().strip()
+    action = {"buy": "BUY", "sell": "SELL", "close": "CLOSE"}.get(raw_action)
+    if not action:
+        raise HTTPException(400, f"action must be buy/sell/close, got {raw_action!r}")
+
+    # Normalise symbol: BTCUSDT → BTC/USDT
+    raw_sym = (data.get("symbol") or "BTC/USDT").upper().strip()
+    symbol = raw_sym
+    if "/" not in symbol:
+        for quote in ("USDT", "BUSD", "BTC", "ETH", "TH"):
+            if symbol.endswith(quote):
+                symbol = symbol[:-len(quote)] + "/" + quote
+                break
+
+    if symbol not in settings.symbols:
+        raise HTTPException(400, f"Symbol {symbol!r} not monitored. Expected one of: {settings.symbols}")
+
+    confidence = min(1.0, max(0.0, float(data.get("confidence", 0.80))))
+    strategy_name = str(data.get("strategy", "pine_script"))[:64]
+    sl_pct = min(0.20, max(0.005, float(data.get("sl_pct", 0.025))))
+    tp_pct = min(0.50, max(0.005, float(data.get("tp_pct", 0.05))))
+
+    analysis = await _trader.analyze_symbol(symbol)
+    if not analysis:
+        raise HTTPException(503, f"Cannot fetch market data for {symbol}")
+
+    ts_now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+
+    if action == "CLOSE":
+        if symbol not in _trader.open_trades:
+            _last_tv_event[symbol] = {"ts": ts_now, "action": "CLOSE", "executed": False, "price": analysis.price, "strategy": strategy_name}
+            return {"ok": False, "reason": f"No open position for {symbol}"}
+        result = await _trader._close_trade(symbol, analysis.price, f"tv:{strategy_name}")
+        _last_tv_event[symbol] = {"ts": ts_now, "action": "CLOSE", "executed": bool(result), "price": analysis.price, "strategy": strategy_name}
+        return {"ok": bool(result), "action": "CLOSE", "symbol": symbol, "price": round(analysis.price, 6)}
+
+    from ..agent.strategy_manager import TradingSignal as _TradingSignal
+    from ..agent.market_regime import RegimeResult as _RegimeResult
+
+    signal = _TradingSignal(
+        action=action, confidence=confidence,
+        reasoning=f"TradingView alert — {strategy_name}",
+        strategy=f"tv:{strategy_name}",
+        stop_loss_pct=sl_pct,
+        take_profit_pct=tp_pct,
+    )
+    regime = _trader.regimes.get(symbol) or _RegimeResult("RANGING", 0.5, 20.0, 2.0, 0.0, "tv_alert")
+    executed = await _trader._execute_trade(symbol, signal, analysis, regime, force=True)
+    _last_tv_event[symbol] = {
+        "ts": ts_now, "action": action, "confidence": confidence,
+        "price": analysis.price, "executed": executed, "strategy": strategy_name,
+    }
+    logger.info("TradingView webhook: %s %s conf=%.0f%% executed=%s", action, symbol, confidence * 100, executed)
+    return {
+        "ok": executed, "action": action, "symbol": symbol,
+        "price": round(analysis.price, 6), "confidence": confidence, "executed": executed,
+    }
+
+
+@router.get("/webhook/tradingview/status")
+async def tradingview_status():
+    """Last received TradingView alert per symbol."""
+    token_set = bool(settings.get("notifications", "tradingview_webhook_token", default=""))
+    return {"token_configured": token_set, "last_events": _last_tv_event}
 
 
 @router.post("/training/loop/stop")

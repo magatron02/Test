@@ -244,6 +244,59 @@ class StrategyManager:
         return TradingSignal("HOLD", max(bs, ss), "smc",
                              f"SMC: {analysis.smc_summary}", 0.02, 0.05)
 
+    def grid_signal(self, analysis: MarketAnalysis) -> TradingSignal:
+        """Grid trading strategy (Phase 3 / OctoBot-inspired).
+
+        Divides the Bollinger-Band range into N equally-spaced levels.
+        - Price at or below a lower grid level  → BUY  (accumulate on dip)
+        - Price at or above an upper grid level → SELL (harvest gain)
+        - Confidence scales with how many levels deep the price has moved.
+
+        Config (strategy.grid in settings.yml):
+          n_levels:      5      — number of grid levels each side
+          min_bb_width:  0.02   — skip if BB is too tight (low volatility)
+        """
+        cfg = settings.get("strategy", "grid") or {}
+        n_levels = int(cfg.get("n_levels", 5))
+        min_bb_width = float(cfg.get("min_bb_width", 0.02))
+
+        bb_pos = float(getattr(analysis, "bb_position", 0.5) or 0.5)
+        atr_pct = float(getattr(analysis, "atr_pct", 1.0) or 1.0)
+
+        # Skip if market is too flat (BB bands too tight — no grid edge)
+        if atr_pct < min_bb_width * 100:
+            return TradingSignal("HOLD", 0.1, "grid", "Grid: BB too tight — low volatility", 0.025, 0.05)
+
+        # Divide [0, 1] BB position range into n_levels+1 segments
+        level_size = 1.0 / (n_levels + 1)
+
+        if bb_pos <= level_size:
+            # Deepest buy zone (below 1st lower level)
+            depth = max(1, round((level_size - bb_pos) / level_size * n_levels) + 1)
+            confidence = min(0.55 + 0.08 * depth, 0.92)
+            return TradingSignal(
+                "BUY", confidence, "grid",
+                f"Grid L{depth}/{n_levels}: BB={bb_pos:.2f} below lower band",
+                max(0.015, atr_pct / 100 * 1.5),
+                max(0.025, atr_pct / 100 * level_size * n_levels * 2),
+            )
+        elif bb_pos >= 1.0 - level_size:
+            # Deepest sell zone (above top level)
+            depth = max(1, round((bb_pos - (1 - level_size)) / level_size * n_levels) + 1)
+            confidence = min(0.55 + 0.08 * depth, 0.92)
+            return TradingSignal(
+                "SELL", confidence, "grid",
+                f"Grid U{depth}/{n_levels}: BB={bb_pos:.2f} above upper band",
+                max(0.015, atr_pct / 100 * 1.5),
+                max(0.025, atr_pct / 100 * level_size * n_levels * 2),
+            )
+        # Inside grid — which zone?
+        zone = int(bb_pos / level_size)
+        mid = n_levels // 2 + 1
+        if zone < mid:
+            return TradingSignal("HOLD", 0.30, "grid", f"Grid zone {zone}/{n_levels+1}: accumulation side", 0.025, 0.05)
+        return TradingSignal("HOLD", 0.30, "grid", f"Grid zone {zone}/{n_levels+1}: distribution side", 0.025, 0.05)
+
     def signal_for_strategy(
         self,
         strategy: str,
@@ -266,6 +319,8 @@ class StrategyManager:
             return self.ichimoku_strategy(analysis)
         if strategy == "smc":
             return self.smc_strategy(analysis)
+        if strategy == "grid":
+            return self.grid_signal(analysis)
         return self.hybrid_signal(analysis, ml_signal)
 
     def get_signal(self, analysis: MarketAnalysis, ml_signal: Optional[TradingSignal] = None) -> TradingSignal:

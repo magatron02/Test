@@ -24,6 +24,7 @@ from .agent.hourly_trainer import HourlyTrainer
 from .agent.alert_monitor import AlertMonitor
 from .api.routes import router, set_trader, set_training_loop, set_hourly_trainer
 from .api.websocket import broadcast, websocket_endpoint
+from .notifications.telegram_bot import create_bot as _create_telegram_bot
 
 logging.basicConfig(
     level=getattr(logging, settings.get("app", "log_level", default="INFO")),
@@ -89,6 +90,7 @@ _training_loop_inst: TrainingLoop = None
 _hourly_trainer_inst: HourlyTrainer = None
 _alert_monitor_inst: AlertMonitor = None
 _alert_task = None
+_telegram_bot = None
 
 
 async def _snapshot_loop():
@@ -165,6 +167,12 @@ async def startup():
     _alert_monitor_inst = AlertMonitor(exchange, broadcast_fn=broadcast)
     _alert_task = asyncio.create_task(_alert_monitor_inst.start())
     _hourly_trainer_inst.start()
+
+    # Phase 3 — Telegram command bot (bidirectional; skip if not configured)
+    global _telegram_bot
+    _telegram_bot = _create_telegram_bot(trader=_trader)
+    _telegram_bot.start()
+
     logger.info(f"AI Trader started in {settings.trading_mode} mode (exchange={ex_name}) with model={settings.ai_model}")
 
     if settings.get("app", "open_browser", default=True):
@@ -185,6 +193,8 @@ async def shutdown():
         _alert_monitor_inst.stop()
     if _alert_task:
         _alert_task.cancel()
+    if _telegram_bot:
+        _telegram_bot.stop()
 
 
 def main():

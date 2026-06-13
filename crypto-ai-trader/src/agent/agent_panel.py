@@ -20,12 +20,18 @@ RiskStatus    = Literal["GREEN",   "YELLOW",  "RED"]
 
 _WEIGHTS = {"Technical": 0.40, "Sentiment": 0.30, "Risk": 0.30}
 
-# Map every vote label to a directional float (-1 .. +1)
+# Map every vote label to a directional float (-1 .. +1).
+# Risk agent is NEUTRAL or NEGATIVE only — GREEN=0.0 so the Risk agent never
+# nudges toward BUY (it only vetoes or stays out of the way).
 _DIR = {
     "BUY": 1.0, "SELL": -1.0, "HOLD": 0.0,
     "BULLISH": 1.0, "BEARISH": -1.0, "NEUTRAL": 0.0,
-    "GREEN": 0.4, "YELLOW": 0.0, "RED": -1.0,
+    "GREEN": 0.0, "YELLOW": 0.0, "RED": -1.0,
 }
+
+# Maximum positive weighted-score achievable (Risk contributes 0 or negative).
+# Used to normalise displayed confidence so operators see a proper 0-100% figure.
+_DISPLAY_MAX: float = _WEIGHTS["Technical"] + _WEIGHTS["Sentiment"]  # 0.70
 
 
 @dataclass
@@ -250,10 +256,14 @@ class AgentPanel:
         else:
             action = "BUY" if weighted > 0.18 else "SELL" if weighted < -0.18 else "HOLD"
 
-        confidence = float(np.clip(abs(weighted), 0.0, 1.0))
+        # Normalise confidence to [0, 1] against _DISPLAY_MAX so the UI shows
+        # a meaningful percentage instead of a structurally-capped raw score.
+        confidence = float(np.clip(abs(weighted) / max(_DISPLAY_MAX, 1e-9), 0.0, 1.0))
 
-        dirs = [_DIR.get(v.vote, 0) for v in votes]
-        agree = all(d > 0 for d in dirs) or all(d < 0 for d in dirs)
+        # UNANIMOUS: Tech + Sentiment agree (Risk is excluded — it is neutral/veto-only)
+        tech_dir = _DIR.get(next((v.vote for v in votes if v.agent == "Technical"), "HOLD"), 0)
+        sent_dir = _DIR.get(next((v.vote for v in votes if v.agent == "Sentiment"), "NEUTRAL"), 0)
+        agree = (tech_dir > 0 and sent_dir > 0) or (tech_dir < 0 and sent_dir < 0)
 
         return PanelConsensus(
             action         = action,

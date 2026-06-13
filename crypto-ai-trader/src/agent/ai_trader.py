@@ -111,7 +111,7 @@ class AITrader:
         # Phase 2 — Multi-agent consensus panel (Technical + Sentiment + Risk)
         from .agent_panel import AgentPanel as _AgentPanel
         self._panel = _AgentPanel()
-        self._last_panel: dict = {}
+        self._last_panel: Dict[str, dict] = {}  # keyed by symbol
 
         # Walk-forward optimizer overrides — None until _apply_opt_params() runs
         self._opt_min_conf:       Optional[float] = None
@@ -612,20 +612,22 @@ class AITrader:
         # Phase 2 — Multi-agent panel pre-flight vote
         _risk_snap: dict = {}
         try:
-            _rs = getattr(self._risk, "_state", None)
-            if _rs:
-                _risk_snap = {
-                    "portfolio_heat":    float(getattr(_rs, "portfolio_heat_pct", 0.0) or 0.0),
-                    "current_drawdown":  float(getattr(_rs, "current_drawdown_pct", 0.0) or 0.0),
-                }
+            _rs = self._risk.state  # use public property (W5)
+            _risk_snap = {
+                "portfolio_heat":   float(_rs.get("portfolio_heat", 0.0) or 0.0),
+                "current_drawdown": float(_rs.get("drawdown_pct",   0.0) or 0.0),
+            }
         except Exception:
             pass
+        _feat = analysis.features or {}
+        if not _feat:
+            logger.debug("Panel: empty features for %s — agents will use defaults", analysis.symbol)
         _panel_result = self._panel.vote(
-            features   = analysis.features or {},
+            features   = _feat,
             risk_state = _risk_snap,
             regime     = regime.regime if regime else "RANGING",
         )
-        self._last_panel = self._panel.to_dict(_panel_result)
+        self._last_panel[analysis.symbol] = self._panel.to_dict(_panel_result)  # keyed (W1)
         self._set_agent("panel", "active",
             f"Panel: {_panel_result.action} ({_panel_result.confidence:.0%})" +
             (" | VETO" if _panel_result.veto else ""))
@@ -702,7 +704,7 @@ class AITrader:
         # Phase 2 — Panel veto gate: Risk RED overrides directional trade to HOLD
         if _panel_result.veto and sig.action in ("BUY", "SELL"):
             sig = TradingSignal(
-                "HOLD", sig.confidence * 0.5, sig.strategy,
+                "HOLD", sig.confidence, sig.strategy,  # keep original confidence (W2)
                 f"Agent panel VETO: {_panel_result.veto}",
                 sig.stop_loss_pct, sig.take_profit_pct,
             )
@@ -760,7 +762,10 @@ class AITrader:
                 price=analysis.price,
             ))
 
-        self._signal_attribution = {**components, "chosen": chosen, "panel": self._last_panel}
+        self._signal_attribution = {
+            **components, "chosen": chosen,
+            "panel": self._last_panel.get(analysis.symbol, {}),  # symbol-keyed (W1)
+        }
         return final_sig
 
     # ── Trade execution ───────────────────────────────────────────────────

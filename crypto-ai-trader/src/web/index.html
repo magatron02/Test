@@ -1511,6 +1511,9 @@ md-circular-progress.spin-inline {
       <option value="dca">DCA</option>
       <option value="trend">Trend</option>
       <option value="mean_reversion">MeanRev</option>
+      <option value="ichimoku">Ichimoku</option>
+      <option value="smc">SMC</option>
+      <option value="grid">Grid</option>
     </select>
     <span class="ml-auto d-flex align-items-center gap-2">
       <button class="btn btn-link p-0" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark" style="color:var(--text-muted);font-size:0.95rem;line-height:1;text-decoration:none"><i class="bi bi-sun-fill" id="themeIcon"></i></button>
@@ -3377,6 +3380,55 @@ md-circular-progress.spin-inline {
           <button class="btn btn-primary btn-sm" onclick="saveNotifications()">
             <i class="bi bi-save me-1"></i>Save Notifications
           </button>
+        </div>
+      </div>
+
+      <!-- TradingView Webhook Card (Phase 3) -->
+      <div class="card mt-3" style="border-color:rgba(38,166,154,0.35)">
+        <div class="card-header d-flex justify-content-between align-items-center" style="background:rgba(38,166,154,0.06)">
+          <span><i class="bi bi-broadcast me-2" style="color:var(--teal)"></i>TradingView Webhook</span>
+          <button class="btn btn-outline-secondary btn-sm" style="font-size:0.65rem" onclick="refreshTvStatus()">↻ Status</button>
+        </div>
+        <div class="card-body" style="font-size:0.78rem">
+          <div class="mb-2 text-muted" style="font-size:0.7rem">
+            URL ใน TradingView Pine Script alert:
+          </div>
+          <div id="tvWebhookUrl" class="p-2 rounded mb-2" style="background:rgba(0,0,0,0.25);border:1px solid var(--border2);font-family:var(--font-mono);font-size:0.65rem;word-break:break-all;color:#5bc8ff">
+            http://&lt;server-ip&gt;:8888/api/webhook/tradingview
+          </div>
+          <div class="mb-2 text-muted" style="font-size:0.7rem">Alert Message format (JSON):</div>
+          <pre class="mb-2 p-2 rounded" style="background:rgba(0,0,0,0.25);border:1px solid var(--border2);font-size:0.62rem;color:#c084fc;overflow-x:auto">{"token":"{{strategy.order.action}}","action":"buy","symbol":"BTCUSDT","confidence":0.85}</pre>
+          <div class="mb-2">
+            <label class="form-label small mb-1">Secret Token (ตั้งใน settings.yml: notifications.tradingview_webhook_token)</label>
+            <input type="password" class="form-control form-control-sm mb-1" id="tvToken" placeholder="ปล่อยว่าง = ไม่มีการยืนยัน (local only)" disabled>
+          </div>
+          <div id="tvStatusPanel" class="p-2 rounded" style="background:rgba(0,0,0,0.2);border:1px solid var(--border2);min-height:36px;font-size:0.68rem">
+            <span class="text-muted">กด Status เพื่อตรวจสอบ alerts ล่าสุด</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Telegram Bot Commands Card (Phase 3) -->
+      <div class="card mt-3" style="border-color:rgba(41,182,246,0.3)">
+        <div class="card-header" style="background:rgba(41,182,246,0.05)">
+          <i class="bi bi-robot me-2" style="color:#29b6f6"></i>Telegram Bot Commands
+        </div>
+        <div class="card-body" style="font-size:0.76rem">
+          <div class="text-muted mb-2" style="font-size:0.7rem">
+            เปิดใช้ bot command โดยเพิ่ม <code>bot_enabled: true</code> ใน settings.yml<br>
+            ใช้ bot_token + chat_id เดียวกับ Notifications ด้านบน
+          </div>
+          <div class="p-2 rounded" style="background:rgba(0,0,0,0.2);border:1px solid var(--border2)">
+            <div style="color:#29b6f6;font-weight:600;margin-bottom:6px">Available Commands</div>
+            <div style="font-family:var(--font-mono);font-size:0.65rem;line-height:1.9;color:var(--text-muted)">
+              /status — สถานะ bot, regime, open trades<br>
+              /balance — ยอดพอร์ตและ daily PnL<br>
+              /positions — open positions ทั้งหมด<br>
+              /panel — Agent Panel consensus ล่าสุด<br>
+              /pause — <span style="color:#f87171">หยุดเทรดชั่วคราว (kill switch)</span><br>
+              /resume — <span style="color:#4ade80">เปิดเทรดอีกครั้ง</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -5367,6 +5419,36 @@ async function testNotifications() {
   }
 }
 
+// ── TradingView webhook status (Phase 3) ──────────────────────────────────────
+async function refreshTvStatus() {
+  const panel = document.getElementById('tvStatusPanel');
+  if (!panel) return;
+  panel.innerHTML = '<span class="text-muted" style="font-size:0.68rem">กำลังโหลด…</span>';
+  try {
+    const r = await fetch('/api/webhook/tradingview/status');
+    const d = await r.json();
+    if (!r.ok) { panel.innerHTML = `<span style="color:#f87171;font-size:0.68rem">${_escHtml(d.detail||r.statusText)}</span>`; return; }
+    const tokenOk = d.token_configured;
+    const events  = d.last_events || {};
+    const syms = Object.keys(events);
+    let html = `<div style="margin-bottom:5px;font-size:0.67rem">Token: ${tokenOk ? '<span style="color:#4ade80">✓ configured</span>' : '<span style="color:#facc15">⚠ not set (open)</span>'}</div>`;
+    if (!syms.length) { html += '<div style="color:var(--text-muted);font-size:0.67rem">ยังไม่มี alert เข้ามา</div>'; }
+    else {
+      html += syms.map(s => {
+        const ev = events[s];
+        const exColor = ev.executed ? '#4ade80' : '#facc15';
+        return `<div style="margin-bottom:4px;font-size:0.67rem">
+          <b>${_escHtml(s)}</b> — ${_escHtml(ev.action)} <span style="color:${exColor}">${ev.executed?'✓ executed':'⚠ not executed'}</span>
+          @ ${parseFloat(ev.price||0).toFixed(4)} · ${_escHtml(ev.strategy||'')} · ${_escHtml((ev.ts||'').replace('T',' ').slice(0,16))}
+        </div>`;
+      }).join('');
+    }
+    panel.innerHTML = html;
+  } catch(e) {
+    panel.innerHTML = `<span style="color:#f87171;font-size:0.68rem">${_escHtml(e.message)}</span>`;
+  }
+}
+
 document.getElementById('aiModelSelect').addEventListener('change', async (e) => {
   try {
     await fetch('/api/ai-model', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({model: e.target.value}) });
@@ -5861,14 +5943,22 @@ async function loadGranger(btn) {
 const _AP_AGENT_CLASS = { Technical: 'tech', Sentiment: 'sent', Risk: 'risk' };
 const _AP_VOTE_NORM   = v => (v||'').toLowerCase().replace(/\s+/g,'');
 
+const _escHtml = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
 async function fetchAgentPanel(btn) {
   if (btn) btn.style.opacity = '0.4';
   try {
-    const d = await fetch('/api/agents/panel').then(r => r.json());
+    const r = await fetch('/api/agents/panel');
+    const d = await r.json();
+    if (!r.ok) {
+      const b = document.getElementById('apBody');
+      if (b) b.innerHTML = `<div class="ap-empty-msg" style="color:#f87171">${_escHtml(d.detail || r.statusText)}</div>`;
+      return;
+    }
     renderAgentPanel(d);
   } catch(e) {
     const b = document.getElementById('apBody');
-    if (b) b.innerHTML = `<div class="ap-empty-msg" style="color:#f87171">${e.message}</div>`;
+    if (b) b.innerHTML = `<div class="ap-empty-msg" style="color:#f87171">${_escHtml(e.message)}</div>`;
   } finally {
     if (btn) btn.style.opacity = '';
   }
@@ -5899,11 +5989,11 @@ function renderAgentPanel(d) {
     const cls2   = _AP_AGENT_CLASS[v.agent] || 'tech';
     const vcls   = _AP_VOTE_NORM(v.vote);
     const pct    = Math.round((v.confidence || 0) * 100);
-    const sigs   = (v.signals || []).join(' · ') || '—';
+    const sigs   = (v.signals || []).map(_escHtml).join(' · ') || '—';  // escape (S1)
     return `<div class="ap-agent-col">
-      <div class="ap-agent-label ap-${cls2}">${v.agent}</div>
+      <div class="ap-agent-label ap-${cls2}">${_escHtml(v.agent)}</div>
       <div class="ap-vote-row">
-        <span class="ap-vote-badge ${vcls}">${v.vote}</span>
+        <span class="ap-vote-badge ${vcls}">${_escHtml(v.vote)}</span>
         <div class="ap-bar-wrap"><div class="ap-bar ${cls2}" style="width:${pct}%"></div></div>
         <span class="ap-conf">${pct}%</span>
       </div>
