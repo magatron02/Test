@@ -13,7 +13,7 @@
 <style>
 :root{
   --bg:#060708; --deep:#030304;
-  --glass:rgba(255,255,255,0.055); --glass2:rgba(255,255,255,0.03);
+  --glass:rgba(255,255,255,0.07); --glass2:rgba(255,255,255,0.03);
   --hi:rgba(255,255,255,0.13);
   --bd:rgba(255,255,255,0.10); --bd2:rgba(255,255,255,0.055);
   --tx:rgba(255,255,255,0.95); --tm:rgba(255,255,255,0.64); --td:rgba(255,255,255,0.46);
@@ -122,7 +122,7 @@ section.band{padding:clamp(70px,9vw,120px) 0;position:relative;z-index:1}
 /* glass card base */
 .glass{
   position:relative;background:var(--glass);border:1px solid var(--bd);border-radius:22px;
-  backdrop-filter:blur(15px) saturate(140%);-webkit-backdrop-filter:blur(15px) saturate(140%);
+  backdrop-filter:blur(21px) saturate(140%);-webkit-backdrop-filter:blur(21px) saturate(140%);
   box-shadow:inset 0 1px 0 var(--hi),0 18px 44px rgba(0,0,0,.42);overflow:hidden;
 }
 .glass::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(180deg,rgba(255,255,255,.07) 0%,transparent 24%)}
@@ -250,9 +250,9 @@ footer{position:relative;z-index:1;border-top:1px solid var(--bd2);margin-top:cl
         </defs>
         <g stroke="rgba(255,255,255,0.10)" stroke-width="1" fill="none">
           <path d="M180,250 C360,210 460,300 600,360"/>
-          <path d="M1020,230 C860,210 720,300 600,360"/>
+          <path d="M950,225 C840,215 710,300 600,360"/>
           <path d="M210,540 C360,520 470,440 600,360"/>
-          <path d="M1010,560 C860,520 740,430 600,360"/>
+          <path d="M950,565 C840,530 730,430 600,360"/>
           <path d="M600,360 L600,150"/>
         </g>
         <!-- nodes -->
@@ -262,20 +262,20 @@ footer{position:relative;z-index:1;border-top:1px solid var(--bd2);margin-top:cl
             <text x="18" y="-2" fill="rgba(255,255,255,0.85)">Binance</text>
             <text x="18" y="15" fill="rgba(255,255,255,0.4)">BTC · ETH</text>
           </g>
-          <g transform="translate(1020,230)">
+          <g transform="translate(950,225)">
             <circle r="5" fill="#34d399"/><circle r="14" fill="none" stroke="rgba(52,211,153,0.3)"/>
-            <text x="18" y="-2" fill="rgba(255,255,255,0.85)">OKX</text>
-            <text x="18" y="15" fill="rgba(255,255,255,0.4)">SOL · BNB</text>
+            <text x="-18" y="-2" text-anchor="end" fill="rgba(255,255,255,0.85)">OKX</text>
+            <text x="-18" y="15" text-anchor="end" fill="rgba(255,255,255,0.4)">SOL · BNB</text>
           </g>
           <g transform="translate(210,540)">
             <circle r="5" fill="#9db8b0"/><circle r="14" fill="none" stroke="rgba(157,184,176,0.3)"/>
             <text x="18" y="-2" fill="rgba(255,255,255,0.85)">Bitkub</text>
             <text x="18" y="15" fill="rgba(255,255,255,0.4)">THB pairs</text>
           </g>
-          <g transform="translate(1010,560)">
+          <g transform="translate(950,565)">
             <circle r="5" fill="#c4b5fd"/><circle r="14" fill="none" stroke="rgba(196,181,253,0.3)"/>
-            <text x="18" y="-2" fill="rgba(255,255,255,0.85)">SET</text>
-            <text x="18" y="15" fill="rgba(255,255,255,0.4)">Thai equities</text>
+            <text x="-18" y="-2" text-anchor="end" fill="rgba(255,255,255,0.85)">SET</text>
+            <text x="-18" y="15" text-anchor="end" fill="rgba(255,255,255,0.4)">Thai equities</text>
           </g>
         </g>
         <!-- central AI core -->
