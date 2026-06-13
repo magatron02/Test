@@ -35,6 +35,8 @@ GBM_FEATURE_KEYS = [
     "wq_alpha101", "wq_mom_5", "wq_mom_10", "wq_vol_zscore", "wq_close_to_high",
     # Microstructure features (F-MICRO)
     "book_imbalance", "whale_bid", "whale_ask", "twap_detected", "twap_score",
+    # Phase 1 — Macro sentiment (historical F&G + funding; default 0.0 if unavailable)
+    "fng_value", "fng_momentum", "funding_rate_hist",
 ]
 
 

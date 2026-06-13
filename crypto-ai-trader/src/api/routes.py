@@ -230,6 +230,41 @@ async def ml_feature_importance():
         return {"model_type": "none", "features": [], "error": str(e)}
 
 
+@router.get("/ml/granger")
+async def ml_granger(symbol: Optional[str] = None, max_lag: int = 3):
+    """Granger causality: which features statistically predict price returns?
+
+    Tests each GBM feature using statsmodels F-test (ssr_ftest).
+    Returns features sorted by p-value (most predictive first).
+    """
+    try:
+        from ..agent.granger_analyzer import run_granger_tests, load_records_for_symbol
+        from ..agent.trainer import GBM_FEATURE_KEYS
+
+        records = load_records_for_symbol(symbol=symbol, limit=800)
+        n = len(records)
+        if n < 30:
+            return {
+                "symbol": symbol or "all", "n_samples": n,
+                "tests": [], "error": f"insufficient data ({n} samples, need 30+)",
+            }
+
+        tests = run_granger_tests(records, GBM_FEATURE_KEYS, max_lag=min(max_lag, 5))
+        n_sig = sum(1 for t in tests if t["significant"])
+        return {
+            "symbol": symbol or "all",
+            "n_samples": n,
+            "n_features_tested": len(tests),
+            "n_significant": n_sig,
+            "alpha": 0.05,
+            "max_lag": max_lag,
+            "tests": tests[:25],
+        }
+    except Exception as exc:
+        logger.warning("ml_granger error: %s", exc)
+        return {"error": str(exc), "tests": []}
+
+
 @router.get("/portfolio/hrp")
 async def portfolio_hrp():
     """Hierarchical Risk Parity weights across tracked symbols (ML4T Ch.13)."""

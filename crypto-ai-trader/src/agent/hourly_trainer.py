@@ -111,13 +111,28 @@ class HourlyTrainer:
             async with aiohttp.ClientSession(
                 timeout=aiohttp.ClientTimeout(total=30)
             ) as session:
+                # Phase 1 — fetch macro-sentiment history once per run (free APIs)
+                fng_hist: dict = {}
+                funding_hist: dict = {}
+                try:
+                    from ..data.historical_sentiment import (
+                        fetch_historical_fng, fetch_historical_funding,
+                    )
+                    fng_hist = await fetch_historical_fng(session)
+                    funding_hist = await fetch_historical_funding(session, "BTCUSDT")
+                except Exception as _se:
+                    logger.debug("HourlyTrainer: sentiment fetch skipped — %s", _se)
+
                 for sym in symbols:
                     try:
                         candles = await self._fetch_klines(session, sym)
                         if len(candles) < LOOKAHEAD + 10:
                             continue
                         sym_bars: list = []
-                        added = self._label_and_store(sym, candles, bars_out=sym_bars)
+                        added = self._label_and_store(
+                            sym, candles, bars_out=sym_bars,
+                            fng_hist=fng_hist, funding_hist=funding_hist,
+                        )
                         if sym_bars:
                             buf = self._opt_bars.setdefault(sym, [])
                             buf.extend(sym_bars)
@@ -221,9 +236,11 @@ class HourlyTrainer:
         return candles
 
     def _label_and_store(
-        self, symbol: str, candles: List[OHLCV], bars_out: Optional[list] = None
+        self, symbol: str, candles: List[OHLCV], bars_out: Optional[list] = None,
+        fng_hist: Optional[dict] = None, funding_hist: Optional[dict] = None,
     ) -> int:
         from .market_analyzer import analyze
+        from ..data.historical_sentiment import fng_for_candle, funding_for_candle
 
         added = 0
         db = SessionLocal()
@@ -280,6 +297,16 @@ class HourlyTrainer:
 
                 features = dict(analysis.features)
                 features["_ts_key"] = ts_key   # dedup key
+
+                # Phase 1 — inject macro-sentiment features (no look-ahead)
+                if fng_hist:
+                    fng_val, fng_mom = fng_for_candle(fng_hist, candle.timestamp)
+                    features["fng_value"]    = fng_val
+                    features["fng_momentum"] = fng_mom
+                if funding_hist:
+                    features["funding_rate_hist"] = funding_for_candle(
+                        funding_hist, candle.timestamp
+                    )
 
                 record = TrainingRecord(
                     symbol=symbol,
